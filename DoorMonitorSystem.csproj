@@ -1,0 +1,50 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows7.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <LangVersion>preview</LangVersion>
+    <ApplicationIcon>Assets\Images\logo.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Assets\Images\bg.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\Images\logo.ico" />
+  </ItemGroup>
+ 
+
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.1.66" />
+    <PackageReference Include="Extended.Wpf.Toolkit" Version="4.7.25104.5739" />
+    <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.135" />
+    <PackageReference Include="MySql.Data" Version="9.3.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Sharp7" Version="1.1.84" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\Images\bg.png" />
+    <Resource Include="Assets\Images\优迈LOGO.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Communication.Protocol\Communication.Protocol.csproj" />
+    <ProjectReference Include="..\Communicationlib\Communicationlib.csproj" />
+    <ProjectReference Include="..\ControlLibrary\ControlLibrary.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="UControl\InputDialog.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="UControl\DoorControl.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,153 @@
+﻿<UserControl  x:Class="DoorMonitorSystem.Views.DevvarlistView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:DoorMonitorSystem.Views"
+        xmlns:dc ="clr-namespace:DoorMonitorSystem.ViewModels"
+        xmlns:sys="clr-namespace:System;assembly=mscorlib"
+        xmlns:sharp7="clr-namespace:Sharp7;assembly=Sharp7" 
+        xmlns:USC="clr-namespace:ControlLibrary;assembly=ControlLibrary"
+        xmlns:Converter="clr-namespace:DoorMonitorSystem.Assets.Converter"
+        mc:Ignorable="d"    >
+    <UserControl.DataContext>
+        <dc:DevvarlistViewModel/> 
+    </UserControl.DataContext>
+    <UserControl.Resources>
+        <Converter:DictIdToNameConverter x:Key="DictIdToNameConverter" />
+        <Converter:S7WordLengthConverter  x:Key="S7WordLengthConverter" />
+        <ObjectDataProvider x:Key="S7WordLengthValues"
+                            MethodName="GetValues"
+                            ObjectType="{x:Type sys:Enum}">
+            <ObjectDataProvider.MethodParameters>
+                <x:Type TypeName="sharp7:S7WordLength"/>
+            </ObjectDataProvider.MethodParameters>
+        </ObjectDataProvider>
+    </UserControl.Resources>
+    <Grid Margin="10"  >
+        <Grid.RowDefinitions> 
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition/>
+        </Grid.RowDefinitions>
+        <StackPanel  Orientation="Horizontal"  Margin="0,5,0,10">
+
+            <StackPanel>
+                <TextBlock Text="设备选择" FontSize="12"  Width="100"/>
+                <ComboBox/>
+            </StackPanel>
+           
+ 
+
+
+        </StackPanel>
+        
+        <!-- 输入配置栏 -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10" HorizontalAlignment="Left" VerticalAlignment="Top">
+
+            <!-- 设备ID -->
+            <StackPanel Margin="5,0" Orientation="Vertical">
+                <TextBlock Text="设备号" FontSize="12"/>
+                <TextBox Width="50"   VerticalAlignment="Center"  HorizontalContentAlignment="Center"  Text="{Binding NewPoint.Devid}" />
+            </StackPanel>
+
+            <!-- 点位描述 -->
+            <StackPanel Margin="5,0" Orientation="Vertical">
+                <TextBlock Text="点位描述" FontSize="12"/>
+                <TextBox Width="120" Text="{Binding NewPoint.Description}" />
+            </StackPanel>
+
+            <!-- DB号 -->
+            <StackPanel Margin="5,0" Orientation="Vertical">
+                <TextBlock Text="DB号" FontSize="12"/>
+                <TextBox Width="50" Text="{Binding NewPoint.DBNumber}" />
+            </StackPanel>
+
+            <!-- 地址 -->
+            <StackPanel Margin="5,0" Orientation="Vertical">
+                <TextBlock Text="地址" FontSize="12"/>
+                <TextBox Width="60" Text="{Binding NewPoint.Address}" />
+            </StackPanel>
+
+            <!-- 位偏移 -->
+            <StackPanel Margin="5,0" Orientation="Vertical">
+                <TextBlock Text="位偏移" FontSize="12"/>
+                <TextBox Width="50" Text="{Binding NewPoint.BitOffset}" />
+            </StackPanel>
+
+            <!-- 数据类型 -->
+            <StackPanel Margin="5,0" Orientation="Vertical">
+                <TextBlock Text="数据类型" FontSize="12"/>
+                <ComboBox Width="90" ItemsSource="{Binding Source={StaticResource S7WordLengthValues}}"    SelectedIndex="{Binding  NewPoint.VarType, Mode=TwoWay}"      />
+            </StackPanel>
+
+            <!-- 报警提示 -->
+            <StackPanel Margin="5,0" Orientation="Vertical">
+                <TextBlock Text="报警提示" FontSize="12"/>
+                <ComboBox Width="100" ItemsSource="{Binding AlarmModes}" SelectedIndex="{Binding NewPoint.IsAlarm, Mode=TwoWay}" />
+            </StackPanel>
+
+            <!-- 记录等级（含不记录） -->
+            <StackPanel Margin="5,0" Orientation="Vertical">
+                <TextBlock Text="记录等级" FontSize="12"/>
+                <ComboBox Width="80" ItemsSource="{Binding RecordLevels}"   SelectedIndex="{Binding NewPoint.RecordLevel, Mode=TwoWay}" />
+            </StackPanel>
+
+            <!-- Bool状态描述 -->
+            <StackPanel Margin="5,0" Orientation="Vertical">
+                <TextBlock Text="高位描述" FontSize="12"/>
+                <ComboBox Width="80" ItemsSource="{Binding BitStauts}" SelectedItem="{Binding NewPoint.BitHigh}" />
+               
+            </StackPanel>
+            <!-- Bool状态描述 -->
+            <StackPanel Margin="5,0" Orientation="Vertical">
+                <TextBlock Text="低位描述" FontSize="12"/>
+                <ComboBox Width="80" ItemsSource="{Binding BitStauts}" SelectedItem="{Binding NewPoint.BitLow}" />
+            </StackPanel>
+
+            <!-- 关联数据 -->
+            <StackPanel Margin="5,0" Orientation="Vertical">
+                <TextBlock Text="关联点位" FontSize="12"/>
+                <TextBox Width="80" Text="{Binding NewPoint.ModbusAddress}"   />
+            </StackPanel>
+
+            <!-- 关联UI -->
+            <StackPanel Margin="5,0" Orientation="Vertical">
+                <TextBlock Text="关联UI" FontSize="12"/>
+                <TextBox Width="250" Text="{Binding  SelectedPath.FullPath}"   />
+            </StackPanel>
+
+            <USC:TreeComboBox ItemsSource="{Binding PathTreeList}"  Height="20" FontSize="15"
+                              Command="{Binding ScanPathCommand}"
+                   SelectedItem="{Binding SelectedPath, Mode=TwoWay}" />
+
+            <!-- 添加按钮 -->
+            <Button   Content="添加" Width="80" Height="30" HorizontalAlignment="Left" Margin="5"
+           Command="{Binding AddPointCommand}" />
+
+        </StackPanel>
+ 
+        <!-- 显示配置表 -->
+        <DataGrid Grid.Row="2" ItemsSource="{Binding PointList}" AutoGenerateColumns="False"
+                  CanUserAddRows="False" Margin="0,10,0,0" IsReadOnly="False">
+            <DataGrid.Columns   >
+                <DataGridTextColumn Header="序号" Binding="{Binding  PointId}" Width="150" />
+                <DataGridTextColumn Header="点位描述" Binding="{Binding Description}" Width="150" />
+                <DataGridTextColumn Header="DB号" Binding="{Binding DBNumber}" Width="60"/>
+                <DataGridTextColumn Header="地址" Binding="{Binding Address}" Width="60"/>
+                <DataGridTextColumn Header="位偏移" Binding="{Binding BitOffset}" Width="60"/>
+
+                <DataGridTextColumn Header="数据类型" Binding="{Binding VarType, Converter={StaticResource S7WordLengthConverter}}" Width="80" />
+                <!--<DataGridTextColumn Header="数据类型" Binding="{Binding VarType}" Width="80"/>-->
+                <DataGridTextColumn Header="报警提示" Binding="{Binding IsAlarm, Converter={StaticResource DictIdToNameConverter}, ConverterParameter=AlarmMode}"  />
+                <DataGridTextColumn Header="记录等级" Binding="{Binding RecordLevel, Converter={StaticResource DictIdToNameConverter}, ConverterParameter=RecordLevel}"  />
+                <!--<DataGridTextColumn Header="报警提示" Binding="{Binding IsAlarm}" Width="100"/>-->
+                <!--<DataGridTextColumn Header="记录等级" Binding="{Binding RecordLevel}" Width="80"/>-->
+                <DataGridTextColumn Header="高位描述" Binding="{Binding  BitHigh}" Width="160"/>
+                <DataGridTextColumn Header="低位描述" Binding="{Binding  BitLow}" Width="160"/>
+                <DataGridTextColumn Header="关联点位" Binding="{Binding  ModbusAddress}" Width="160"/>
+                <DataGridTextColumn Header="关联UI" Binding="{Binding  UiBinding}" />
+            </DataGrid.Columns>
+        </DataGrid>
+     </Grid>
+</UserControl>

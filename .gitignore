@@ -1,0 +1,21 @@
+## .NET/WPF Project .gitignore 
+ 
+# Build results 
+[Dd]ebug/ 
+[Rr]elease/ 
+bin/ 
+obj/ 
+ 
+# Visual Studio 
+.vs/ 
+*.user 
+*.suo 
+*.cache 
+ 
+# Backup files 
+*.backup.json 
+*_wpftmp.* 
+ 
+# NuGet 
+packages/ 
+*.nupkg

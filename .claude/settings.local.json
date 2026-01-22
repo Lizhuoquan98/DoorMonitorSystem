@@ -1,0 +1,15 @@
+{
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "allow": [
+      "Bash(npm update -g @google/gemini-cli)",
+      "Bash(gemini:*)",
+      "Bash(pwd:*)",
+      "Edit",
+      "Bash(del:*)",
+      "Read(E:\\VS2022\\WPF\\ControlLibrary\\BitControl.xaml)",
+      "Bash(dir:*)",
+      "mcp__acp__Bash"
+    ]
+  }
+}
