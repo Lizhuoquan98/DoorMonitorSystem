@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 
@@ -20,11 +21,12 @@ namespace DoorMonitorSystem.ViewModels
     /// </summary>
     public class DeployViewModel : NotifyPropertyChanged
     {
+        #region 字段和属性
+
         /// <summary>
         /// 所有设备配置集合
         /// </summary>
         private ObservableCollection<ConfigEntity> _devices = [];
-
 
         public ObservableCollection<ConfigEntity> Devices
         {
@@ -38,17 +40,6 @@ namespace DoorMonitorSystem.ViewModels
 
         public ObservableCollection<string> ProtocolKeys { get; set; } = [];
 
-        //private string? _selectedProtocolKey;
-        //public string? SelectedProtocolKey
-        //{
-        //    get => _selectedProtocolKey;
-        //    set
-        //    {
-        //        _selectedProtocolKey = value;
-        //        OnPropertyChanged( );
-        //        // 可以在这里触发 protocol 变更逻辑
-        //    }
-        //}
         private ConfigEntity? _selectedDevice = new ConfigEntity();
 
         /// <summary>
@@ -61,8 +52,14 @@ namespace DoorMonitorSystem.ViewModels
             {
                 _selectedDevice = value?.Clone();
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(IsDeviceSelected));
             }
         }
+
+        /// <summary>
+        /// 是否有选中的设备（用于UI绑定）
+        /// </summary>
+        public bool IsDeviceSelected => SelectedDevice != null && SelectedDeviceIndex >= 0;
 
         private int _selectedDeviceIndex = -1;
         public int SelectedDeviceIndex
@@ -74,11 +71,10 @@ namespace DoorMonitorSystem.ViewModels
                 {
                     _selectedDeviceIndex = value;
                     OnPropertyChanged();
+                    OnPropertyChanged(nameof(IsDeviceSelected));
                 }
             }
         }
-
-        private bool addDevice=false;
 
         private int _selectedProtocolIndex = -1;
         public int SelectedProtocolIndex
@@ -89,17 +85,16 @@ namespace DoorMonitorSystem.ViewModels
                 if (_selectedProtocolIndex != value)
                 {
                     _selectedProtocolIndex = value;
-                    if (_selectedProtocolIndex>=0 && addDevice)
+                    OnPropertyChanged();
+
+                    // 当协议变更时，更新参数列表
+                    if (_selectedProtocolIndex >= 0 && SelectedDevice != null)
                     {
-                        addDevice = false;
-                        //SelectedDevice.CommParsams= GetProtocolConfig( GlobalData.ProtocolsPairs[ProtocolKeys[_selectedProtocolIndex]].GetType());
-                   
+                        UpdateDeviceParameters();
                     }
-                   
                 }
             }
         }
-
 
         private int _selectedParaIndex = -1;
         public int SelectedparaIndex
@@ -110,37 +105,85 @@ namespace DoorMonitorSystem.ViewModels
                 if (_selectedParaIndex != value)
                 {
                     _selectedParaIndex = value;
-
                     OnPropertyChanged();
                 }
             }
         }
+
+        /// <summary>
+        /// 连接测试状态消息
+        /// </summary>
+        private string _testStatusMessage = "";
+        public string TestStatusMessage
+        {
+            get => _testStatusMessage;
+            set
+            {
+                _testStatusMessage = value;
+                OnPropertyChanged();
+            }
+        }
+
+        /// <summary>
+        /// 是否正在测试连接
+        /// </summary>
+        private bool _isTesting = false;
+        public bool IsTesting
+        {
+            get => _isTesting;
+            set
+            {
+                _isTesting = value;
+                OnPropertyChanged();
+            }
+        }
+
+        #endregion
+
+        #region 命令
+
         /// <summary>
         /// 添加设备命令
         /// </summary>
         public ICommand AddDeviceCommand => new RelayCommand(_ =>
         {
-            
-            SelectedDevice = new ConfigEntity();
-            Devices.Add(SelectedDevice);
+            var newDevice = new ConfigEntity
+            {
+                Name = $"新设备 {Devices.Count + 1}",
+                ID = Devices.Count + 1,
+                Protocol = ProtocolKeys.FirstOrDefault() ?? "",
+                CommParsams = []
+            };
 
+            Devices.Add(newDevice);
+            SelectedDeviceIndex = Devices.Count - 1;
+            SelectedDevice = newDevice;
         });
 
         /// <summary>
-        /// 添加参数命令（针对当前选中的设备）
+        /// 删除设备命令
         /// </summary>
-        public ICommand AddParamCommand => new RelayCommand(_ =>
+        public ICommand DeleteDeviceCommand => new RelayCommand(_ =>
         {
-            if (Devices == null || SelectedDeviceIndex == -1) return;
-            Devices[SelectedDeviceIndex].CommParsams.Add(new CommParamEntity
+            if (SelectedDeviceIndex < 0 || SelectedDeviceIndex >= Devices.Count)
             {
-                Name = "New Parameter",
-                Value = "Default Value"
-            });
-            SelectedDevice = Devices[SelectedDeviceIndex].Clone();
+                MessageBox.Show("请先选择要删除的设备！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var result = MessageBox.Show(
+                $"确定要删除设备 \"{SelectedDevice?.Name}\" 吗？",
+                "确认删除",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                Devices.RemoveAt(SelectedDeviceIndex);
+                SelectedDevice = Devices.FirstOrDefault();
+                SelectedDeviceIndex = Devices.Any() ? 0 : -1;
+            }
         });
-
-
 
         /// <summary>
         /// 保存命令，将 Devices 集合保存为 JSON 文件
@@ -148,42 +191,53 @@ namespace DoorMonitorSystem.ViewModels
         public ICommand SaveCommand => new RelayCommand(SaveToJson);
 
         /// <summary>
+        /// 测试连接命令
+        /// </summary>
+        public ICommand TestConnectionCommand => new RelayCommand(async _ => await TestConnection());
+
+        #endregion
+
+        #region 构造函数
+
+        /// <summary>
         /// 构造函数，自动加载配置文件
         /// </summary>
         public DeployViewModel()
         {
             LoadFromJson();
-            ProtocolKeys.Clear();
-            //foreach (var key in GlobalData.ProtocolsPairs.Keys)
-            //{
-            //    ProtocolKeys.Add(key);
-            //}
+            LoadProtocolKeys();
         }
 
-        public static List<CommParamEntity> GetProtocolConfig(Type pluginType)
+        #endregion
+
+        #region 私有方法
+
+        /// <summary>
+        /// 加载协议列表
+        /// </summary>
+        private void LoadProtocolKeys()
         {
-            
+            ProtocolKeys.Clear();
 
-            // 扫描所有实例属性（public + non-public），如果你只想公开属性改为 BindingFlags.Public | Instance
-            var props = pluginType.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            var list = new List<CommParamEntity>();
-
-            foreach (var prop in props)
-            {
-                // 查找我们定义的特性（注意命名空间）
-                var attr = prop.GetCustomAttribute<ProtocolConfigAttribute>();
-                if (attr == null) continue;
-
-                list.Add(new CommParamEntity
-                { 
-                    Name = attr.DisplayName,
-                });
-            }
-            return list;
+            // TODO: 从 GlobalData.ProtocolsPairs 加载协议列表
+            // 暂时添加示例协议
+            ProtocolKeys.Add("S7-1200");
+            ProtocolKeys.Add("S7-1500");
+            ProtocolKeys.Add("Modbus TCP");
+            ProtocolKeys.Add("OPC UA");
         }
 
+        /// <summary>
+        /// 更新设备参数列表（根据协议特性生成）
+        /// </summary>
+        private void UpdateDeviceParameters()
+        {
+            if (SelectedDevice == null || _selectedProtocolIndex < 0) return;
 
-
+            // TODO: 根据协议类型，使用反射获取特性标记的参数
+            // var protocolType = GlobalData.ProtocolsPairs[ProtocolKeys[_selectedProtocolIndex]].GetType();
+            // SelectedDevice.CommParsams = new ObservableCollection<CommParamEntity>(GetProtocolConfig(protocolType));
+        }
 
         /// <summary>
         /// 从 JSON 文件加载设备配置
@@ -200,31 +254,119 @@ namespace DoorMonitorSystem.ViewModels
                     {
                         Devices = new ObservableCollection<ConfigEntity>(list);
                         SelectedDevice = Devices.FirstOrDefault();
-
+                        if (Devices.Any())
+                        {
+                            SelectedDeviceIndex = 0;
+                        }
                     }
                 }
             }
             catch (Exception ex)
             {
-
-                MessageBox.Show(ex.Message);
+                MessageBox.Show($"加载配置文件失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
-
         }
 
         /// <summary>
         /// 将设备配置保存为 JSON 文件
         /// </summary>
-        /// <param name="obj">未使用，可为 null</param>
         private void SaveToJson(object obj)
         {
-            if (SelectedDevice == null || SelectedDeviceIndex < 0 || SelectedDeviceIndex >= Devices.Count)
+            try
             {
-                return; // 无效的设备索引或设备列表
+                if (SelectedDevice == null || SelectedDeviceIndex < 0 || SelectedDeviceIndex >= Devices.Count)
+                {
+                    // 直接保存整个列表
+                    ConvertDataToJsoncs.SaveDataToJson(Devices, "Config/devices.json");
+                    MessageBox.Show("配置保存成功！", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                // 更新当前选中的设备
+                Devices[SelectedDeviceIndex] = SelectedDevice;
+                ConvertDataToJsoncs.SaveDataToJson(Devices, "Config/devices.json");
+                MessageBox.Show("配置保存成功！", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
             }
-            Devices[SelectedDeviceIndex] = SelectedDevice;
-            addDevice = true;
-            ConvertDataToJsoncs.SaveDataToJson(Devices, "Config/devices.json");
+            catch (Exception ex)
+            {
+                MessageBox.Show($"保存配置失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
+
+        /// <summary>
+        /// 测试设备连接
+        /// </summary>
+        private async Task TestConnection()
+        {
+            if (SelectedDevice == null)
+            {
+                TestStatusMessage = "❌ 请先选择要测试的设备！";
+                return;
+            }
+
+            IsTesting = true;
+            TestStatusMessage = "🔄 正在测试连接...";
+
+            try
+            {
+                // 模拟连接测试（延迟1秒）
+                await Task.Delay(1000);
+
+                // TODO: 实际的连接测试逻辑
+                // 根据协议类型创建通信对象并测试连接
+                // var comm = GlobalData.ProtocolsPairs[SelectedDevice.Protocol];
+                // bool isConnected = await comm.TestConnection(SelectedDevice.CommParsams);
+
+                // 模拟测试结果
+                bool isConnected = new Random().Next(0, 2) == 1;
+
+                if (isConnected)
+                {
+                    TestStatusMessage = $"✅ 设备 \"{SelectedDevice.Name}\" 连接成功！";
+                }
+                else
+                {
+                    TestStatusMessage = $"❌ 设备 \"{SelectedDevice.Name}\" 连接失败！";
+                }
+            }
+            catch (Exception ex)
+            {
+                TestStatusMessage = $"❌ 连接测试异常: {ex.Message}";
+            }
+            finally
+            {
+                IsTesting = false;
+            }
+        }
+
+        #endregion
+
+        #region 静态方法
+
+        /// <summary>
+        /// 根据协议类型获取参数配置（通过反射读取特性）
+        /// </summary>
+        public static List<CommParamEntity> GetProtocolConfig(Type pluginType)
+        {
+            // 扫描所有实例属性（public + non-public），如果你只想公开属性改为 BindingFlags.Public | Instance
+            var props = pluginType.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var list = new List<CommParamEntity>();
+
+            foreach (var prop in props)
+            {
+                // 查找我们定义的特性（注意命名空间）
+                var attr = prop.GetCustomAttribute<ProtocolConfigAttribute>();
+                if (attr == null) continue;
+
+                list.Add(new CommParamEntity
+                {
+                    Name = attr.DisplayName,
+                    Value = "" // 默认值为空
+                });
+            }
+            return list;
+        }
+
+        #endregion
     }
 }

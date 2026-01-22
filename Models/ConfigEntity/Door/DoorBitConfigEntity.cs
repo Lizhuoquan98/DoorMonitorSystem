@@ -19,6 +19,9 @@ namespace DoorMonitorSystem.Models.ConfigEntity.Door
         [Required, StringLength(100)]
         public string Description { get; set; } = "";
 
+        /// <summary>点位分类ID（关联 BitCategory 表，用于弹窗分栏显示）</summary>
+        public int? CategoryId { get; set; }
+
         /// <summary>头部显示优先级</summary>
         public int HeaderPriority { get; set; }
 

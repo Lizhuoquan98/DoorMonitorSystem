@@ -33,91 +33,91 @@ namespace DoorMonitorSystem.Assets.Database
             // 从数据库加载数据
             GetSqlData();
 
-            //{
-            //    //var dllPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Communication.Protocol.dll");
-            //    //var comm = ProtocolLoader.LoadAllProtocols(dllPath);
-            //    // 获取插件所在文件夹（假设 Communication.Protocol.dll 就在这个目录下）
-            //    var pluginFolder = AppDomain.CurrentDomain.BaseDirectory;
+            {
+                //var dllPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Communication.Protocol.dll");
+                //var comm = ProtocolLoader.LoadAllProtocols(dllPath);
+                // 获取插件所在文件夹（假设 Communication.Protocol.dll 就在这个目录下）
+                var pluginFolder = AppDomain.CurrentDomain.BaseDirectory;
 
-            //    // 加载所有插件
-            //    GlobalData.ProtocolsPairs = ProtocolLoader.LoadAllProtocols(pluginFolder);
-            //    if (GlobalData.ProtocolsPairs is null)
-            //        return;
-            //    var protocols = GlobalData.ProtocolsPairs;
+                // 加载所有插件
+                GlobalData.ProtocolsPairs = ProtocolLoader.LoadAllProtocols(pluginFolder);
+                if (GlobalData.ProtocolsPairs is null)
+                    return;
+                var protocols = GlobalData.ProtocolsPairs;
 
-            //    foreach (var dev in GlobalData.ListDveices)
-            //    {
-            //        if (!protocols.TryGetValue(dev.Protocol, out var protocol))
-            //        {
-            //            Debug.WriteLine($"设备 {dev.Name} 找不到协议 {dev.Protocol}");
-            //            continue;
-            //        }
-            //        protocol.Initialize(dev.CommParsams);
-            //        try
-            //        {
-            //            protocol.Open();
-            //            if (!protocol.IsConnected)
-            //                continue;
-            //            Debug.WriteLine($"{dev.Name} 协议 {dev.Protocol} 打开成功");
-            //            // 启动一个独立任务，专门执行协议方法调度
-            //            _ = Task.Run(async () =>
-            //            {
-            //                var methods = protocol.GetSupportedMethods();
-            //                // 每个方法各自执行
-            //                var tasks = new List<Task>();
+                foreach (var dev in GlobalData.ListDveices)
+                {
+                    if (!protocols.TryGetValue(dev.Protocol, out var protocol))
+                    {
+                        Debug.WriteLine($"设备 {dev.Name} 找不到协议 {dev.Protocol}");
+                        continue;
+                    }
+                    protocol.Initialize(dev.CommParsams);
+                    try
+                    {
+                        protocol.Open();
+                        if (!protocol.IsConnected)
+                            continue;
+                        Debug.WriteLine($"{dev.Name} 协议 {dev.Protocol} 打开成功");
+                        // 启动一个独立任务，专门执行协议方法调度
+                        _ = Task.Run(async () =>
+                        {
+                            var methods = protocol.GetSupportedMethods();
+                            // 每个方法各自执行
+                            var tasks = new List<Task>();
 
-            //                // Startup 模式执行一次
-            //                foreach (var m in methods.Values.Where(m => m.Mode == ExecutionMode.Startup))
-            //                {
-            //                    _ = Task.Run(async () =>
-            //                    {
-            //                        try { await m.InvokeAsync(); }
-            //                        catch (Exception ex) { Debug.WriteLine($"Startup {m.Name} error: {ex.Message}"); }
-            //                    });
-            //                }
-            //                foreach (var pair in methods)
-            //                {
-            //                    var method = pair.Value;
-            //                    if (method.Mode == ExecutionMode.Polling)
-            //                    {
-            //                        tasks.Add(Task.Run(async () =>
-            //                        {
-            //                            while (protocol.IsConnected && method.Enabled)
-            //                            {
-            //                                try
-            //                                {
-            //                                    var req = (addr: (ushort)1, count: (ushort)5);
-            //                                    var result = await method.InvokeAsync(req);
-            //                                    method.IntervalMs = 100;
-            //                                    if (result is ushort[] words)
-            //                                    {
-            //                                        // 调用业务分发
-            //                                        //  GlobalData.UpdateDeviceValues(dev.ID, words);
-            //                                    }
+                            // Startup 模式执行一次
+                            foreach (var m in methods.Values.Where(m => m.Mode == ExecutionMode.Startup))
+                            {
+                                _ = Task.Run(async () =>
+                                {
+                                    try { await m.InvokeAsync(); }
+                                    catch (Exception ex) { Debug.WriteLine($"Startup {m.Name} error: {ex.Message}"); }
+                                });
+                            }
+                            foreach (var pair in methods)
+                            {
+                                var method = pair.Value;
+                                if (method.Mode == ExecutionMode.Polling)
+                                {
+                                    tasks.Add(Task.Run(async () =>
+                                    {
+                                        while (protocol.IsConnected && method.Enabled)
+                                        {
+                                            try
+                                            {
+                                                var req = (addr: (ushort)1, count: (ushort)5);
+                                                var result = await method.InvokeAsync(req);
+                                                method.IntervalMs = 100;
+                                                if (result is ushort[] words)
+                                                {
+                                                    // 调用业务分发
+                                                    //  GlobalData.UpdateDeviceValues(dev.ID, words);
+                                                }
 
-            //                                }
-            //                                catch (Exception ex)
-            //                                {
-            //                                    Debug.WriteLine($"[{dev.Name}][{method.Name}] 出错: {ex.Message}");
-            //                                }
-            //                                await Task.Delay(method.IntervalMs);
-            //                            }
-            //                        }));
-            //                    } 
-            //                }
-            //                await Task.WhenAll(tasks);
-            //            }); 
-            //        }
-            //        catch (Exception ex)
-            //        {
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                Debug.WriteLine($"[{dev.Name}][{method.Name}] 出错: {ex.Message}");
+                                            }
+                                            await Task.Delay(method.IntervalMs);
+                                        }
+                                    }));
+                                }
+                            }
+                            await Task.WhenAll(tasks);
+                        });
+                    }
+                    catch (Exception ex)
+                    {
 
-            //            Debug.WriteLine($"{dev.Name} 协议 {dev.Protocol} 通讯建立失败！！");
-            //            Debug.WriteLine($"{ex.ToString}");
-            //        }
+                        Debug.WriteLine($"{dev.Name} 协议 {dev.Protocol} 通讯建立失败！！");
+                        Debug.WriteLine($"{ex.ToString}");
+                    }
 
 
-            //    }
-            //}
+                }
+            }
 
         }
 
@@ -223,25 +223,11 @@ namespace DoorMonitorSystem.Assets.Database
             mysql.CreateTableFromModel<PanelGroupEntity>();
             mysql.CreateTableFromModel<PanelEntity>();
             mysql.CreateTableFromModel<PanelBitConfigEntity>();
-
-            // 检查是否需要插入初始数据（如果站台表为空，则插入模拟数据）
-            var existingStations = mysql.SelectAll<StationEntity>();
-            if (existingStations.Count == 0)
-            {
-                Debug.WriteLine("开始插入模拟数据...");
-             //   InsertMockData(mysql);
-                Debug.WriteLine("模拟数据插入完成！");
-            }
-            else
-            {
-                Debug.WriteLine($"数据库已有 {existingStations.Count} 个站台，跳过插入模拟数据");
-            }
-
-           
+            mysql.CreateTableFromModel<BitCategoryEntity>();
+            
              
         }
-
- 
+          
 
         /// <summary>
         /// 从单个字节中获取指定位的值

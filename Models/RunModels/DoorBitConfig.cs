@@ -43,6 +43,21 @@ namespace DoorMonitorSystem.Models.RunModels
         /// <summary>点位绑定的门类型（滑动门/应急门/端门）</summary>
         public DoorType BindingDoorType { get; set; }
 
+        /// <summary>点位分类ID（关联 BitCategory 表）</summary>
+        public int? CategoryId { get; set; }
+
+        /// <summary>点位分类对象（用于弹窗分栏显示）</summary>
+        private BitCategoryModel? _category;
+        public BitCategoryModel? Category
+        {
+            get => _category;
+            set
+            {
+                _category = value;
+                OnPropertyChanged();
+            }
+        }
+
         /// <summary>排序序号（用于弹窗中点位的显示顺序）</summary>
         public int SortOrder { get; set; }
 

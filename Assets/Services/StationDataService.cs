@@ -18,10 +18,43 @@ namespace DoorMonitorSystem.Assets.Services
     public class StationDataService
     {
         private readonly string _connectionString;
+        private Dictionary<int, BitCategoryModel> _categoryCache = new();
 
         public StationDataService(string connectionString)
         {
             _connectionString = connectionString;
+        }
+
+        /// <summary>
+        /// 从数据库加载所有分类数据并缓存
+        /// </summary>
+        private void LoadCategories(MySqlConnection conn)
+        {
+            _categoryCache.Clear();
+
+            var categoryEntities = conn.Query<BitCategoryEntity>(
+                "SELECT * FROM BitCategory ORDER BY SortOrder"
+            ).ToList();
+
+            foreach (var entity in categoryEntities)
+            {
+                var category = new BitCategoryModel
+                {
+                    CategoryId = entity.Id,
+                    Code = entity.Code,
+                    Name = entity.Name,
+                    Icon = entity.Icon,
+                    BackgroundColor = entity.BackgroundColor,
+                    ForegroundColor = entity.ForegroundColor,
+                    SortOrder = entity.SortOrder,
+                    LayoutRows = entity.LayoutRows,
+                    LayoutColumns = entity.LayoutColumns
+                };
+
+                _categoryCache[entity.Id] = category;
+            }
+
+            Debug.WriteLine($"成功加载 {_categoryCache.Count} 个分类");
         }
 
         /// <summary>
@@ -35,6 +68,9 @@ namespace DoorMonitorSystem.Assets.Services
             {
                 using var conn = new MySqlConnection(_connectionString);
                 conn.Open();
+
+                // 0. 首先加载所有分类数据到缓存
+                LoadCategories(conn);
 
                 // 1. 加载所有站台
                 var stationEntities = conn.Query<StationEntity>(
@@ -195,6 +231,7 @@ namespace DoorMonitorSystem.Assets.Services
                     Description = entity.Description,
                     BitValue = false,
                     BindingDoorType = (DoorType)entity.DoorTypeId,
+                    CategoryId = entity.CategoryId,
                     SortOrder = entity.SortOrder,
                     HeaderPriority = entity.HeaderPriority,
                     ImagePriority = entity.ImagePriority,
@@ -207,6 +244,12 @@ namespace DoorMonitorSystem.Assets.Services
                     HighBrush = System.Windows.Media.Brushes.LimeGreen,
                     LowBrush = System.Windows.Media.Brushes.DarkGray
                 };
+
+                // 关联分类对象
+                if (entity.CategoryId.HasValue && _categoryCache.ContainsKey(entity.CategoryId.Value))
+                {
+                    bitConfig.Category = _categoryCache[entity.CategoryId.Value];
+                }
 
                 bitConfigs.Add(bitConfig);
             }
@@ -349,6 +392,7 @@ namespace DoorMonitorSystem.Assets.Services
         public int Id { get; set; }
         public int DoorTypeId { get; set; }
         public string Description { get; set; } = "";
+        public int? CategoryId { get; set; }  // 分类ID（关联 BitCategory 表）
         public int SortOrder { get; set; }
         public int HeaderPriority { get; set; }
         public int ImagePriority { get; set; }

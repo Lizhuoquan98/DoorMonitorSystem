@@ -59,56 +59,103 @@
                            HorizontalAlignment="Stretch"/>
         </DataTemplate>
 
-        <!-- 面板模板（顶部标题） -->
+        <!-- 优化后的面板模板（顶部标题） -->
         <DataTemplate x:Key="PanelTopTemplate" DataType="{x:Type models:PanelModel}">
-            <GroupBox MinWidth="100" Margin="5,0">
-                <GroupBox.Header>
-                    <Label Content="{Binding PanelName}"
-                           FontSize="20" Background="Black"
-                           Foreground="#FFCAB83E" Padding="5,1"/>
-                </GroupBox.Header>
-                <ItemsControl ItemsSource="{Binding BitList}"
-                             ItemTemplate="{StaticResource PanelBitTemplate}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <UniformGrid Rows="{Binding LayoutRows}"
-                                        Columns="{Binding LayoutColumns}"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                </ItemsControl>
-            </GroupBox>
+            <Border MinWidth="120" Margin="8,5" CornerRadius="6"
+                    Background="#1a1f2e" BorderBrush="#2a5f8f" BorderThickness="1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 顶部标题 -->
+                    <Border Grid.Row="0" Background="#1e3a5f" CornerRadius="5,5,0,0" Padding="10,8">
+                        <TextBlock Text="{Binding PanelName}"
+                                  FontSize="16" FontWeight="Bold"
+                                  Foreground="#FFCAB83E"
+                                  HorizontalAlignment="Center"
+                                  TextAlignment="Center"/>
+                    </Border>
+
+                    <!-- 点位内容 -->
+                    <ItemsControl Grid.Row="1" ItemsSource="{Binding BitList}"
+                                 ItemTemplate="{StaticResource PanelBitTemplate}"
+                                 Padding="8">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Rows="{Binding LayoutRows}"
+                                            Columns="{Binding LayoutColumns}"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </Grid>
+            </Border>
         </DataTemplate>
 
-        <!-- 面板模板（底部标题） -->
+        <!-- 优化后的面板模板（底部标题） -->
         <DataTemplate x:Key="PanelBottomTemplate" DataType="{x:Type models:PanelModel}">
-            <GroupBox MinWidth="100" Margin="5,0">
-                <GroupBox.Header>
-                    <Label Content="{Binding PanelName}"
-                           FontSize="20" Background="Black"
-                           Foreground="#FFCAB83E" Padding="5,1"/>
-                </GroupBox.Header>
-                <ItemsControl ItemsSource="{Binding BitList}"
-                             ItemTemplate="{StaticResource PanelBitTemplate}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <UniformGrid Rows="{Binding LayoutRows}"
-                                        Columns="{Binding LayoutColumns}"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                </ItemsControl>
-            </GroupBox>
+            <Border MinWidth="120" Margin="8,5" CornerRadius="6"
+                    Background="#1a1f2e" BorderBrush="#2a5f8f" BorderThickness="1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 点位内容 -->
+                    <ItemsControl Grid.Row="0" ItemsSource="{Binding BitList}"
+                                 ItemTemplate="{StaticResource PanelBitTemplate}"
+                                 Padding="8">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Rows="{Binding LayoutRows}"
+                                            Columns="{Binding LayoutColumns}"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+
+                    <!-- 底部标题 -->
+                    <Border Grid.Row="1" Background="#1e3a5f" CornerRadius="0,0,5,5" Padding="10,8">
+                        <TextBlock Text="{Binding PanelName}"
+                                  FontSize="16" FontWeight="Bold"
+                                  Foreground="#FFCAB83E"
+                                  HorizontalAlignment="Center"
+                                  TextAlignment="Center"/>
+                    </Border>
+                </Grid>
+            </Border>
         </DataTemplate>
 
-        <!-- 面板组模板 -->
+        <!-- 面板组模板（根据面板的 TitlePosition 自动选择模板） -->
         <DataTemplate x:Key="PanelGroupTemplate" DataType="{x:Type models:PanelGroup}">
-            <ItemsControl ItemsSource="{Binding Panels}"  Margin="0,2">
+            <ItemsControl ItemsSource="{Binding Panels}" Margin="0,2">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
-                    <StaticResource ResourceKey="PanelBottomTemplate"/>
+                    <DataTemplate>
+                        <ContentControl Content="{Binding}">
+                            <ContentControl.Style>
+                                <Style TargetType="ContentControl">
+                                    <Style.Triggers>
+                                        <!-- TitlePosition = 1 使用顶部标题模板 -->
+                                        <DataTrigger Binding="{Binding TitlePosition}" Value="1">
+                                            <Setter Property="ContentTemplate" Value="{StaticResource PanelTopTemplate}"/>
+                                        </DataTrigger>
+                                        <!-- TitlePosition = 2 使用底部标题模板 -->
+                                        <DataTrigger Binding="{Binding TitlePosition}" Value="2">
+                                            <Setter Property="ContentTemplate" Value="{StaticResource PanelBottomTemplate}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                    <!-- 默认使用底部标题模板 -->
+                                    <Setter Property="ContentTemplate" Value="{StaticResource PanelBottomTemplate}"/>
+                                </Style>
+                            </ContentControl.Style>
+                        </ContentControl>
+                    </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
         </DataTemplate>
@@ -121,16 +168,9 @@
     </UserControl.Resources>
 
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
-
-        <!-- 顶部分隔线 -->
-        <Border Height="50" BorderThickness="0,0,0,1" BorderBrush="Black" Margin="0,0,0,5"/>
-
-        <!-- 主内容区 - 站台列表 -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="30,0">
+        <!-- 主内容区 - 站台列表（全屏显示） -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10"
+                     Background="Transparent">
             <ItemsControl ItemsSource="{Binding Stations}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -138,43 +178,50 @@
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
 
-                <!-- 单个站台模板 -->
+                <!-- 单个站台模板（极简容器版） -->
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type vm:StationViewModel}">
-                        <Border BorderBrush="Gray" BorderThickness="1"
-                                CornerRadius="5" Margin="0,10" Padding="10">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
+                        <!-- 极简站台卡片 - 只作为内容容器 -->
+                        <Border BorderThickness="0" CornerRadius="10"
+                                Margin="0,8" Padding="20"
+                                Background="#1a1f2e">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#000000" BlurRadius="15"
+                                                ShadowDepth="3" Opacity="0.4"/>
+                            </Border.Effect>
 
-                                <!-- 站台标题 -->
-                                <TextBlock Grid.Row="0"
-                                          Text="{Binding Station.StationName}"
-                                          FontSize="24" FontWeight="Bold"
-                                          Foreground="White"
-                                          HorizontalAlignment="Center"
-                                          Margin="0,0,0,10"/>
+                            <!-- 悬停效果 -->
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Effect">
+                                                <Setter.Value>
+                                                    <DropShadowEffect Color="#1976d2" BlurRadius="20"
+                                                                    ShadowDepth="3" Opacity="0.6"/>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
 
-                                <!-- 站台内容（门组和面板组混合显示） -->
-                                <ItemsControl Grid.Row="1"
-                                             ItemsSource="{Binding DisplayItems}"
-                                             ItemTemplateSelector="{StaticResource StationItemTemplateSelector}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                </ItemsControl>
-                            </Grid>
+                            <!-- 站台内容（门组和面板组混合显示） -->
+                            <ItemsControl ItemsSource="{Binding DisplayItems}"
+                                         ItemTemplateSelector="{StaticResource StationItemTemplateSelector}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Vertical" HorizontalAlignment="Center"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
                         </Border>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
         </ScrollViewer>
 
-        <!-- 门详情弹窗 -->
+        <!-- 门详情弹窗（优化版） -->
         <Popup x:Name="popup"
                IsOpen="{Binding IsPopupOpen}"
                Placement="Center"
@@ -182,17 +229,18 @@
                StaysOpen="True"
                Opened="Popup_Opened">
             <!-- 外层阴影边框 -->
-            <Border Background="Transparent" Padding="15"
+            <Border Background="Transparent" Padding="20"
                     x:Name="PopupContent"
                     TextOptions.TextFormattingMode="Display"
                     TextOptions.TextRenderingMode="ClearType"
                     RenderOptions.ClearTypeHint="Enabled">
                 <Border.Effect>
-                    <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="0" Opacity="0.5"/>
+                    <DropShadowEffect Color="Black" BlurRadius="30" ShadowDepth="0" Opacity="0.6"/>
                 </Border.Effect>
 
                 <!-- 主弹窗边框 -->
-                <Border CornerRadius="12" MaxWidth="800" MaxHeight="600"   Background="#1e2838">
+                <Border CornerRadius="15" MinWidth="800" MaxWidth="1200" MaxHeight="650"
+                       Background="#1a1f2e" BorderBrush="#2a5f8f" BorderThickness="1">
                    
 
                     <Grid>
@@ -202,13 +250,20 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <!-- 标题栏（可拖动） -->
-                        <Border Grid.Row="0" CornerRadius="12,12,0,0"
-                                Background="#1e3a5f" Padding="15,12"
+                        <!-- 优化后的标题栏（可拖动） -->
+                        <Border Grid.Row="0" CornerRadius="15,15,0,0"
+                                Padding="20,15"
                                 MouseLeftButtonDown="Label_MouseLeftButtonDown"
                                 MouseMove="Label_MouseMove"
                                 MouseLeftButtonUp="Label_MouseLeftButtonUp"
                                 Cursor="Hand">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="#1e3a5f" Offset="0"/>
+                                    <GradientStop Color="#2a5f8f" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -216,42 +271,50 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
-                                <!-- 图标 -->
+                                <!-- 门图标（优化） -->
                                 <Border Grid.Column="0"
-                                       Width="32" Height="32"
-                                       CornerRadius="6"
+                                       Width="45" Height="45"
+                                       CornerRadius="8"
                                        Background="#2a5a8f"
-                                       Margin="0,0,12,0">
-                                    <TextBlock Text="🚪" FontSize="18"
+                                       Margin="0,0,15,0">
+                                    <Border.Effect>
+                                        <DropShadowEffect Color="#000000" BlurRadius="8" ShadowDepth="2" Opacity="0.4"/>
+                                    </Border.Effect>
+                                    <TextBlock Text="🚪" FontSize="24"
                                               HorizontalAlignment="Center"
                                               VerticalAlignment="Center"/>
                                 </Border>
 
-                                <!-- 标题文字 -->
+                                <!-- 标题文字（优化） -->
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding PopupTitle}"
-                                              FontSize="16" FontWeight="Bold"
+                                              FontSize="18" FontWeight="Bold"
                                               Foreground="White"/>
-                                    <TextBlock Text="点击标题栏可拖动窗口"
-                                              FontSize="10"
-                                              Foreground="#8899aa"
-                                              Margin="0,2,0,0"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                        <TextBlock Text="💡" FontSize="11" Margin="0,0,5,0"/>
+                                        <TextBlock Text="拖动标题栏可移动窗口 • 按 ESC 关闭"
+                                                  FontSize="11"
+                                                  Foreground="#a0b0c0"/>
+                                    </StackPanel>
                                 </StackPanel>
 
-                                <!-- 关闭按钮 -->
+                                <!-- 关闭按钮（优化） -->
                                 <Button Grid.Column="2"
                                        Command="{Binding ClosePopupCommand}"
                                        Click="Close_Click"
-                                       Width="32" Height="32"
+                                       Width="38" Height="38"
                                        Background="#d32f2f"
                                        BorderThickness="0"
                                        Cursor="Hand">
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
                                             <Border Background="{TemplateBinding Background}"
-                                                   CornerRadius="6">
+                                                   CornerRadius="8">
+                                                <Border.Effect>
+                                                    <DropShadowEffect Color="#d32f2f" BlurRadius="6" ShadowDepth="0" Opacity="0.5"/>
+                                                </Border.Effect>
                                                 <TextBlock Text="✕"
-                                                          FontSize="16" FontWeight="Bold"
+                                                          FontSize="18" FontWeight="Bold"
                                                           Foreground="White"
                                                           HorizontalAlignment="Center"
                                                           VerticalAlignment="Center"/>
@@ -260,6 +323,9 @@
                                                 <Trigger Property="IsMouseOver" Value="True">
                                                     <Setter Property="Background" Value="#f44336"/>
                                                 </Trigger>
+                                                <Trigger Property="IsPressed" Value="True">
+                                                    <Setter Property="Background" Value="#c62828"/>
+                                                </Trigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
                                     </Button.Template>
@@ -267,150 +333,117 @@
                             </Grid>
                         </Border>
 
-                        <!-- 点位详情内容区 -->
+                        <!-- 优化后的点位详情内容区（动态分类显示） -->
                         <ScrollViewer Grid.Row="1"
                                      VerticalScrollBarVisibility="Auto"
                                      HorizontalScrollBarVisibility="Disabled"
-                                     MaxHeight="450"
-                                     Margin="15,15,15,10">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                     MaxHeight="480"
+                                     Margin="20,20,20,15"
+                                     Background="#141824">
+                            <!-- 使用 CategoryGroups 动态显示所有分类 -->
+                            <ItemsControl ItemsSource="{Binding CategoryGroups}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <!-- 动态分类卡片 -->
+                                        <Border Margin="8"
+                                               CornerRadius="10"
+                                               Background="#1a1a2e"
+                                               BorderBrush="{Binding Category.BackgroundBrush}"
+                                               BorderThickness="2">
+                                            <Border.Effect>
+                                                <DropShadowEffect Color="{Binding Category.BackgroundColor}"
+                                                                BlurRadius="12"
+                                                                ShadowDepth="0"
+                                                                Opacity="0.4"/>
+                                            </Border.Effect>
 
-                                <!-- 告警点位分组 -->
-                                <Border Margin="5"  
-                                       CornerRadius="8"
-                                       Background="#1a1a2e"
-                                       BorderBrush="#d32f2f"
-                                       BorderThickness="2"
-                                       Visibility="{Binding AlarmBits.Count, Converter={StaticResource CountToVisibilityConverter}}">
-                                    <Border.Effect>
-                                        <DropShadowEffect Color="#d32f2f" BlurRadius="8" ShadowDepth="0" Opacity="0.3"/>
-                                    </Border.Effect>
-
-                                    <StackPanel  >
-                                        <!-- 告警标题 -->
-                                        <Border Background="#d32f2f" CornerRadius="6,6,0,0" Padding="12,8">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="⚠" FontSize="16" Margin="0,0,8,0"/>
-                                                <TextBlock Text="告警" FontSize="16" FontWeight="Bold" Foreground="White"/>
-                                                <!-- 数量徽章：显示激活的告警数量 -->
-                                                <Border Background="#ffebee" CornerRadius="10"
-                                                       Padding="8,2" Margin="8,0,0,0"
-                                                       Visibility="{Binding ActiveAlarmCount, Converter={StaticResource CountToVisibilityConverter}}">
-                                                    <TextBlock Text="{Binding ActiveAlarmCount}"
-                                                              FontSize="12" FontWeight="Bold"
-                                                              Foreground="#d32f2f"/>
+                                            <StackPanel>
+                                                <!-- 动态分类标题 -->
+                                                <Border CornerRadius="8,8,0,0"
+                                                       Background="{Binding Category.BackgroundBrush}"
+                                                       Padding="15,10">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <!-- 动态图标 -->
+                                                        <TextBlock Text="{Binding Category.Icon}"
+                                                                  FontSize="16"
+                                                                  Margin="0,0,8,0"/>
+                                                        <!-- 动态分类名称 -->
+                                                        <TextBlock Text="{Binding Category.Name}"
+                                                                  FontSize="16"
+                                                                  FontWeight="Bold"
+                                                                  Foreground="{Binding Category.ForegroundBrush}"/>
+                                                        <!-- 激活数量徽章 -->
+                                                        <Border Background="{Binding Category.ForegroundBrush}"
+                                                               CornerRadius="10"
+                                                               Padding="8,2"
+                                                               Margin="8,0,0,0"
+                                                               Visibility="{Binding ActiveCount, Converter={StaticResource CountToVisibilityConverter}}">
+                                                            <TextBlock Text="{Binding ActiveCount}"
+                                                                      FontSize="12"
+                                                                      FontWeight="Bold"
+                                                                      Foreground="{Binding Category.BackgroundBrush}"/>
+                                                        </Border>
+                                                    </StackPanel>
                                                 </Border>
+
+                                                <!-- 点位列表 -->
+                                                <ItemsControl ItemsSource="{Binding Bits}"
+                                                             Padding="10">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <UniformGrid Rows="{Binding Category.LayoutRows}"
+                                                                        Columns="{Binding Category.LayoutColumns}"/>
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border CornerRadius="6"
+                                                                   Background="#1e2838"
+                                                                   BorderBrush="#3a4555"
+                                                                   BorderThickness="1"
+                                                                   Margin="3,2"
+                                                                   Padding="8,4"
+                                                                   SnapsToDevicePixels="True"
+                                                                   UseLayoutRounding="True">
+                                                                <Border.Effect>
+                                                                    <DropShadowEffect Color="Black" BlurRadius="4" ShadowDepth="1" Opacity="0.3"/>
+                                                                </Border.Effect>
+                                                                <usc:BitControl Text="{Binding Description}"
+                                                                              BITColor="{Binding IndicatorBrush}"
+                                                                              Value="{Binding BitValue}"
+                                                                              FontSize="15"
+                                                                              Height="28"
+                                                                              HorizontalAlignment="Stretch"
+                                                                              Foreground="White"/>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
                                             </StackPanel>
                                         </Border>
-
-                                        <!-- 告警点位列表 -->
-                                        <ItemsControl ItemsSource="{Binding AlarmBits}"  
-                                                     MaxWidth="320" Padding="10">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <WrapPanel   Orientation="Vertical" />
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border CornerRadius="6"
-                                                           Background="#1e2838"
-                                                           BorderBrush="#3a4555"
-                                                           BorderThickness="1"
-                                                           Margin="3,2"
-                                                           Padding="8,4"
-                                                           SnapsToDevicePixels="True"
-                                                           UseLayoutRounding="True">
-                                                        <Border.Effect>
-                                                            <DropShadowEffect Color="Black" BlurRadius="4" ShadowDepth="1" Opacity="0.3"/>
-                                                        </Border.Effect>
-                                                        <usc:BitControl Text="{Binding Description}"
-                                                                      BITColor="{Binding IndicatorBrush}"
-                                                                      Value="{Binding BitValue}"
-                                                                      FontSize="15" Height="28"
-                                                                      MinWidth="120" MaxWidth="200"
-                                                                      Foreground="White"/>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </StackPanel>
-                                </Border>
-
-                                <!-- 状态点位分组 -->
-                                <Border Margin="5"  
-                                       CornerRadius="8"
-                                       Background="#1a1a2e"
-                                       BorderBrush="#1976d2"
-                                       BorderThickness="2"
-                                       Visibility="{Binding StatusBits.Count, Converter={StaticResource CountToVisibilityConverter}}">
-                                    <Border.Effect>
-                                        <DropShadowEffect Color="#1976d2" BlurRadius="8" ShadowDepth="0" Opacity="0.3"/>
-                                    </Border.Effect>
-
-                                    <StackPanel>
-                                        <!-- 状态标题 -->
-                                        <Border Background="#1976d2" CornerRadius="6,6,0,0" Padding="12,8">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="ℹ" FontSize="16" Margin="0,0,8,0"/>
-                                                <TextBlock Text="状态" FontSize="16" FontWeight="Bold" Foreground="White"/>
-                                                <!-- 数量徽章：显示激活的状态数量 -->
-                                                <Border Background="#e3f2fd" CornerRadius="10"
-                                                       Padding="8,2" Margin="8,0,0,0"
-                                                       Visibility="{Binding ActiveStatusCount, Converter={StaticResource CountToVisibilityConverter}}">
-                                                    <TextBlock Text="{Binding ActiveStatusCount}"
-                                                              FontSize="12" FontWeight="Bold"
-                                                              Foreground="#1976d2"/>
-                                                </Border>
-                                            </StackPanel>
-                                        </Border>
-
-                                        <!-- 状态点位列表 -->
-                                        <ItemsControl ItemsSource="{Binding StatusBits}"
-                                                     MaxWidth="320" Padding="10">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <WrapPanel Orientation="Vertical" MaxHeight="400"/>
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border CornerRadius="6"
-                                                           Background="#1e2838"
-                                                           BorderBrush="#3a4555"
-                                                           BorderThickness="1"
-                                                           Margin="3,2"
-                                                           Padding="8,4"
-                                                           SnapsToDevicePixels="True"
-                                                           UseLayoutRounding="True">
-                                                        <Border.Effect>
-                                                            <DropShadowEffect Color="Black" BlurRadius="4" ShadowDepth="1" Opacity="0.3"/>
-                                                        </Border.Effect>
-                                                        <usc:BitControl Text="{Binding Description}"
-                                                                      BITColor="{Binding IndicatorBrush}"
-                                                                      Value="{Binding BitValue}"
-                                                                      FontSize="15" Height="28"
-                                                                      MinWidth="160" MaxWidth="300"
-                                                                      Foreground="White"/>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </StackPanel>
-                                </Border>
-
-                            </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                         </ScrollViewer>
 
-                        <!-- 底部提示 -->
+                        <!-- 优化后的底部提示（简化版） -->
                         <Border Grid.Row="2"
-                               Background="#16202e"
-                               CornerRadius="0,0,12,12"
-                               Padding="15,8">
-                            <TextBlock Text="按 ESC 键或点击关闭按钮关闭窗口"
-                                      FontSize="11"
-                                      Foreground="#6b7a90"
-                                      HorizontalAlignment="Center"/>
+                               Background="#0d1117"
+                               CornerRadius="0,0,15,15"
+                               Padding="20,10"
+                               BorderBrush="#2a5f8f"
+                               BorderThickness="0,1,0,0">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="ℹ️" FontSize="11" Margin="0,0,6,0"/>
+                                <TextBlock Text="按 ESC 键快速关闭  •  拖动标题栏可移动窗口"
+                                          FontSize="11"
+                                          Foreground="#7b8a9a"/>
+                            </StackPanel>
                         </Border>
                     </Grid>
                 </Border>

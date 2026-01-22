@@ -10,6 +10,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="packages\NModbus4.2.1.0\**" />
+    <EmbeddedResource Remove="packages\NModbus4.2.1.0\**" />
+    <None Remove="packages\NModbus4.2.1.0\**" />
+    <Page Remove="packages\NModbus4.2.1.0\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Remove="Assets\Images\bg.png" />
   </ItemGroup>
 
@@ -45,6 +52,10 @@
     <Compile Update="UControl\DoorControl.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="packages\" />
   </ItemGroup>
 
 </Project>

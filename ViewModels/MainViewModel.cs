@@ -1,5 +1,6 @@
 using Base;
 using DoorMonitorSystem.Assets.Services;
+using DoorMonitorSystem.Assets.Helper;
 using DoorMonitorSystem.Base;
 using DoorMonitorSystem.Models.RunModels;
 using System;
@@ -10,6 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System.Collections.Generic;
 
 namespace DoorMonitorSystem.ViewModels
 {
@@ -64,6 +66,8 @@ namespace DoorMonitorSystem.ViewModels
             {
                 _selectedDoor = value;
                 OnPropertyChanged();
+                // 通知所有相关属性更新
+                OnPropertyChanged(nameof(CategoryGroups));
                 OnPropertyChanged(nameof(AlarmBits));
                 OnPropertyChanged(nameof(StatusBits));
                 OnPropertyChanged(nameof(ActiveAlarmCount));
@@ -72,64 +76,130 @@ namespace DoorMonitorSystem.ViewModels
         }
 
         /// <summary>
-        /// 弹窗告警点位（从选中门的Bits筛选）
+        /// 按分类分组的点位集合（用于弹窗动态显示）
+        /// </summary>
+        public ObservableCollection<CategoryGroup> CategoryGroups
+        {
+            get
+            {
+                if (SelectedDoor == null) return new();
+
+                var groups = new ObservableCollection<CategoryGroup>();
+
+                // 按分类分组点位
+                var categoryGrouping = SelectedDoor.Bits
+                    .Where(b => b.Category != null)
+                    .GroupBy(b => b.Category)
+                    .OrderBy(g => g.Key.SortOrder);
+
+                foreach (var group in categoryGrouping)
+                {
+                    var category = group.Key;
+                    var bits = new ObservableCollection<DoorBitConfig>(
+                        group.OrderBy(b => b.SortOrder)
+                    );
+
+                    // 计算激活数量
+                    int activeCount = bits.Count(b => b.BitValue == true);
+
+                    groups.Add(new CategoryGroup
+                    {
+                        Category = category,
+                        Bits = bits,
+                        ActiveCount = activeCount
+                    });
+                }
+
+                // 添加未分类的点位（如果有）
+                var uncategorized = SelectedDoor.Bits
+                    .Where(b => b.Category == null)
+                    .OrderBy(b => b.SortOrder)
+                    .ToList();
+
+                if (uncategorized.Any())
+                {
+                    groups.Add(new CategoryGroup
+                    {
+                        Category = new BitCategoryModel
+                        {
+                            CategoryId = 0,
+                            Code = "Uncategorized",
+                            Name = "其他",
+                            Icon = "📋",
+                            BackgroundColor = "#607D8B",
+                            ForegroundColor = "#FFFFFF",
+                            SortOrder = 999
+                        },
+                        Bits = new ObservableCollection<DoorBitConfig>(uncategorized),
+                        ActiveCount = uncategorized.Count(b => b.BitValue == true)
+                    });
+                }
+
+                return groups;
+            }
+        }
+
+        /// <summary>
+        /// 报警类别的点位集合（用于UI绑定）
         /// </summary>
         public ObservableCollection<DoorBitConfig> AlarmBits
         {
             get
             {
                 if (SelectedDoor == null) return new();
-                // 筛选告警类点位（优先级配置在 HeaderPriority/ImagePriority/BottomPriority 中）
-                var alarms = SelectedDoor.Bits.Where(b =>
-                    b.HeaderPriority > 0 || b.ImagePriority > 0 || b.BottomPriority > 0)
-                    .OrderBy(b => b.SortOrder)
-                    .ToList();
-                return new ObservableCollection<DoorBitConfig>(alarms);
+
+                return new ObservableCollection<DoorBitConfig>(
+                    SelectedDoor.Bits
+                        .Where(b => b.Category != null && b.Category.Code == "Alarm")
+                        .OrderBy(b => b.SortOrder)
+                );
             }
         }
 
         /// <summary>
-        /// 激活的告警点位数量（BitValue = true）
-        /// </summary>
-        public int ActiveAlarmCount
-        {
-            get
-            {
-                if (SelectedDoor == null) return 0;
-                return SelectedDoor.Bits.Count(b =>
-                    (b.HeaderPriority > 0 || b.ImagePriority > 0 || b.BottomPriority > 0) &&
-                    b.BitValue == true);
-            }
-        }
-
-        /// <summary>
-        /// 弹窗状态点位（从选中门的Bits筛选）
+        /// 状态类别的点位集合（用于UI绑定）
         /// </summary>
         public ObservableCollection<DoorBitConfig> StatusBits
         {
             get
             {
                 if (SelectedDoor == null) return new();
-                // 筛选状态类点位
-                var status = SelectedDoor.Bits.Where(b =>
-                    b.HeaderPriority == 0 && b.ImagePriority == 0 && b.BottomPriority == 0)
-                    .OrderBy(b => b.SortOrder)
-                    .ToList();
-                return new ObservableCollection<DoorBitConfig>(status);
+
+                return new ObservableCollection<DoorBitConfig>(
+                    SelectedDoor.Bits
+                        .Where(b => b.Category != null && b.Category.Code == "Status")
+                        .OrderBy(b => b.SortOrder)
+                );
             }
         }
 
         /// <summary>
-        /// 激活的状态点位数量（BitValue = true）
+        /// 激活的报警数量
+        /// </summary>
+        public int ActiveAlarmCount
+        {
+            get
+            {
+                if (SelectedDoor == null) return 0;
+                return SelectedDoor.Bits
+                    .Count(b => b.Category != null &&
+                                b.Category.Code == "Alarm" &&
+                                b.BitValue == true);
+            }
+        }
+
+        /// <summary>
+        /// 激活的状态数量
         /// </summary>
         public int ActiveStatusCount
         {
             get
             {
                 if (SelectedDoor == null) return 0;
-                return SelectedDoor.Bits.Count(b =>
-                    b.HeaderPriority == 0 && b.ImagePriority == 0 && b.BottomPriority == 0 &&
-                    b.BitValue == true);
+                return SelectedDoor.Bits
+                    .Count(b => b.Category != null &&
+                                b.Category.Code == "Status" &&
+                                b.BitValue == true);
             }
         }
 
@@ -297,7 +367,27 @@ namespace DoorMonitorSystem.ViewModels
             if (obj is DoorModel door)
             {
                 SelectedDoor = door;
-                PopupTitle = $"门 {door.DoorName} - 详细状态";
+
+                // 构建完整的标题：站台名称 - 门名称 - 详细信息
+                string stationName = "";
+
+                // 从 Stations 集合中查找包含该门的站台
+                foreach (var station in Stations)
+                {
+                    bool foundDoor = false;
+                    foreach (var doorGroup in station.Station.DoorGroups)
+                    {
+                        if (doorGroup.Doors.Contains(door))
+                        {
+                            stationName = station.Station.StationName;
+                            foundDoor = true;
+                            break;
+                        }
+                    }
+                    if (foundDoor) break;
+                }
+
+                PopupTitle = $"{stationName} - {door.DoorName} - 详细信息";
                 IsPopupOpen = true;
             }
         }

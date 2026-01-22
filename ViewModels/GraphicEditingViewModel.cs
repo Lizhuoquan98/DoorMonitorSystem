@@ -45,16 +45,11 @@ namespace DoorMonitorSystem.ViewModels
         public GraphicEditingViewModel()
         {
             // 初始化命令
-            AddCommand = new RelayCommand(AddPath);
-            DeleteCommand = new RelayCommand(DeletePath);
-            ClearCommand = new RelayCommand(ClearPaths);
             SaveCommand = new RelayCommand(SavePaths);
-            SelectCommand = new RelayCommand(SelectPath);
-            TextChangedCommand = new RelayCommand(OnTextChanged);
             ExportDictionaryCommand = new RelayCommand(ExportGraphicDictionary);
             ImportDictionaryCommand = new RelayCommand(ImportGraphicDictionary);
-
-
+            ImportSvgCommand = new RelayCommand(ImportSvgFile);
+            DeleteGraphicCommand = new RelayCommand(DeleteGraphic);  // 删除图形命令
 
             // 从静态 GraphicDictionary 构造分组视图数据
             if (GlobalData.GraphicDictionary != null)
@@ -68,7 +63,7 @@ namespace DoorMonitorSystem.ViewModels
                     });
                 }
             }
-           
+
         }
 
       
@@ -164,14 +159,11 @@ namespace DoorMonitorSystem.ViewModels
 
         // ------------------- 命令定义 -------------------
 
-        public ICommand AddCommand { get; }
-        public ICommand DeleteCommand { get; }
-        public ICommand ClearCommand { get; }
-        public ICommand SaveCommand { get; } 
+        public ICommand SaveCommand { get; }
         public ICommand ExportDictionaryCommand { get; }
         public ICommand ImportDictionaryCommand { get; }
-        public ICommand SelectCommand { get; }
-        public ICommand TextChangedCommand { get; }
+        public ICommand ImportSvgCommand { get; }  // 导入 SVG 命令
+        public ICommand DeleteGraphicCommand { get; }  // 删除图形命令
 
         // 添加图形命令
         private void AddPath(object obj)
@@ -208,13 +200,19 @@ namespace DoorMonitorSystem.ViewModels
         {
             if (string.IsNullOrWhiteSpace(IconName))
             {
-                MessageBox.Show("图形名称不能为空！");
+                MessageBox.Show("图形名称不能为空！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (PathItems.Count == 0)
+            {
+                MessageBox.Show("请先导入 SVG 文件！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             if (GlobalData.GraphicDictionary.ContainsKey(IconName))
             {
-                MessageBox.Show("图形名称存在冲突，请修改后保存！");
+                MessageBox.Show("图形名称已存在，请修改后保存！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -231,20 +229,41 @@ namespace DoorMonitorSystem.ViewModels
                 Items = snapshot
             });
 
+            MessageBox.Show($"图形 \"{IconName}\" 已成功保存到字典！", "保存成功", MessageBoxButton.OK, MessageBoxImage.Information);
+
+            // 清空输入
             PathItems.Clear();
+            IconName = "";
         }
 
-
-        // 图形点击时设置为选中
-        private void SelectPath(object obj)
+        /// <summary>
+        /// 删除图形从字典
+        /// </summary>
+        private void DeleteGraphic(object obj)
         {
-            if (obj is IconItem item)
+            if (obj is string graphicName)
             {
-                foreach (var i in PathItems)
-                    i.IsSelected = false;
+                var result = MessageBox.Show(
+                    $"确定要删除图形 \"{graphicName}\" 吗？",
+                    "确认删除",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question
+                );
 
-                item.IsSelected = true;
-                SelectedItem = item;
+                if (result == MessageBoxResult.Yes)
+                {
+                    // 从全局字典中删除
+                    GlobalData.GraphicDictionary.Remove(graphicName);
+
+                    // 从 UI 列表中删除
+                    var groupToRemove = GraphicGroups.FirstOrDefault(g => g.Name == graphicName);
+                    if (groupToRemove != null)
+                    {
+                        GraphicGroups.Remove(groupToRemove);
+                    }
+
+                    MessageBox.Show($"图形 \"{graphicName}\" 已成功删除！", "删除成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
             }
         }
 
@@ -261,7 +280,8 @@ namespace DoorMonitorSystem.ViewModels
                     Name = kvp.Key,
                     Items = kvp.Value.Select(i => new SerializableIconItem
                     {
-                        PathData = i.Data?.ToString(),
+                        // 直接使用 ToString()，因为导入时已经将 Transform 烘焙到坐标中了
+                        PathData = i.Data?.ToString() ?? "",
                         StrokeColor = ((SolidColorBrush)i.Stroke).Color.ToString(),
                         FillColor = ((SolidColorBrush)i.Fill).Color.ToString(),
                         StrokeThickness = i.StrokeThickness
@@ -329,7 +349,136 @@ namespace DoorMonitorSystem.ViewModels
                 catch (Exception ex)
                 {
                     MessageBox.Show($"导入失败：{ex.Message}");
-                } 
+                }
+            }
+        }
+
+        /// <summary>
+        /// 导入 SVG 文件并解析为图形
+        /// </summary>
+        private void ImportSvgFile(object obj)
+        {
+            var openDialog = new OpenFileDialog
+            {
+                Filter = "SVG 文件|*.svg|所有文件|*.*",
+                Title = "选择 SVG 文件"
+            };
+
+            if (openDialog.ShowDialog() == true)
+            {
+                try
+                {
+                    // 读取 SVG 文件内容（使用 UTF-8 编码）
+                    string svgContent = File.ReadAllText(openDialog.FileName, System.Text.Encoding.UTF8);
+
+                    // 使用 SvgParser 解析 SVG
+                    var svgPaths = Assets.Helper.SvgParser.ParseSvgFile(svgContent);
+
+                    if (svgPaths == null || svgPaths.Count == 0)
+                    {
+                        MessageBox.Show("未能从 SVG 文件中找到有效的 Path 元素。", "导入失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+
+                    // 清空当前画布
+                    PathItems.Clear();
+
+                    // 将解析出的 Path 添加到画布
+                    int successCount = 0;
+                    foreach (var svgPath in svgPaths)
+                    {
+                        try
+                        {
+                            // 直接使用原始路径数据
+                            string pathData = svgPath.PathData;
+
+                            // 规范化 Path Data（去除多余空格）
+                            pathData = Assets.Helper.SvgParser.NormalizePathData(pathData);
+
+                            // 解析几何数据
+                            var geometry = Geometry.Parse(pathData);
+
+                            // ★ 关键修复：应用 Transform 并立即烘焙到几何中
+                            if (!string.IsNullOrEmpty(svgPath.Transform))
+                            {
+                                var translateMatch = System.Text.RegularExpressions.Regex.Match(
+                                    svgPath.Transform,
+                                    @"translate\(([^,\s]+)[\s,]+([^)]+)\)"
+                                );
+
+                                if (translateMatch.Success)
+                                {
+                                    if (double.TryParse(translateMatch.Groups[1].Value, out double tx) &&
+                                        double.TryParse(translateMatch.Groups[2].Value, out double ty))
+                                    {
+                                        // 创建带变换的几何图形
+                                        var transformedGeometry = geometry.Clone();
+                                        transformedGeometry.Transform = new TranslateTransform(tx, ty);
+                                        
+                                        // ★ 使用 GetFlattenedPathGeometry 将变换烘焙到路径坐标中
+                                        geometry = transformedGeometry.GetFlattenedPathGeometry();
+                                    }
+                                }
+                            }
+
+                            // 记录边界框信息
+                            string boundsInfo = Assets.Helper.SvgParser.GetGeometryBoundsInfo(geometry);
+
+                            // 解析颜色
+                            var fillBrush = Assets.Helper.SvgParser.ParseColorToBrush(svgPath.Fill);
+                            var strokeBrush = Assets.Helper.SvgParser.ParseColorToBrush(svgPath.Stroke);
+
+                            // 创建 IconItem - 符合门控系统要求的格式
+                            var iconItem = new IconItem
+                            {
+                                Data = geometry,  // 现在 geometry 已经包含了绝对坐标，没有 Transform 属性
+                                Fill = fillBrush,
+                                Stroke = strokeBrush,
+                                StrokeThickness = svgPath.StrokeThickness,
+                                IsSelected = false
+                                // Id 会自动生成 GUID
+                            };
+
+                            PathItems.Add(iconItem);
+                            successCount++;
+
+                            // 输出转换日志（用于调试）
+                            System.Diagnostics.Debug.WriteLine(
+                                $"✓ IconItem #{successCount} 转换成功:\n" +
+                                $"  - PathData 长度: {pathData.Length} 字符\n" +
+                                $"  - Transform: {(string.IsNullOrEmpty(svgPath.Transform) ? "none" : svgPath.Transform)}\n" +
+                                $"  - 边界框: {boundsInfo}\n" +
+                                $"  - Fill: {svgPath.Fill}\n" +
+                                $"  - Stroke: {svgPath.Stroke}\n" +
+                                $"  - ID: {iconItem.Id}"
+                            );
+                        }
+                        catch (Exception ex)
+                        {
+                            // 跳过无效的 Path，继续处理其他的
+                            System.Diagnostics.Debug.WriteLine($"✗ 解析 Path 失败: {ex.Message}\n{ex.StackTrace}");
+                        }
+                    }
+
+                    MessageBox.Show(
+                        $"SVG 导入成功！\n\n" +
+                        $"文件: {Path.GetFileName(openDialog.FileName)}\n" +
+                        $"成功导入: {successCount} 个图形元素\n" +
+                        $"总共发现: {svgPaths.Count} 个 Path 元素",
+                        "导入成功",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information
+                    );
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(
+                        $"SVG 文件导入失败！\n\n错误信息:\n{ex.Message}",
+                        "导入失败",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error
+                    );
+                }
             }
         }
 
@@ -354,15 +503,4 @@ namespace DoorMonitorSystem.ViewModels
     }
 }
 
-
-/*
-
-    M172.935 139.173h301.368v763.674H141.451v-732.19a31.69 31.69 0 0 1 31.484-31.484z m709.614 763.674H549.697V139.173h301.368a31.69 31.69 0 0 1 31.69 31.69v731.984h-0.206z  
-    M300 120h430v800H300z 
-    M97.121 855.518h829.758q22.028 0 22.028 22.027v51.519q0 22.027-22.028 22.027H97.121q-22.028 0-22.028-22.027v-51.519q0-22.027 22.028-22.027z 
-    M211.307 532.48h10.72q17.12 0 17.12 17.12v10.72q0 17.12-17.12 17.12h-10.72q-17.12 0-17.12-17.12V549.6q0-17.12 17.12-17.12zM801.973 532.48h10.72q17.12 0 17.12 17.12v10.72q0 17.12-17.12 17.12h-10.72q-17.12 0-17.12-17.12V549.6q0-17.12 17.12-17.12z 
-
-     */
-
-
-
+ 

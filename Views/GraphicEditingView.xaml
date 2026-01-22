@@ -4,142 +4,271 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:vm="clr-namespace:DoorMonitorSystem.ViewModels"
-             xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
-             xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
-             mc:Ignorable="d" 
-              Background="AliceBlue">
+             mc:Ignorable="d"
+             
+             Background="#0d1117"  Height="720"  Width="800">
+    <UserControl.DataContext>
+        <vm:GraphicEditingViewModel />
+    </UserControl.DataContext>
 
-    <Grid>
+    <UserControl.Resources>
+        <!-- 深色主题按钮样式 -->
+        <Style x:Key="DarkButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#2196F3"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                               CornerRadius="6"
+                               Padding="{TemplateBinding Padding}">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#2196F3" BlurRadius="8" ShadowDepth="0" Opacity="0.4"/>
+                            </Border.Effect>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#1976D2"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#0D47A1"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 删除按钮样式 -->
+        <Style x:Key="DeleteButtonStyle" TargetType="Button" BasedOn="{StaticResource DarkButtonStyle}">
+            <Setter Property="Background" Value="#d32f2f"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#f44336"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <!-- 成功按钮样式 -->
+        <Style x:Key="SuccessButtonStyle" TargetType="Button" BasedOn="{StaticResource DarkButtonStyle}">
+            <Setter Property="Background" Value="#4CAF50"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#66BB6A"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- 深色文本框样式 -->
+        <Style x:Key="DarkTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="#1a1f2e"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="CaretBrush" Value="White"/>
+            <Setter Property="SelectionBrush" Value="#2196F3"/>
+            <Setter Property="BorderBrush" Value="#2a5f8f"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="1"/>
+            <Setter Property="FontSize" Value="17"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="{TemplateBinding Background}"
+                               BorderBrush="{TemplateBinding BorderBrush}"
+                               BorderThickness="{TemplateBinding BorderThickness}"
+                               CornerRadius="6">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                        Margin="{TemplateBinding Padding}"
+                                        Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter Property="BorderBrush" Value="#2196F3"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="20">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition  Width="Auto"/>
-            <ColumnDefinition  Width="290"/> 
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="20"/>
+            <ColumnDefinition Width="1.2*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- 输入区域 -->
-        <StackPanel Grid.Row="0" Width="300" Margin="10">
-            <TextBlock Text="路径 Data:"/>
-            <TextBox Height="150" TextWrapping="Wrap"
-                     Text="{Binding PathDataText, UpdateSourceTrigger=PropertyChanged}">
-                <i:Interaction.Triggers>
-                    <i:EventTrigger EventName="TextChanged">
-                        <i:InvokeCommandAction Command="{Binding TextChangedCommand}"
-                                               CommandParameter="{Binding Text, RelativeSource={RelativeSource  AncestorType=TextBox}}"/>
-                    </i:EventTrigger>
-                </i:Interaction.Triggers>
-            </TextBox>
+        <!-- 左侧：导入和预览区域 -->
+        <Border Grid.Column="0" Background="#161b22" CornerRadius="12" BorderBrush="#2a5f8f" BorderThickness="1">
+            <Border.Effect>
+                <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="3" Opacity="0.5"/>
+            </Border.Effect>
 
-            <StackPanel Orientation="Horizontal">
-                <StackPanel Margin="2" Width="96">
-                    <TextBlock Text="描边颜色:" Margin="0,10,0,0"/>
-                    <xctk:ColorPicker SelectedColor="{Binding StrokeColor}" />
-                </StackPanel>
-                <StackPanel Margin="2" Width="96">
-                    <TextBlock Text="填充颜色:" Margin="0,10,0,0"/>
-                    <xctk:ColorPicker SelectedColor="{Binding FillColor}" />
-                </StackPanel>
-                <StackPanel Margin="2" Width="96">
-                    <TextBlock Text="线宽:" Margin="0,10,0,0"/>
-                    <TextBox Text="{Binding Thickness}" Height="23"/>
-                </StackPanel>
+            <StackPanel Margin="20">
+                <!-- 标题 -->
+                <Border Background="#1e3a5f" CornerRadius="8" Padding="15,12" Margin="0,0,0,20">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="📁" FontSize="20" Margin="0,0,10,0"/>
+                        <TextBlock Text="SVG 图形导入" FontSize="18" FontWeight="Bold" Foreground="White"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 导入 SVG 按钮 -->
+                <Button Content="📂 选择 SVG 文件导入"
+                        Style="{StaticResource SuccessButtonStyle}"
+                        Command="{Binding ImportSvgCommand}"
+                        Height="50"
+                        FontSize="16"
+                        Margin="0,0,0,20"/>
+
+                <!-- 图形名称输入 -->
+                <TextBlock Text="图形名称:" Foreground="#a0b0c0" FontSize="13" Margin="0,0,0,8"/>
+                <TextBox Style="{StaticResource DarkTextBoxStyle}"
+                         Text="{Binding IconName, UpdateSourceTrigger=PropertyChanged}"
+                         Height="45"
+                         Margin="0,0,0,20"/>
+
+                <!-- 保存按钮 -->
+                <Button Content="💾 保存到图形字典"
+                        Style="{StaticResource DarkButtonStyle}"
+                        Command="{Binding SaveCommand}"
+                        Height="45"
+                        FontSize="15"
+                        Margin="0,0,0,20"/>
+
+                <!-- 图形预览 -->
+                <TextBlock Text="图形预览:" Foreground="#a0b0c0" FontSize="13" Margin="0,0,0,8"/>
+                <Border BorderBrush="#2a5f8f" BorderThickness="2" CornerRadius="8"
+                        Background="#1a1f2e"  > 
+                    <Viewbox  Grid.Row="1" Margin="5"  >
+                        <ItemsControl  ItemsSource="{Binding PathItems}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <!-- 所有图形叠加在同一个Grid中 -->
+                                    <Grid/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Path 
+                                          Width="1024" Height="1024"
+                                          Data="{Binding Data}"
+                                          Fill="{Binding Fill}"
+                                          Stroke="{Binding Stroke}"
+                                          StrokeThickness="{Binding StrokeThickness}">
+                                    </Path>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Viewbox> 
+                </Border>
+
+                <!-- 提示信息 -->
+                <TextBlock Text="💡 支持从 Inkscape、Figma、Adobe Illustrator 等工具导出的 SVG 文件"
+                          Foreground="#7b8a9a" FontSize="11"
+                          Margin="0,15,0,0" TextWrapping="Wrap"/>
             </StackPanel>
+        </Border>
 
-            <StackPanel Orientation="Horizontal">
-                <Button Width="96" Content="添加图形" Margin="2,1" Command="{Binding AddCommand}"/>
-                <Button Width="96" Content="删除图形" Margin="2,1" Command="{Binding DeleteCommand}"/>
-                <Button Width="96" Content="清空画布" Margin="2,1" Command="{Binding ClearCommand}"/>
-            </StackPanel>
+        <!-- 右侧：图形字典管理 -->
+        <Border Grid.Column="2" Background="#161b22" CornerRadius="12" BorderBrush="#2a5f8f" BorderThickness="1">
+            <Border.Effect>
+                <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="3" Opacity="0.5"/>
+            </Border.Effect>
 
-            <TextBlock Text="图形预览:" Margin="0,10,0,0"/>
-            <Border BorderBrush="Gray" BorderThickness="1">
-                <Viewbox Width="290" Height="290">
-                    <Grid>
-                        <Path Stroke="{Binding StrokeBrush}"  Width="1024" Height="1024"
-                              Fill="{Binding FillBrush}"
-                              StrokeThickness="{Binding Thickness}"
-                              Data="{Binding PathData}" />
-                    </Grid>
-                </Viewbox>
-            </Border>
-        </StackPanel>
+            <Grid Margin="20">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-        <StackPanel   Grid.Column="1">
-            <StackPanel Orientation="Horizontal" Margin="0,15,0,0">
-                <TextBlock Padding="1" Text="图形名称:"/>
-                <TextBox Padding="1" VerticalContentAlignment="Center" Text="{Binding IconName}" Width="100"/>
-                <Button Padding="2,0" Margin="10,0,0,0" Content="保存到图形字典"   Command="{Binding SaveCommand}"/>
-            </StackPanel>
+                <!-- 标题 -->
+                <Border Grid.Row="0" Background="#1e3a5f" CornerRadius="8" Padding="15,12" Margin="0,0,0,15">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="📚" FontSize="20" Margin="0,0,10,0"/>
+                        <TextBlock Text="图形字典" FontSize="18" FontWeight="Bold" Foreground="White"/>
+                    </StackPanel>
+                </Border>
 
-            <TextBlock Text="组合图形:" Margin="0,15,0,0"/>
-            <Border Background="Aquamarine">
-                <Viewbox Width="500" Height="500" Stretch="Uniform">
-                    <ItemsControl ItemsSource="{Binding PathItems}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <Canvas Width="1024" Height="1024"  Background="White"/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
+                <!-- 操作按钮 -->
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,15">
+                    <Button Content="💾 导出字典"
+                            Style="{StaticResource DarkButtonStyle}"
+                            Command="{Binding ExportDictionaryCommand}"
+                            Padding="15,8"
+                            Margin="0,0,10,0"/>
+                    <Button Content="📥 导入字典"
+                            Style="{StaticResource DarkButtonStyle}"
+                            Command="{Binding ImportDictionaryCommand}"
+                            Padding="15,8"/>
+                </StackPanel>
+
+                <!-- 字典列表 -->
+                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding GraphicGroups}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Path Stroke="{Binding Stroke}" Fill="{Binding Fill}" StrokeThickness="{Binding StrokeThickness}" 
-                                        Data="{Binding Data}">
-                                    <i:Interaction.Triggers>
-                                        <i:EventTrigger EventName="MouseLeftButtonDown">
-                                            <i:InvokeCommandAction
-                                    Command="{Binding DataContext.SelectCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                    CommandParameter="{Binding}" />
-                                        </i:EventTrigger>
-                                    </i:Interaction.Triggers>
-                                </Path>
+                                <Border Background="#1a1f2e" CornerRadius="8"
+                                       BorderBrush="#2a5f8f" BorderThickness="1"
+                                       Margin="0,0,0,15" Padding="15">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <!-- 图形名称 -->
+                                        <TextBlock Grid.Row="0" Text="{Binding Name}"
+                                                  FontWeight="Bold" FontSize="15"
+                                                  Foreground="White"
+                                                  Margin="0,0,0,10"/>
+
+                                        <!-- 图形预览 -->
+                                        <Border Grid.Row="1" BorderBrush="#3a4555" BorderThickness="1"
+                                               CornerRadius="6" Background="White"
+                                               Height="150" Margin="0,0,0,10">
+                                            <Viewbox Stretch="Uniform" Margin="5">
+                                                <ItemsControl ItemsSource="{Binding Items}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <!-- 使用 Grid 而不是 Canvas，与预览面板一致 -->
+                                                            <Grid/>
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Path Stroke="{Binding Stroke}"
+                                                                 Fill="{Binding Fill}"
+                                                                 StrokeThickness="{Binding StrokeThickness}"
+                                                                 Data="{Binding Data}"/>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </Viewbox>
+                                        </Border>
+
+                                        <!-- 删除按钮 -->
+                                        <Button Grid.Row="2" Content="🗑️ 删除"
+                                               Style="{StaticResource DeleteButtonStyle}"
+                                               Command="{Binding DataContext.DeleteGraphicCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                               CommandParameter="{Binding Name}"
+                                               HorizontalAlignment="Right"
+                                               Padding="12,6"/>
+                                    </Grid>
+                                </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                </Viewbox>
-            </Border>
-
-        </StackPanel>
-
-        <StackPanel Margin="10" Grid.Column="2">
-            <StackPanel Orientation="Horizontal" Margin="0,10"> 
-                <TextBlock Text="图形数据字典预览：" FontSize="16" FontWeight="Bold" />
-
-                <!--<Button Padding="2,0" Margin="10,0,0,0" Content="导入字典" FontSize="14"   Command="{Binding ImportDictionaryCommand}"/>-->
-
-                <Button Padding="2,0" Margin="10,0,0,0" Content="导出字典" FontSize="14"   Command="{Binding ExportDictionaryCommand}"/>
-            </StackPanel>
-            
-            <!-- 添加 ScrollViewer 支持滚动 -->
-            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="620">
-                <ItemsControl ItemsSource="{Binding GraphicGroups}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Margin="0,10">
-                                <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="14" Margin="0,5"/>
-                                <Border BorderBrush="Gray" BorderThickness="1">
-                                    <Viewbox Width="200" Height="200">
-                                        <ItemsControl ItemsSource="{Binding Items}">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <Canvas Width="1024" Height="1024" Background="White"/>
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Path Stroke="{Binding Stroke}"
-                                                  Fill="{Binding Fill}"
-                                                  StrokeThickness="{Binding StrokeThickness}"
-                                                  Data="{Binding Data}" />
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </Viewbox>
-                                </Border>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
-        </StackPanel> 
-
+                </ScrollViewer>
+            </Grid>
+        </Border>
     </Grid>
 </UserControl>
+    
