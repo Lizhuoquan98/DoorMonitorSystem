@@ -53,5 +53,12 @@ namespace DoorMonitorSystem.Models.RunModels
 
         /// <summary>点位排序序号</summary>
         public int SortOrder { get; set; }
+
+        /// <summary>BitControl 专用的颜色配置对象</summary>
+        public ControlLibrary.Models.BitColor ConfigColor => new ControlLibrary.Models.BitColor 
+        { 
+            High = HighBrush, 
+            Low = LowBrush 
+        };
     }
 }

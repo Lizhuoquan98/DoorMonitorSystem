@@ -4,6 +4,135 @@
              xmlns:local="clr-namespace:DoorMonitorSystem"
              StartupUri=" Views/MainWindow.xaml">
     <Application.Resources>
-         
+        <!-- 导航按钮样式 -->
+        <Style x:Key="ButtonNavigation" TargetType="Button">
+            <Setter Property="Width" Value="110"/>
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontFamily" Value="Microsoft YaHei"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="VerticalAlignment" Value="Bottom"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="White"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Margin" Value="10,0"/>
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="5"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter x:Name="ContentPresenter"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              TextBlock.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#33FFFFFF"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#FFFFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#66FFFFFF"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="Black"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 普通操作按钮样式 -->
+        <Style x:Key="ActionButton" TargetType="Button">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="15,0"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="White"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#33FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#66FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 文本框样式 -->
+        <Style TargetType="TextBox">
+            <Setter Property="Height" Value="25"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Background" Value="#11FFFFFF"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#88FFFFFF"/>
+            <Setter Property="Padding" Value="2"/>
+            <Setter Property="CaretBrush" Value="White"/>
+        </Style>
+
+        <!-- 下拉框样式简化 -->
+        <!-- 下拉框比较复杂，这里只做基本调整，彻底美化需要重写Template -->
+        <Style TargetType="ComboBox">
+            <Setter Property="Height" Value="25"/>
+            <Setter Property="Margin" Value="0,0,0,0"/>
+        </Style>
+
+        <!-- DataGrid 样式 -->
+        <Style TargetType="DataGrid">
+            <Setter Property="Background" Value="#11FFFFFF"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#44FFFFFF"/>
+            <Setter Property="RowBackground" Value="Transparent"/>
+            <Setter Property="AlternatingRowBackground" Value="#11FFFFFF"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="#44FFFFFF"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+        </Style>
+        
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#33000000"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="BorderBrush" Value="#44FFFFFF"/>
+            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+        </Style>
+        
+        <Style TargetType="DataGridCell">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DataGridCell">
+                        <Border BorderBrush="Transparent" BorderThickness="0" Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
+                            <ContentPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#440099FF"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
     </Application.Resources>
 </Application>

@@ -26,7 +26,7 @@ namespace DoorMonitorSystem.Views
         public DevvarlistView()
         { 
             InitializeComponent();    
-            this.DataContext = new DevvarlistViewModel();   
+          // this.DataContext = new DevvarlistViewModel();   
         }
 
          

@@ -563,6 +563,11 @@ namespace DoorMonitorSystem.Assets.Helper
                 type = Nullable.GetUnderlyingType(type);
             }
 
+            if (type.IsEnum)
+            {
+                return "INT";
+            }
+
             var typeMapping = new Dictionary<Type, string>
         {
             { typeof(int), "INT" },
@@ -746,6 +751,67 @@ namespace DoorMonitorSystem.Assets.Helper
         }
 
         /// <summary>
+        /// 查找所有实体 (别名 SelectAll)
+        /// </summary>
+        public List<T> FindAll<T>() where T : new()
+        {
+            return SelectAll<T>();
+        }
+
+        /// <summary>
+        /// 根据条件查找实体
+        /// </summary>
+        /// <param name="whereClause">WHERE子句，例如 "Id = @id AND Name = @name"</param>
+        /// <param name="parameters">参数列表</param>
+        public List<T> FindAll<T>(string whereClause, params MySqlParameter[] parameters) where T : new()
+        {
+            var type = typeof(T);
+            var tableName = GetTableName(type);
+            var sql = $"SELECT * FROM `{tableName}` WHERE {whereClause}";
+
+            var dataTable = ExecuteQuery(sql, parameters);
+            var result = new List<T>();
+
+            foreach (DataRow row in dataTable.Rows)
+            {
+                var entity = new T();
+                foreach (var property in type.GetProperties())
+                {
+                    if (property.GetCustomAttribute<NotMappedAttribute>() != null)
+                        continue;
+
+                    var columnName = GetColumnName(property);
+                    if (dataTable.Columns.Contains(columnName) && row[columnName] != DBNull.Value)
+                    {
+                        var value = row[columnName];
+                        var targetType = property.PropertyType;
+
+                        // 处理可空类型
+                        if (targetType.IsGenericType && targetType.GetGenericTypeDefinition() == typeof(Nullable<>))
+                        {
+                            targetType = Nullable.GetUnderlyingType(targetType);
+                        }
+
+                        if (targetType.IsEnum)
+                        {
+                            // Handle Enum conversion from int/string
+                            value = Enum.ToObject(targetType, value);
+                        }
+                        else
+                        {
+                            value = Convert.ChangeType(value, targetType);
+                        }
+
+                        property.SetValue(entity, value);
+                    }
+                }
+                result.Add(entity);
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// 根据主键查询实体
         /// </summary>
         /// <typeparam name="T">实体类型</typeparam>
@@ -802,7 +868,17 @@ namespace DoorMonitorSystem.Assets.Helper
                         targetType = Nullable.GetUnderlyingType(targetType);
                     }
 
-                    property.SetValue(entity, Convert.ChangeType(value, targetType));
+                    if (targetType.IsEnum)
+                    {
+                        // Handle Enum conversion from int/string
+                        value = Enum.ToObject(targetType, value);
+                    }
+                    else
+                    {
+                        value = Convert.ChangeType(value, targetType);
+                    }
+
+                    property.SetValue(entity, value);
                 }
             }
 

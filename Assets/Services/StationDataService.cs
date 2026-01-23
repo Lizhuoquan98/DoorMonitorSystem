@@ -54,7 +54,7 @@ namespace DoorMonitorSystem.Assets.Services
                 _categoryCache[entity.Id] = category;
             }
 
-            Debug.WriteLine($"成功加载 {_categoryCache.Count} 个分类");
+            // Debug.WriteLine($"成功加载 {_categoryCache.Count} 个分类");
         }
 
         /// <summary>
@@ -83,7 +83,7 @@ namespace DoorMonitorSystem.Assets.Services
                     stations.Add(station);
                 }
 
-                Debug.WriteLine($"成功加载 {stations.Count} 个站台");
+                // Debug.WriteLine($"成功加载 {stations.Count} 个站台");
             }
             catch (Exception ex)
             {

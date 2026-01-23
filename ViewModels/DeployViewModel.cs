@@ -53,6 +53,20 @@ namespace DoorMonitorSystem.ViewModels
                 _selectedDevice = value?.Clone();
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsDeviceSelected));
+                
+                // 重置测试状态信息
+                TestStatusMessage = string.Empty;
+
+                // 同步协议索引
+                if (_selectedDevice != null && !string.IsNullOrEmpty(_selectedDevice.Protocol))
+                {
+                    var index = ProtocolKeys.IndexOf(_selectedDevice.Protocol);
+                    if (index >= 0)
+                    {
+                        _selectedProtocolIndex = index;
+                        OnPropertyChanged(nameof(SelectedProtocolIndex));
+                    }
+                }
             }
         }
 
@@ -72,6 +86,9 @@ namespace DoorMonitorSystem.ViewModels
                     _selectedDeviceIndex = value;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(IsDeviceSelected));
+
+                    // 切换设备索引时清空测试状态
+                    TestStatusMessage = string.Empty;
                 }
             }
         }
@@ -86,6 +103,9 @@ namespace DoorMonitorSystem.ViewModels
                 {
                     _selectedProtocolIndex = value;
                     OnPropertyChanged();
+
+                    // 切换协议时清空测试状态
+                    TestStatusMessage = string.Empty;
 
                     // 当协议变更时，更新参数列表
                     if (_selectedProtocolIndex >= 0 && SelectedDevice != null)
@@ -147,10 +167,13 @@ namespace DoorMonitorSystem.ViewModels
         /// </summary>
         public ICommand AddDeviceCommand => new RelayCommand(_ =>
         {
+            // 自动生成唯一 ID：现有最大 ID + 1
+            int nextId = Devices.Any() ? Devices.Max(d => d.ID) + 1 : 1;
+
             var newDevice = new ConfigEntity
             {
                 Name = $"新设备 {Devices.Count + 1}",
-                ID = Devices.Count + 1,
+                ID = nextId,
                 Protocol = ProtocolKeys.FirstOrDefault() ?? "",
                 CommParsams = []
             };
@@ -212,31 +235,52 @@ namespace DoorMonitorSystem.ViewModels
 
         #region 私有方法
 
-        /// <summary>
-        /// 加载协议列表
-        /// </summary>
         private void LoadProtocolKeys()
         {
             ProtocolKeys.Clear();
 
-            // TODO: 从 GlobalData.ProtocolsPairs 加载协议列表
-            // 暂时添加示例协议
-            ProtocolKeys.Add("S7-1200");
-            ProtocolKeys.Add("S7-1500");
-            ProtocolKeys.Add("Modbus TCP");
-            ProtocolKeys.Add("OPC UA");
+            if (GlobalData.ProtocolsPairs != null)
+            {
+                foreach (var key in GlobalData.ProtocolsPairs.Keys)
+                {
+                    ProtocolKeys.Add(key);
+                }
+            }
+            
+            // 如果为空，保持默认加载（降级处理）
+            if (ProtocolKeys.Count == 0)
+            {
+                ProtocolKeys.Add("S7-1200");
+                ProtocolKeys.Add("S7-1500");
+                ProtocolKeys.Add("Modbus TCP");
+                ProtocolKeys.Add("Modbus RTU");
+            }
         }
 
-        /// <summary>
-        /// 更新设备参数列表（根据协议特性生成）
-        /// </summary>
         private void UpdateDeviceParameters()
         {
             if (SelectedDevice == null || _selectedProtocolIndex < 0) return;
 
-            // TODO: 根据协议类型，使用反射获取特性标记的参数
-            // var protocolType = GlobalData.ProtocolsPairs[ProtocolKeys[_selectedProtocolIndex]].GetType();
-            // SelectedDevice.CommParsams = new ObservableCollection<CommParamEntity>(GetProtocolConfig(protocolType));
+            string protocolKey = ProtocolKeys[_selectedProtocolIndex];
+            SelectedDevice.Protocol = protocolKey;
+
+            if (GlobalData.ProtocolsPairs != null && GlobalData.ProtocolsPairs.TryGetValue(protocolKey, out var protocol))
+            {
+                var protocolType = protocol.GetType();
+                var newParams = GetProtocolConfig(protocolType);
+                
+                // 保留已有参数的值（如果名称匹配）
+                foreach (var p in newParams)
+                {
+                    var existing = SelectedDevice.CommParsams.FirstOrDefault(x => x.Name == p.Name);
+                    if (existing != null)
+                    {
+                        p.Value = existing.Value;
+                    }
+                }
+                
+                SelectedDevice.CommParsams = newParams.ToList();
+            }
         }
 
         /// <summary>
@@ -309,24 +353,45 @@ namespace DoorMonitorSystem.ViewModels
 
             try
             {
-                // 模拟连接测试（延迟1秒）
-                await Task.Delay(1000);
+                if (GlobalData.ProtocolsPairs == null || !GlobalData.ProtocolsPairs.TryGetValue(SelectedDevice.Protocol, out var protocolProto))
+                {
+                    TestStatusMessage = $"❌ 未找到协议 \"{SelectedDevice.Protocol}\" 的实现！";
+                    return;
+                }
 
-                // TODO: 实际的连接测试逻辑
-                // 根据协议类型创建通信对象并测试连接
-                // var comm = GlobalData.ProtocolsPairs[SelectedDevice.Protocol];
-                // bool isConnected = await comm.TestConnection(SelectedDevice.CommParsams);
+                // 通过反射创建测试实例，避免干扰运行中的服务
+                var testComm = Activator.CreateInstance(protocolProto.GetType()) as Communicationlib.ICommBase;
+                if (testComm == null)
+                {
+                    TestStatusMessage = "❌ 无法创建协议测试实例！";
+                    return;
+                }
 
-                // 模拟测试结果
-                bool isConnected = new Random().Next(0, 2) == 1;
+                TestStatusMessage = $"🔄 正在初始化 \"{SelectedDevice.Protocol}\" 并尝试连接...";
+                
+                bool isConnected = await Task.Run(() =>
+                {
+                    try
+                    {
+                        testComm.Initialize(SelectedDevice.CommParsams.ToList());
+                        testComm.Open();
+                        bool connected = testComm.IsConnected;
+                        testComm.Close();
+                        return connected;
+                    }
+                    catch (Exception)
+                    {
+                        return false;
+                    }
+                });
 
                 if (isConnected)
                 {
-                    TestStatusMessage = $"✅ 设备 \"{SelectedDevice.Name}\" 连接成功！";
+                    TestStatusMessage = $"✅ 设备 \"{SelectedDevice.Name}\" ({SelectedDevice.Protocol}) 连接成功！";
                 }
                 else
                 {
-                    TestStatusMessage = $"❌ 设备 \"{SelectedDevice.Name}\" 连接失败！";
+                    TestStatusMessage = $"❌ 设备 \"{SelectedDevice.Name}\" ({SelectedDevice.Protocol}) 连接失败，请检查参数或网络环境。";
                 }
             }
             catch (Exception ex)

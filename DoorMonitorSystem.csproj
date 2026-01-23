@@ -10,13 +10,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="packages\NModbus4.2.1.0\**" />
-    <EmbeddedResource Remove="packages\NModbus4.2.1.0\**" />
-    <None Remove="packages\NModbus4.2.1.0\**" />
-    <Page Remove="packages\NModbus4.2.1.0\**" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Remove="Assets\Images\bg.png" />
   </ItemGroup>
 
@@ -27,7 +20,6 @@
 
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.66" />
-    <PackageReference Include="Extended.Wpf.Toolkit" Version="4.7.25104.5739" />
     <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.135" />
     <PackageReference Include="MySql.Data" Version="9.3.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
@@ -40,7 +32,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Communication.Protocol\Communication.Protocol.csproj" />
+
     <ProjectReference Include="..\Communicationlib\Communicationlib.csproj" />
     <ProjectReference Include="..\ControlLibrary\ControlLibrary.csproj" />
   </ItemGroup>
@@ -52,10 +44,6 @@
     <Compile Update="UControl\DoorControl.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="packages\" />
   </ItemGroup>
 
 </Project>

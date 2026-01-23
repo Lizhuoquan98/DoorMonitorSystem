@@ -59,6 +59,7 @@ namespace DoorMonitorSystem.Assets.Database
                         if (!protocol.IsConnected)
                             continue;
                         Debug.WriteLine($"{dev.Name} 协议 {dev.Protocol} 打开成功");
+                        /*
                         // 启动一个独立任务，专门执行协议方法调度
                         _ = Task.Run(async () =>
                         {
@@ -107,12 +108,13 @@ namespace DoorMonitorSystem.Assets.Database
                             }
                             await Task.WhenAll(tasks);
                         });
+                        */
                     }
                     catch (Exception ex)
                     {
 
                         Debug.WriteLine($"{dev.Name} 协议 {dev.Protocol} 通讯建立失败！！");
-                        Debug.WriteLine($"{ex.ToString}");
+                        Debug.WriteLine($"{ex.ToString()}");
                     }
 
 
@@ -224,11 +226,12 @@ namespace DoorMonitorSystem.Assets.Database
             mysql.CreateTableFromModel<PanelEntity>();
             mysql.CreateTableFromModel<PanelBitConfigEntity>();
             mysql.CreateTableFromModel<BitCategoryEntity>();
-            
-             
-        }
-          
+            mysql.CreateTableFromModel<DevicePointConfigEntity>();
 
+            // 加载设备点位配置到全局缓存 (将在 CommunicationService 中处理)
+            // GlobalData.ListDevicePoints = mysql.FindAll<DevicePointConfigEntity>();
+            
+        }
         /// <summary>
         /// 从单个字节中获取指定位的值
         /// </summary>

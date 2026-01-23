@@ -87,6 +87,13 @@ namespace DoorMonitorSystem.Models.RunModels
         /// <summary>弹窗指示灯UI绑定颜色</summary>
         public Brush IndicatorBrush => BitValue ? HighBrush : LowBrush;
 
+        /// <summary>BitControl 专用的颜色配置对象</summary>
+        public ControlLibrary.Models.BitColor ConfigColor => new ControlLibrary.Models.BitColor
+        {
+            High = HighBrush,
+            Low = LowBrush
+        };
+
         #endregion
 
         #region 门三部分显示配置
