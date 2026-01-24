@@ -1,23 +1,98 @@
 ﻿<Window x:Class="DoorMonitorSystem.UControl.InputDialog"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:local="clr-namespace:DoorMonitorSystem.UControl"
-             mc:Ignorable="d" 
-            WindowStartupLocation="CenterScreen" 
-          WindowStyle="None" 
-            Height="119" Width="180">
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+        mc:Ignorable="d" 
+        WindowStartupLocation="CenterScreen" 
+        WindowStyle="None" 
+        AllowsTransparency="True"
+        Background="Transparent"
+        Height="180" Width="360"
+        ResizeMode="NoResize">
 
+    <Border Background="#1a1f2e" 
+            BorderBrush="#2a5f8f" 
+            BorderThickness="1" 
+            CornerRadius="12"
+            Padding="20">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="15" ShadowDepth="0" Opacity="0.5"/>
+        </Border.Effect>
+        
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
 
-    <Grid>
-        <!-- 提示标签，用于显示提示信息 -->
-        <Label x:Name="lblPrompt" Content="请输当前用户密码" Margin="10" VerticalAlignment="Top"/>
-        <!-- 文本输入框，用户在此输入文本 -->
-        <TextBox x:Name="txtInput" Margin="10,40,10,0" VerticalAlignment="Top"/>
-        <!-- 确定按钮，点击后获取输入文本并关闭对话框 -->
-        <Button Content="确定" HorizontalAlignment="Left" Margin="10,80,0,0" VerticalAlignment="Top" Width="70" Click="btnOk_Click"/>
-        <!-- 取消按钮，点击后关闭对话框，不获取输入文本 -->
-        <Button Content="取消" HorizontalAlignment="Right" Margin="0,80,10,0" VerticalAlignment="Top" Width="70" Click="btnCancel_Click"/>
-    </Grid>
+            <!-- 标题/提示 -->
+            <StackPanel Grid.Row="0" Margin="0,0,0,15">
+                <TextBlock Text="身份验证" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,8"/>
+                <Label x:Name="lblPrompt" Content="请输入密码以继续操作" 
+                       Foreground="#a0b0c0" Padding="0" FontSize="13"/>
+            </StackPanel>
+
+            <!-- 输入框 -->
+            <Border Grid.Row="1" Background="#0f121a" CornerRadius="6" BorderBrush="#3a4555" BorderThickness="1" Margin="0,0,0,20">
+                <TextBox x:Name="txtInput" 
+                         Background="Transparent" 
+                         BorderThickness="0" 
+                         Foreground="White" 
+                         CaretBrush="White"
+                         Padding="1"
+                         FontSize="14"
+                         VerticalContentAlignment="Center"
+                         KeyDown="txtInput_KeyDown"/>
+            </Border>
+
+            <!-- 按钮组 -->
+            <Grid Grid.Row="2" VerticalAlignment="Bottom">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="15"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- 取消按钮 -->
+                <Button Grid.Column="0" Content="取消" Click="btnCancel_Click" Cursor="Hand" Height="36">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="border" Background="#2d3342" CornerRadius="6">
+                                <TextBlock Text="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#d0d0d0"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#3d4455"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#252a36"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <!-- 确定按钮 -->
+                <Button Grid.Column="2" Content="确认" Click="btnOk_Click" Cursor="Hand" Height="36">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="border" Background="#2a5f8f" CornerRadius="6">
+                                <TextBlock Text="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="White" FontWeight="Bold"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#3a6f9f"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#1a4f7f"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+            </Grid>
+        </Grid>
+    </Border>
 </Window>

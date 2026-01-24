@@ -90,6 +90,11 @@ namespace DoorMonitorSystem.Models.RunModels
             }
         }
 
+        /// <summary>
+        /// 打开详情命令（直接绑定，避免 RelativeSource 查找开销）
+        /// </summary>
+        public System.Windows.Input.ICommand? OpenDetailCommand { get; set; }
+
         #endregion
     }
 }

@@ -64,7 +64,9 @@ namespace DoorMonitorSystem.Models.RunModels
                 {
                     // 将 #RRGGBB 格式转换为 Brush
                     var color = (Color)ColorConverter.ConvertFromString(ColorValue);
-                    ColorBrush = new SolidColorBrush(color);
+                    var brush = new SolidColorBrush(color);
+                    if (brush.CanFreeze) brush.Freeze();
+                    ColorBrush = brush;
                 }
                 else
                 {
@@ -87,7 +89,9 @@ namespace DoorMonitorSystem.Models.RunModels
                 if (!string.IsNullOrEmpty(colorValue))
                 {
                     var color = (Color)ColorConverter.ConvertFromString(colorValue);
-                    return new SolidColorBrush(color);
+                    var brush = new SolidColorBrush(color);
+                    if (brush.CanFreeze) brush.Freeze();
+                    return brush;
                 }
             }
             catch

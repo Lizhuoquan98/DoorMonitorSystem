@@ -1,9 +1,6 @@
-﻿using ControlLibrary.Models;
-using DoorMonitorSystem.Assets.Database; 
-using DoorMonitorSystem.Assets.Navigation;
-using DoorMonitorSystem.ViewModels;
+﻿using DoorMonitorSystem.Assets.Services;
 using System;
-using System.Windows;  
+using System.Windows;
 
 namespace DoorMonitorSystem.Views
 {
@@ -16,7 +13,8 @@ namespace DoorMonitorSystem.Views
 
         public MainWindow()
         {
-            _ = new LoadDefaultData();
+            // 使用统一的数据管理器进行基础配置初始化
+            DataManager.Instance.Initialize();
 
             // 1. 初始化通信服务实例
             _commService = new DoorMonitorSystem.Assets.Services.DeviceCommunicationService();

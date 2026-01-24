@@ -13,6 +13,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Collections.Generic;
 using System.Windows.Media;
+using System.ComponentModel;
 using ControlLibrary.Models;
 
 namespace DoorMonitorSystem.ViewModels
@@ -66,79 +67,100 @@ namespace DoorMonitorSystem.ViewModels
             get => _selectedDoor;
             set
             {
+                if (_selectedDoor != null)
+                {
+                    foreach (var b in _selectedDoor.Bits) b.PropertyChanged -= Bit_PropertyChanged;
+                }
+
                 _selectedDoor = value;
+
+                if (_selectedDoor != null)
+                {
+                    foreach (var b in _selectedDoor.Bits) b.PropertyChanged += Bit_PropertyChanged;
+                }
+
                 OnPropertyChanged();
-                // 通知所有相关属性更新
-                OnPropertyChanged(nameof(CategoryGroups));
-                OnPropertyChanged(nameof(AlarmBits));
-                OnPropertyChanged(nameof(StatusBits));
-                OnPropertyChanged(nameof(ActiveAlarmCount));
-                OnPropertyChanged(nameof(ActiveStatusCount));
+                
+                // 缓存并通知
+                RefreshCategoryGroups();
+                NotifyAggregateProperties();
             }
         }
 
+        private void Bit_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(DoorBitConfig.BitValue))
+            {
+                NotifyAggregateProperties();
+            }
+        }
+
+        private void NotifyAggregateProperties()
+        {
+            OnPropertyChanged(nameof(ActiveAlarmCount));
+            OnPropertyChanged(nameof(ActiveStatusCount));
+            OnPropertyChanged(nameof(AlarmBits));
+            OnPropertyChanged(nameof(StatusBits));
+            // CategoryGroups 内部已经监听了位变化，所以不需要通知集合本身变化
+            // 但如果使用的是实时计算属性，也需要通知
+            OnPropertyChanged(nameof(CategoryGroups)); 
+        }
+
+        private ObservableCollection<CategoryGroup> _categoryGroups = new();
         /// <summary>
         /// 按分类分组的点位集合（用于弹窗动态显示）
         /// </summary>
         public ObservableCollection<CategoryGroup> CategoryGroups
         {
-            get
+            get => _categoryGroups;
+            private set { _categoryGroups = value; OnPropertyChanged(); }
+        }
+
+        private void RefreshCategoryGroups()
+        {
+            if (SelectedDoor == null)
             {
-                if (SelectedDoor == null) return new();
-
-                var groups = new ObservableCollection<CategoryGroup>();
-
-                // 按分类分组点位
-                var categoryGrouping = SelectedDoor.Bits
-                    .Where(b => b.Category != null)
-                    .GroupBy(b => b.Category)
-                    .OrderBy(g => g.Key.SortOrder);
-
-                foreach (var group in categoryGrouping)
-                {
-                    var category = group.Key;
-                    var bits = new ObservableCollection<DoorBitConfig>(
-                        group.OrderBy(b => b.SortOrder)
-                    );
-
-                    // 计算激活数量
-                    int activeCount = bits.Count(b => b.BitValue == true);
-
-                    groups.Add(new CategoryGroup
-                    {
-                        Category = category,
-                        Bits = bits,
-                        ActiveCount = activeCount
-                    });
-                }
-
-                // 添加未分类的点位（如果有）
-                var uncategorized = SelectedDoor.Bits
-                    .Where(b => b.Category == null)
-                    .OrderBy(b => b.SortOrder)
-                    .ToList();
-
-                if (uncategorized.Any())
-                {
-                    groups.Add(new CategoryGroup
-                    {
-                        Category = new BitCategoryModel
-                        {
-                            CategoryId = 0,
-                            Code = "Uncategorized",
-                            Name = "其他",
-                            Icon = "📋",
-                            BackgroundColor = "#607D8B",
-                            ForegroundColor = "#FFFFFF",
-                            SortOrder = 999
-                        },
-                        Bits = new ObservableCollection<DoorBitConfig>(uncategorized),
-                        ActiveCount = uncategorized.Count(b => b.BitValue == true)
-                    });
-                }
-
-                return groups;
+                CategoryGroups = new();
+                return;
             }
+
+            // 按 CategoryId 分组点位
+            var list = SelectedDoor.Bits
+                .Where(b => b.Category != null)
+                .OrderBy(b => b.SortOrder)
+                .GroupBy(b => b.CategoryId)
+                .Select(g => new CategoryGroup
+                {
+                    Category = g.First().Category!,
+                    Bits = new ObservableCollection<DoorBitConfig>(g.OrderBy(b => b.SortOrder))
+                })
+                .OrderBy(cg => cg.Category.SortOrder)
+                .ToList();
+
+            // 如果有未分类的点位
+            var uncategorized = SelectedDoor.Bits
+                .Where(b => b.Category == null)
+                .OrderBy(b => b.SortOrder)
+                .ToList();
+
+            if (uncategorized.Any())
+            {
+                list.Add(new CategoryGroup
+                {
+                    Category = new BitCategoryModel
+                    {
+                        CategoryId = 0,
+                        Name = "其它",
+                        Icon = "📋",
+                        BackgroundColor = "#607D8B",
+                        ForegroundColor = "#FFFFFF",
+                        SortOrder = 999
+                    },
+                    Bits = new ObservableCollection<DoorBitConfig>(uncategorized)
+                });
+            }
+
+            CategoryGroups = new ObservableCollection<CategoryGroup>(list);
         }
 
         /// <summary>
@@ -225,12 +247,31 @@ namespace DoorMonitorSystem.ViewModels
             ClosePopupCommand = new RelayCommand(OnClosePopup);
             OpenDoorDetailCommand = new RelayCommand(OnOpenDoorDetail);
 
-            // 加载站台数据（从配置文件或数据库加载）
-            LoadStations();
-            Debug.WriteLine($"[MainVM] GraphicDictionary Count: {GlobalData.GraphicDictionary?.Count ?? -1}");
+            // 异步加载业务数据 (站台/门/点位)
+            _ = LoadDataAsync();
 
             // 启动数据更新循环
             _ = Task.Run(UpdateLoop, _updateLoopTokenSource.Token);
+        }
+
+        private async Task LoadDataAsync()
+        {
+            await DataManager.Instance.LoadBusinessDataAsync();
+
+            // 注入命令（避免 XAML 绑定时的 RelativeSource 查找）
+            foreach (var station in Stations)
+            {
+                if (station.Station == null) continue;
+                foreach (var group in station.Station.DoorGroups)
+                {
+                    foreach (var door in group.Doors)
+                    {
+                        door.OpenDetailCommand = OpenDoorDetailCommand;
+                    }
+                }
+            }
+
+            Debug.WriteLine($"[MainVM] Data loading completed. Status: {Stations.Count} stations.");
         }
 
         #endregion
@@ -242,42 +283,7 @@ namespace DoorMonitorSystem.ViewModels
         /// </summary>
         private void LoadStations()
         {
-            try
-            {
-                // 检查数据库配置是否存在
-                if (GlobalData.SysCfg == null)
-                {
-                    Debug.WriteLine("数据库配置未初始化，无法加载站台数据");
-                    return;
-                }
-
-                // 构建连接字符串
-                string connectionString = $"Server={GlobalData.SysCfg.ServerAddress};" +
-                                        $"Database={GlobalData.SysCfg.DatabaseName};" +
-                                        $"User ID={GlobalData.SysCfg.UserName};" +
-                                        $"Password={GlobalData.SysCfg.UserPassword};" +
-                                        $"CharSet=utf8mb4;";
-
-                // 创建数据服务并加载站台
-                var dataService = new StationDataService(connectionString);
-                var stationList = dataService.LoadAllStations();
-
-                // 清空现有数据
-                Stations.Clear();
-
-                // 添加到视图模型集合
-                foreach (var station in stationList)
-                {
-                    Stations.Add(new StationViewModel(station));
-                }
-
-                Debug.WriteLine($"成功从数据库加载 {Stations.Count} 个站台");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"加载站台数据失败: {ex.Message}");
-                Debug.WriteLine($"堆栈跟踪: {ex.StackTrace}");
-            }
+            // 旧逻辑已由 DataManager.LoadBusinessDataAsync 接管
         }
 
         #endregion
@@ -336,57 +342,8 @@ namespace DoorMonitorSystem.ViewModels
         /// </summary>
         private void UpdateDoorVisual(DoorModel door)
         {
-            if (door?.Bits == null) return;
-
-            // 1. 头部颜色条裁决 (Header)
-            // 取激活位中优先级最高的一个
-            var headerBit = door.Bits
-                .Where(b => b.BitValue && b.HeaderPriority > 0)
-                .OrderByDescending(b => b.HeaderPriority)
-                .FirstOrDefault();
-
-            door.Visual.HeaderBackground = headerBit?.HeaderColor ?? Brushes.Gray;
-            door.Visual.HeaderText = door.DoorName;
-
-            // 2. 中间图形/图标裁决 (Icons)
-            var imageBit = door.Bits
-                .Where(b => b.BitValue && b.ImagePriority > 0)
-                .OrderByDescending(b => b.ImagePriority)
-                .FirstOrDefault();
-
-            if (imageBit != null && !string.IsNullOrEmpty(imageBit.GraphicName) &&
-                GlobalData.GraphicDictionary != null &&
-                GlobalData.GraphicDictionary.TryGetValue(imageBit.GraphicName, out var iconTemplates))
-            {
-                // 为防止多门引用同一个 Geometry 对象造成并发或着色冲突，进行 Clone 处理
-                var newIcons = new List<IconItem>();
-                foreach (var template in iconTemplates)
-                {
-                    var cloned = template.Clone();
-                    cloned.Fill = imageBit.GraphicColor;
-                    newIcons.Add(cloned);
-                }
-
-                // 只有在图标真正发生变化时才更新（简单判断数量或标志），减少 UI 刷新压力
-                // 这里暂时直接赋值，DoorVisualResult.Icons 设置了 OnPropertyChanged
-                door.Visual.Icons = newIcons;
-            }
-            else
-            {
-                // 若没有匹配到图形点位，清空图标
-                if (door.Visual.Icons != null && door.Visual.Icons.Count > 0)
-                {
-                    door.Visual.Icons = new List<IconItem>();
-                }
-            }
-
-            // 3. 底部颜色条裁决 (Bottom)
-            var bottomBit = door.Bits
-                .Where(b => b.BitValue && b.BottomPriority > 0)
-                .OrderByDescending(b => b.BottomPriority)
-                .FirstOrDefault();
-
-            door.Visual.BottomBackground = bottomBit?.BottomColor ?? Brushes.Green;
+            // 业务逻辑下沉到 DataManager
+            DataManager.Instance.AdjudicateDoorVisual(door);
         }
 
         private void UpdatePanelVisual(PanelModel panel)

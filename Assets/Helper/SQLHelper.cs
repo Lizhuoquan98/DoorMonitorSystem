@@ -98,7 +98,7 @@ namespace DoorMonitorSystem.Assets.Helper
                 // 先尝试连接指定数据库
                 _connection = new MySqlConnection(ConnectionString);
                 _connection.Open();
-                Debug.WriteLine($"成功连接到数据库: {_databaseName}");
+                // Debug.WriteLine($"成功连接到数据库: {_databaseName}");
             }
             catch (MySqlException ex) when (ex.Number == 1049) // 数据库不存在错误代码
             {

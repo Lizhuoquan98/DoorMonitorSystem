@@ -52,6 +52,15 @@ namespace DoorMonitorSystem.UControl
             Close();
         }
 
+        private void txtInput_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                // 手动触发确定逻辑
+                btnOk_Click(sender, e);
+            }
+        }
+
     }
 }
 

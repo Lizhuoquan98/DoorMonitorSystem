@@ -10,14 +10,12 @@
     xmlns:usc="clr-namespace:ControlLibrary;assembly=ControlLibrary"
     xmlns:conv="clr-namespace:DoorMonitorSystem.Assets.Converter"
     mc:Ignorable="d"
-    Tag="主界面">
+    Tag="主界面"
+    UseLayoutRounding="True">
 
 
 
     <UserControl.Resources>
-
-        <!-- 转换器 -->
-        <conv:CountToVisibilityConverter x:Key="CountToVisibilityConverter"/>
 
         <!-- 门控件模板（使用现有的 DoorControl） -->
         <DataTemplate x:Key="DoorTemplate" DataType="{x:Type models:DoorModel}">
@@ -25,11 +23,12 @@
                 HeaderText="{Binding Visual.HeaderText}"
                 HeaderBackground="{Binding Visual.HeaderBackground}"
                 BottomBackground="{Binding Visual.BottomBackground}"
+                BorderThickness="0"
                 IconItems="{Binding Visual.Icons}"
-                Command="{Binding DataContext.OpenDoorDetailCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                Command="{Binding OpenDetailCommand}"
                 CommandParameter="{Binding}"
                 Width="50" Height="80"
-                Margin="2,0"
+                Margin="1,0"
                 FontSize="14"/>
         </DataTemplate>
 
@@ -54,6 +53,7 @@
                            Value="{Binding BitValue}"
                            FontSize="15" Height="25"
                            Margin="2,1"
+                           Foreground="White"
                            HorizontalAlignment="Stretch"/>
         </DataTemplate>
 
@@ -183,22 +183,23 @@
                         <Border BorderThickness="0" CornerRadius="10"
                                 Margin="0,8" Padding="20"
                                 Background="#1a1f2e">
-                            <Border.Effect>
+                            <!-- <Border.Effect>
                                 <DropShadowEffect Color="#000000" BlurRadius="15"
                                                 ShadowDepth="3" Opacity="0.4"/>
-                            </Border.Effect>
+                            </Border.Effect> -->
 
                             <!-- 悬停效果 -->
                             <Border.Style>
                                 <Style TargetType="Border">
                                     <Style.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter Property="Effect">
+                                            <Setter Property="Background" Value="#252b3b"/>
+                                            <!-- <Setter Property="Effect">
                                                 <Setter.Value>
                                                     <DropShadowEffect Color="#1976d2" BlurRadius="20"
                                                                     ShadowDepth="3" Opacity="0.6"/>
                                                 </Setter.Value>
-                                            </Setter>
+                                            </Setter> -->
                                         </Trigger>
                                     </Style.Triggers>
                                 </Style>
@@ -219,28 +220,33 @@
             </ItemsControl>
         </ScrollViewer>
 
-        <!-- 门详情弹窗（优化版） -->
-        <Popup x:Name="popup"
-               IsOpen="{Binding IsPopupOpen}"
-               Placement="Center"
-               AllowsTransparency="True"
-               StaysOpen="True"
-               Opened="Popup_Opened">
-            <!-- 外层阴影边框 -->
-            <Border Background="Transparent" Padding="20"
-                    x:Name="PopupContent"
-                    TextOptions.TextFormattingMode="Display"
-                    TextOptions.TextRenderingMode="ClearType"
-                    RenderOptions.ClearTypeHint="Enabled">
+        <!-- 门详情弹窗（优化版：Grid Overlay 替代 Popup） -->
+        <!-- 使用 Grid 覆盖层替代 Popup，配合 RenderTransform 实现 GPU 加速拖动 -->
+        <!-- 启用位图缓存 (BitmapCache) 以确保拖动时整个容器被视为一张纹理，消除重绘开销 -->
+        
+        <!-- 门详情弹窗（回退方案：静态居中显示，暂不支持拖动） -->
+        <Grid x:Name="OverlayContainer"
+              Panel.ZIndex="1000"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center">
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsPopupOpen}" Value="True">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+
+            <!-- 主弹窗边框 -->
+            <Border CornerRadius="15" MaxWidth="1200" MaxHeight="650"
+                   Background="#1a1f2e" BorderBrush="#2a5f8f" BorderThickness="1">
                 <Border.Effect>
-                    <DropShadowEffect Color="Black" BlurRadius="30" ShadowDepth="0" Opacity="0.6"/>
+                    <DropShadowEffect BlurRadius="20" ShadowDepth="0" Opacity="0.7"/>
                 </Border.Effect>
-
-                <!-- 主弹窗边框 -->
-                <Border CornerRadius="15" MaxWidth="1200" MaxHeight="650"
-                       Background="#1a1f2e" BorderBrush="#2a5f8f" BorderThickness="1">
-                   
-
+                
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -248,13 +254,9 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <!-- 优化后的标题栏（可拖动） -->
+                        <!-- 标题栏（静态） -->
                         <Border Grid.Row="0" CornerRadius="15,15,0,0"
-                                Padding="20,15"
-                                MouseLeftButtonDown="Label_MouseLeftButtonDown"
-                                MouseMove="Label_MouseMove"
-                                MouseLeftButtonUp="Label_MouseLeftButtonUp"
-                                Cursor="Hand">
+                                Padding="20,15">
                             <Border.Background>
                                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
                                     <GradientStop Color="#1e3a5f" Offset="0"/>
@@ -269,38 +271,39 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
-                                <!-- 门图标（优化） -->
+                                <!-- 门视图 -->
                                 <Border Grid.Column="0"
-                                       Width="45" Height="45"
-                                       CornerRadius="8"
+                                       Width="45" Height="65"
+                                       CornerRadius="5"
                                        Background="#2a5a8f"
-                                       Margin="0,0,15,0">
-                                    <Border.Effect>
-                                        <DropShadowEffect Color="#000000" BlurRadius="8" ShadowDepth="2" Opacity="0.4"/>
-                                    </Border.Effect>
-                                    <TextBlock Text="🚪" FontSize="24"
-                                              HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
+                                       Margin="0,0,15,0"
+                                       Padding="2">
+                                    <usc:DoorControl
+                                        HeaderText="{Binding SelectedDoor.DoorName}"
+                                        HeaderBackground="{Binding SelectedDoor.Visual.HeaderBackground}"
+                                        BottomBackground="{Binding SelectedDoor.Visual.BottomBackground}"
+                                        IconItems="{Binding SelectedDoor.Visual.Icons}"
+                                        BorderThickness="0"
+                                        FontSize="11"/>
                                 </Border>
 
-                                <!-- 标题文字（优化） -->
+                                <!-- 标题文字 -->
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding PopupTitle}"
                                               FontSize="16" FontWeight="Bold"
                                               Foreground="White"/>
                                     <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
                                         <TextBlock Text="💡" FontSize="11" Margin="0,0,5,0"/>
-                                        <TextBlock Text="拖动标题栏可移动窗口 • 按 ESC 关闭"
+                                        <TextBlock Text="按 ESC 键或右上角按钮关闭"
                                                   FontSize="11"
                                                   Foreground="#a0b0c0"/>
                                     </StackPanel>
                                 </StackPanel>
 
-                                <!-- 关闭按钮（优化） -->
+                                <!-- 关闭按钮 -->
                                 <Button Grid.Column="2"
                                         Margin="10,0,0,0"
                                        Command="{Binding ClosePopupCommand}"
-                                       Click="Close_Click"
                                        Width="38" Height="38"
                                        Background="#d32f2f"
                                        BorderThickness="0"
@@ -309,9 +312,6 @@
                                         <ControlTemplate TargetType="Button">
                                             <Border Background="{TemplateBinding Background}"
                                                    CornerRadius="8">
-                                                <Border.Effect>
-                                                    <DropShadowEffect Color="#d32f2f" BlurRadius="6" ShadowDepth="0" Opacity="0.5"/>
-                                                </Border.Effect>
                                                 <TextBlock Text="✕"
                                                           FontSize="18" FontWeight="Bold"
                                                           Foreground="White"
@@ -332,7 +332,7 @@
                             </Grid>
                         </Border>
 
-                        <!-- 优化后的点位详情内容区（动态分类显示） -->
+                        <!-- 点位详情内容区 -->
                         <ScrollViewer Grid.Row="1"
                                      VerticalScrollBarVisibility="Auto"
                                      HorizontalScrollBarVisibility="Disabled"
@@ -354,13 +354,6 @@
                                                Background="#1a1a2e"
                                                BorderBrush="{Binding Category.BackgroundBrush}"
                                                BorderThickness="2">
-                                            <Border.Effect>
-                                                <DropShadowEffect Color="{Binding Category.BackgroundColor}"
-                                                                BlurRadius="12"
-                                                                ShadowDepth="0"
-                                                                Opacity="0.4"/>
-                                            </Border.Effect>
-
                                             <StackPanel>
                                                 <!-- 动态分类标题 -->
                                                 <Border CornerRadius="8,8,0,0"
@@ -380,8 +373,17 @@
                                                         <Border Background="{Binding Category.ForegroundBrush}"
                                                                CornerRadius="10"
                                                                Padding="8,2"
-                                                               Margin="8,0,0,0"
-                                                               Visibility="{Binding ActiveCount, Converter={StaticResource CountToVisibilityConverter}}">
+                                                               Margin="8,0,0,0">
+                                                            <Border.Style>
+                                                                <Style TargetType="Border">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding ActiveCount}" Value="0">
+                                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Border.Style>
                                                             <TextBlock Text="{Binding ActiveCount}"
                                                                       FontSize="12"
                                                                       FontWeight="Bold"
@@ -392,7 +394,7 @@
 
                                                 <!-- 点位列表 -->
                                                 <ItemsControl ItemsSource="{Binding Bits}"
-                                                             Padding="10">
+                                                              Padding="10">
                                                     <ItemsControl.ItemsPanel>
                                                         <ItemsPanelTemplate>
                                                             <UniformGrid Rows="{Binding Category.LayoutRows}"
@@ -409,9 +411,6 @@
                                                                    Padding="8,4"
                                                                    SnapsToDevicePixels="True"
                                                                    UseLayoutRounding="True">
-                                                                <Border.Effect>
-                                                                    <DropShadowEffect Color="Black" BlurRadius="4" ShadowDepth="1" Opacity="0.3"/>
-                                                                </Border.Effect>
                                                                 <usc:BitControl Text="{Binding Description}"
                                                                               BITColor="{Binding ConfigColor}"
                                                                               Value="{Binding BitValue}"
@@ -430,7 +429,7 @@
                             </ItemsControl>
                         </ScrollViewer>
 
-                        <!-- 优化后的底部提示（简化版） -->
+                        <!-- 底部提示 -->
                         <Border Grid.Row="2"
                                Background="#0d1117"
                                CornerRadius="0,0,15,15"
@@ -439,14 +438,14 @@
                                BorderThickness="0,1,0,0">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <TextBlock Text="ℹ️" FontSize="11" Margin="0,0,6,0"/>
-                                <TextBlock Text="按 ESC 键快速关闭  •  拖动标题栏可移动窗口"
+                                <TextBlock Text="按 ESC 键快速关闭"
                                           FontSize="11"
                                           Foreground="#7b8a9a"/>
                             </StackPanel>
                         </Border>
                     </Grid>
-                </Border>
             </Border>
-        </Popup>
+        </Grid>
+        
     </Grid>
 </UserControl>

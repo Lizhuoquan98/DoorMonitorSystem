@@ -1,4 +1,5 @@
-﻿using DoorMonitorSystem.ViewModels;
+﻿using DoorMonitorSystem.Assets.Services;
+using DoorMonitorSystem.ViewModels;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -47,26 +48,16 @@ namespace DoorMonitorSystem.Views
         /// </summary>
         private void MainView_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Escape && popup.IsOpen)
+            if (e.Key == Key.Escape)
             {
                 var viewModel = this.DataContext as MainViewModel;
-                if (viewModel != null)
+                if (viewModel != null && viewModel.IsPopupOpen)
                 {
                     viewModel.IsPopupOpen = false;
-                    popup.HorizontalOffset = 0;
-                    popup.VerticalOffset = 0;
                 }
-                e.Handled = true;
+                // 不要设置为 Handled，以免影响其他输入
+                // e.Handled = true; 
             }
-        }
-
-        /// <summary>
-        /// Popup 打开时设置焦点（确保能接收键盘事件）
-        /// </summary>
-        private void Popup_Opened(object sender, EventArgs e)
-        {
-            // 给主视图设置焦点
-            this.Focus();
         }
 
         private void Popup_KeyDown(object sender, KeyEventArgs e)
@@ -74,42 +65,6 @@ namespace DoorMonitorSystem.Views
             // 不再需要这个方法，已改用 MainView_PreviewKeyDown
         }
 
-        private void Label_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            _isDragging = true;
 
-     
-             _startPoint = e.GetPosition(Window.GetWindow(this));
-            var label = sender as UIElement;
-            label?.CaptureMouse();
-        }
-
-        private void Label_MouseMove(object sender, MouseEventArgs e)
-        {
-            if (!_isDragging) return;
-
-            var popup = this.popup; // 你的 Popup 控件名
-
-            var currentPoint = e.GetPosition(Window.GetWindow(this));
-            var offset = currentPoint - _startPoint;
-
-            popup.HorizontalOffset += offset.X;
-            popup.VerticalOffset += offset.Y;
-
-            _startPoint = currentPoint;
-        }
-
-        private void Label_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            _isDragging = false;
-            var label = sender as UIElement;
-            label?.ReleaseMouseCapture();
-        }
-
-        private void Close_Click(object sender, RoutedEventArgs e)
-        {
-            popup.HorizontalOffset  = 0;
-            popup.VerticalOffset  = 0;
-        }
     }
 }

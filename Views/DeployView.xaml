@@ -128,6 +128,22 @@
             </Setter>
         </Style>
 
+        <!-- 表格内嵌入编辑框样式 (新增：带交互反馈) -->
+        <Style x:Key="InlineEditBoxStyle" TargetType="TextBox" BasedOn="{StaticResource ModernTextBoxStyle}">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#0DFFFFFF"/>
+                    <Setter Property="BorderBrush" Value="#40FFFFFF"/>
+                </Trigger>
+                <Trigger Property="IsFocused" Value="True">
+                    <Setter Property="Background" Value="#1a1f2e"/>
+                    <Setter Property="BorderBrush" Value="#2196F3"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- ListBox 项样式 -->
         <Style x:Key="DeviceListItemStyle" TargetType="ListBoxItem">
             <Setter Property="Background" Value="#1a1f2e"/>
@@ -582,22 +598,14 @@
                                         <DataGridTemplateColumn Header="参数值" Width="*">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Text="{Binding Value}"
-                                                              Foreground="#2196F3"
-                                                              FontWeight="Medium"
-                                                              VerticalAlignment="Center"/>
-                                                </DataTemplate>
-                                            </DataGridTemplateColumn.CellTemplate>
-                                            <DataGridTemplateColumn.CellEditingTemplate>
-                                                <DataTemplate>
                                                     <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
-                                                            Style="{StaticResource ModernTextBoxStyle}"
+                                                            Style="{StaticResource InlineEditBoxStyle}"
                                                             Padding="5,2"
                                                             Height="30"
                                                             VerticalAlignment="Center"
                                                             VerticalContentAlignment="Center"/>
                                                 </DataTemplate>
-                                            </DataGridTemplateColumn.CellEditingTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
                                     </DataGrid.Columns>
                                 </DataGrid>

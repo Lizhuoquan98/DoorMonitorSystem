@@ -38,6 +38,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Config\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Update="UControl\InputDialog.xaml.cs">
       <SubType>Code</SubType>
     </Compile>

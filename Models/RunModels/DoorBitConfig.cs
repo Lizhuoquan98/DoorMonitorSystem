@@ -34,6 +34,7 @@ namespace DoorMonitorSystem.Models.RunModels
             get => _bitValue;
             set
             {
+                if (_bitValue == value) return;
                 _bitValue = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IndicatorBrush));

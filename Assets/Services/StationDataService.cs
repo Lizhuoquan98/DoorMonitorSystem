@@ -1,3 +1,4 @@
+using ControlLibrary.Models;
 using Dapper;
 using DoorMonitorSystem.Models.ConfigEntity;
 using DoorMonitorSystem.Models.ConfigEntity.Door;
@@ -8,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Windows.Media;
 
 namespace DoorMonitorSystem.Assets.Services
 {
@@ -19,6 +21,7 @@ namespace DoorMonitorSystem.Assets.Services
     {
         private readonly string _connectionString;
         private Dictionary<int, BitCategoryModel> _categoryCache = new();
+        private Dictionary<int, Brush> _brushCache = new();
 
         public StationDataService(string connectionString)
         {
@@ -58,6 +61,36 @@ namespace DoorMonitorSystem.Assets.Services
         }
 
         /// <summary>
+        /// 加载所有颜色定义并缓存为 Brush
+        /// </summary>
+        private void LoadColors(MySqlConnection conn)
+        {
+            _brushCache.Clear();
+            var colorEntities = conn.Query<BitColorEntity>("SELECT * FROM BitColor").ToList();
+            foreach (var entity in colorEntities)
+            {
+                try
+                {
+                    var color = (Color)ColorConverter.ConvertFromString(entity.ColorValue);
+                    var brush = new SolidColorBrush(color);
+                    if (brush.CanFreeze) brush.Freeze();
+                    _brushCache[entity.Id] = brush;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[ColorLoad] Failed to parse color: {entity.ColorValue}, {ex.Message}");
+                }
+            }
+        }
+
+        private Brush GetBrush(int? id, Brush defaultBrush)
+        {
+            if (id.HasValue && _brushCache.TryGetValue(id.Value, out var brush))
+                return brush;
+            return defaultBrush;
+        }
+
+        /// <summary>
         /// 从数据库加载所有站台数据
         /// </summary>
         public List<StationMainGroup> LoadAllStations()
@@ -69,8 +102,9 @@ namespace DoorMonitorSystem.Assets.Services
                 using var conn = new MySqlConnection(_connectionString);
                 conn.Open();
 
-                // 0. 首先加载所有分类数据到缓存
+                // 0. 首先加载基础字典数据到缓存
                 LoadCategories(conn);
+                LoadColors(conn);
 
                 // 1. 加载所有站台
                 var stationEntities = conn.Query<StationEntity>(
@@ -189,9 +223,9 @@ namespace DoorMonitorSystem.Assets.Services
                     Visual = new DoorVisualResult
                     {
                         HeaderText = entity.DoorName,
-                        HeaderBackground = System.Windows.Media.Brushes.LightGray,
-                        BottomBackground = System.Windows.Media.Brushes.Green,
-                        Icons = new List<ControlLibrary.Models.IconItem>()
+                        HeaderBackground = Brushes.Gray,
+                        BottomBackground = Brushes.Green,
+                        Icons = new List<IconItem>()
                     }
                 };
 
@@ -236,13 +270,14 @@ namespace DoorMonitorSystem.Assets.Services
                     HeaderPriority = entity.HeaderPriority,
                     ImagePriority = entity.ImagePriority,
                     BottomPriority = entity.BottomPriority,
-                    // TODO: 从 BitColorEntity 加载颜色配置
-                    HeaderColor = System.Windows.Media.Brushes.Gray,
+                    // 从数据库加载颜色配置
+                    HighBrush = GetBrush(entity.HighColorId, Brushes.LimeGreen),
+                    LowBrush = GetBrush(entity.LowColorId, Brushes.DarkGray),
+                    
+                    HeaderColor = GetBrush(entity.HeaderColorId ?? entity.HighColorId, Brushes.Gray),
                     GraphicName = entity.GraphicName ?? "",
-                    GraphicColor = System.Windows.Media.Brushes.Black,
-                    BottomColor = System.Windows.Media.Brushes.Green,
-                    HighBrush = System.Windows.Media.Brushes.LimeGreen,
-                    LowBrush = System.Windows.Media.Brushes.DarkGray
+                    GraphicColor = GetBrush(entity.HighColorId, Brushes.Black),
+                    BottomColor = GetBrush(entity.BottomColorId ?? entity.HighColorId, Brushes.Green)
                 };
 
                 // 关联分类对象
@@ -363,8 +398,8 @@ namespace DoorMonitorSystem.Assets.Services
                     Description = entity.Description,
                     BitValue = false,
                     SortOrder = entity.SortOrder,
-                    HighBrush = System.Windows.Media.Brushes.LimeGreen,
-                    LowBrush = System.Windows.Media.Brushes.DarkGray
+                    HighBrush = GetBrush(entity.HighColorId, Brushes.LimeGreen),
+                    LowBrush = GetBrush(entity.LowColorId, Brushes.DarkGray)
                 };
 
                 bitConfigs.Add(bitConfig);
@@ -400,6 +435,8 @@ namespace DoorMonitorSystem.Assets.Services
         public string GraphicName { get; set; } = "";
         public int HighColorId { get; set; }
         public int LowColorId { get; set; }
+        public int? HeaderColorId { get; set; }
+        public int? BottomColorId { get; set; }
     }
 
     /// <summary>面板点位配置实体</summary>

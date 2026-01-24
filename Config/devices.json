@@ -1,0 +1,57 @@
+[
+  {
+    "Name": "雷达",
+    "ID": 2,
+    "Protocol": "MODBUS_TCP_CLIENT",
+    "CommParsams": [
+      {
+        "Name": "目标IP",
+        "Value": "127.0.0.1"
+      },
+      {
+        "Name": "目标端口",
+        "Value": "502"
+      },
+      {
+        "Name": "本地端口",
+        "Value": "0"
+      },
+      {
+        "Name": "从站ID",
+        "Value": "1"
+      },
+      {
+        "Name": "起始地址",
+        "Value": "1"
+      },
+      {
+        "Name": "寄存器数量",
+        "Value": "5"
+      }
+    ]
+  },
+  {
+    "Name": "ISCS",
+    "ID": 3,
+    "Protocol": "MODBUS_TCP_SERVER",
+    "CommParsams": [
+      {
+        "Name": "监听端口",
+        "Value": "505"
+      },
+      {
+        "Name": "设备ID",
+        "Value": "255"
+      },
+      {
+        "Name": "起始地址",
+        "Value": "1"
+      },
+      {
+        "Name": "寄存器数量",
+        "Value": "100"
+      }
+    ]
+  }
+
+]

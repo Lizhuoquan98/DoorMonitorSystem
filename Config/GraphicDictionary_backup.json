@@ -1,0 +1,431 @@
+[
+  {
+    "Name": "关门",
+    "Items": [
+      {
+        "PathData": "M0,0L1024,0 1024,1024 0,1024z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FF404040",
+        "StrokeThickness": 1
+      },
+      {
+        "PathData": "M40,40L984,40 984,984 40,984z",
+        "StrokeColor": "#FF303030",
+        "FillColor": "#FFFFFFFF",
+        "StrokeThickness": 8
+      },
+      {
+        "PathData": "M80,80L492,80 492,944 80,944z",
+        "StrokeColor": "#FF1E1E1E",
+        "FillColor": "#FF4CAF50",
+        "StrokeThickness": 6
+      },
+      {
+        "PathData": "M532,80L944,80 944,944 532,944z",
+        "StrokeColor": "#FF1E1E1E",
+        "FillColor": "#FF4CAF50",
+        "StrokeThickness": 6
+      },
+      {
+        "PathData": "M470,480C483.254,480,494,490.746,494,504L494,520C494,533.254 483.254,544 470,544 456.746,544 446,533.254 446,520L446,504C446,490.746,456.746,480,470,480z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FFE0E0E0",
+        "StrokeThickness": 1
+      },
+      {
+        "PathData": "M554,480C567.254,480,578,490.746,578,504L578,520C578,533.254 567.254,544 554,544 540.746,544 530,533.254 530,520L530,504C530,490.746,540.746,480,554,480z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FFE0E0E0",
+        "StrokeThickness": 1
+      },
+      {
+        "PathData": "M508,80L516,80 516,944 508,944z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FF1E1E1E",
+        "StrokeThickness": 1
+      }
+    ]
+  },
+  {
+    "Name": "开门",
+    "Items": [
+      {
+        "PathData": "M0,0L1024,0 1024,1024 0,1024z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FF404040",
+        "StrokeThickness": 1
+      },
+      {
+        "PathData": "M40,40L984,40 984,984 40,984z",
+        "StrokeColor": "#FF303030",
+        "FillColor": "#FFFFFFFF",
+        "StrokeThickness": 8
+      },
+      {
+        "PathData": "M80,80L492,80 492,944 80,944z",
+        "StrokeColor": "#FF1E1E1E",
+        "FillColor": "#FFF44336",
+        "StrokeThickness": 6
+      },
+      {
+        "PathData": "M532,80L944,80 944,944 532,944z",
+        "StrokeColor": "#FF1E1E1E",
+        "FillColor": "#FFF44336",
+        "StrokeThickness": 6
+      },
+      {
+        "PathData": "M102,480C115.254,480,126,490.746,126,504L126,520C126,533.254 115.254,544 102,544 88.746,544 78,533.254 78,520L78,504C78,490.746,88.746,480,102,480z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FFE0E0E0",
+        "StrokeThickness": 1
+      },
+      {
+        "PathData": "M922,480C935.254,480,946,490.746,946,504L946,520C946,533.254 935.254,544 922,544 908.746,544 898,533.254 898,520L898,504C898,490.746,908.746,480,922,480z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FFE0E0E0",
+        "StrokeThickness": 1
+      }
+    ]
+  },
+  {
+    "Name": "开门中",
+    "Items": [
+      {
+        "PathData": "M0,0L1024,0 1024,1024 0,1024z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FF404040",
+        "StrokeThickness": 1
+      },
+      {
+        "PathData": "M40,40L984,40 984,984 40,984z",
+        "StrokeColor": "#FF303030",
+        "FillColor": "#FFFFFFFF",
+        "StrokeThickness": 8
+      },
+      {
+        "PathData": "M80,80L492,80 492,944 80,944z",
+        "StrokeColor": "#FF1E1E1E",
+        "FillColor": "#FFB0BEC5",
+        "StrokeThickness": 6
+      },
+      {
+        "PathData": "M532,80L944,80 944,944 532,944z",
+        "StrokeColor": "#FF1E1E1E",
+        "FillColor": "#FFB0BEC5",
+        "StrokeThickness": 6
+      },
+      {
+        "PathData": "M470,480C483.254,480,494,490.746,494,504L494,520C494,533.254 483.254,544 470,544 456.746,544 446,533.254 446,520L446,504C446,490.746,456.746,480,470,480z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FFE0E0E0",
+        "StrokeThickness": 1
+      },
+      {
+        "PathData": "M554,480C567.254,480,578,490.746,578,504L578,520C578,533.254 567.254,544 554,544 540.746,544 530,533.254 530,520L530,504C530,490.746,540.746,480,554,480z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FFE0E0E0",
+        "StrokeThickness": 1
+      },
+      {
+        "PathData": "M295,380L215,512 295,644 345,620 285,512 345,404z",
+        "StrokeColor": "#FF2E7D32",
+        "FillColor": "#FF4CAF50",
+        "StrokeThickness": 6
+      },
+      {
+        "PathData": "M729,380L809,512 729,644 679,620 739,512 679,404z",
+        "StrokeColor": "#FF2E7D32",
+        "FillColor": "#FF4CAF50",
+        "StrokeThickness": 6
+      }
+    ]
+  },
+  {
+    "Name": "关门中",
+    "Items": [
+      {
+        "PathData": "M0,0L1024,0 1024,1024 0,1024z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FF404040",
+        "StrokeThickness": 1
+      },
+      {
+        "PathData": "M40,40L984,40 984,984 40,984z",
+        "StrokeColor": "#FF303030",
+        "FillColor": "#FFFFFFFF",
+        "StrokeThickness": 8
+      },
+      {
+        "PathData": "M80,80L492,80 492,944 80,944z",
+        "StrokeColor": "#FF1E1E1E",
+        "FillColor": "#FFB0BEC5",
+        "StrokeThickness": 6
+      },
+      {
+        "PathData": "M532,80L944,80 944,944 532,944z",
+        "StrokeColor": "#FF1E1E1E",
+        "FillColor": "#FFB0BEC5",
+        "StrokeThickness": 6
+      },
+      {
+        "PathData": "M470,480C483.254,480,494,490.746,494,504L494,520C494,533.254 483.254,544 470,544 456.746,544 446,533.254 446,520L446,504C446,490.746,456.746,480,470,480z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FFE0E0E0",
+        "StrokeThickness": 1
+      },
+      {
+        "PathData": "M554,480C567.254,480,578,490.746,578,504L578,520C578,533.254 567.254,544 554,544 540.746,544 530,533.254 530,520L530,504C530,490.746,540.746,480,554,480z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FFE0E0E0",
+        "StrokeThickness": 1
+      },
+      {
+        "PathData": "M265,380L345,512 265,644 215,620 275,512 215,404z",
+        "StrokeColor": "#FFC62828",
+        "FillColor": "#FFF44336",
+        "StrokeThickness": 6
+      },
+      {
+        "PathData": "M759,380L679,512 759,644 809,620 749,512 809,404z",
+        "StrokeColor": "#FFC62828",
+        "FillColor": "#FFF44336",
+        "StrokeThickness": 6
+      }
+    ]
+  },
+  {
+    "Name": "故障",
+    "Items": [
+      {
+        "PathData": "M0,0L1024,0 1024,1024 0,1024z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FF404040",
+        "StrokeThickness": 1
+      },
+      {
+        "PathData": "M40,40L984,40 984,984 40,984z",
+        "StrokeColor": "#FF303030",
+        "FillColor": "#FFFFFFFF",
+        "StrokeThickness": 8
+      },
+      {
+        "PathData": "M80,80L944,80 944,944 80,944z",
+        "StrokeColor": "#FF1E1E1E",
+        "FillColor": "#FF607D8B",
+        "StrokeThickness": 6
+      },
+      {
+        "PathData": "M512,160L96,880 928,880z",
+        "StrokeColor": "#FF212121",
+        "FillColor": "#FFD32F2F",
+        "StrokeThickness": 20
+      },
+      {
+        "PathData": "M467,300L557,300 542,600 482,600z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FFFFFFFF",
+        "StrokeThickness": 1
+      },
+      {
+        "PathData": "M467,680L557,680 557,770 467,770z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FFFFFFFF",
+        "StrokeThickness": 1
+      }
+    ]
+  },
+  {
+    "Name": "解锁",
+    "Items": [
+      {
+        "PathData": "M0,0L1024,0 1024,1024 0,1024z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FF404040",
+        "StrokeThickness": 1
+      },
+      {
+        "PathData": "M40,40L984,40 984,984 40,984z",
+        "StrokeColor": "#FF303030",
+        "FillColor": "#FFFFFFFF",
+        "StrokeThickness": 8
+      },
+      {
+        "PathData": "M80,80L492,80 492,944 80,944z",
+        "StrokeColor": "#FF1E1E1E",
+        "FillColor": "#FFB0BEC5",
+        "StrokeThickness": 6
+      },
+      {
+        "PathData": "M532,80L944,80 944,944 532,944z",
+        "StrokeColor": "#FF1E1E1E",
+        "FillColor": "#FFB0BEC5",
+        "StrokeThickness": 6
+      },
+      {
+        "PathData": "M362,500L662,500 662,750 362,750z",
+        "StrokeColor": "#FF212121",
+        "FillColor": "#FFFFC107",
+        "StrokeThickness": 6
+      },
+      {
+        "PathData": "M392,500L392,400C392,300,632,300,632,400",
+        "StrokeColor": "#FF212121",
+        "FillColor": "#00FFFFFF",
+        "StrokeThickness": 56
+      },
+      {
+        "PathData": "M392,504L392,400C392,308,632,308,632,400",
+        "StrokeColor": "#FFFFC107",
+        "FillColor": "#00FFFFFF",
+        "StrokeThickness": 40
+      },
+      {
+        "PathData": "M482,600L542,600 542,660 482,660z",
+        "StrokeColor": "#FF212121",
+        "FillColor": "#FF212121",
+        "StrokeThickness": 1
+      },
+      {
+        "PathData": "M512,660L512,710",
+        "StrokeColor": "#FF212121",
+        "FillColor": "#00FFFFFF",
+        "StrokeThickness": 20
+      }
+    ]
+  },
+  {
+    "Name": "遇阻",
+    "Items": [
+      {
+        "PathData": "M0,0L1024,0 1024,1024 0,1024z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FF404040",
+        "StrokeThickness": 1
+      },
+      {
+        "PathData": "M40,40L984,40 984,984 40,984z",
+        "StrokeColor": "#FF303030",
+        "FillColor": "#FFFFFFFF",
+        "StrokeThickness": 8
+      },
+      {
+        "PathData": "M80,80L450,80 450,944 80,944z",
+        "StrokeColor": "#FF1E1E1E",
+        "FillColor": "#FFB0BEC5",
+        "StrokeThickness": 6
+      },
+      {
+        "PathData": "M574,80L944,80 944,944 574,944z",
+        "StrokeColor": "#FF1E1E1E",
+        "FillColor": "#FFB0BEC5",
+        "StrokeThickness": 6
+      },
+      {
+        "PathData": "M512,300L550,450 680,400 580,512 680,624 550,574 512,724 474,574 344,624 444,512 344,400 474,450z",
+        "StrokeColor": "#FFFFEB3B",
+        "FillColor": "#FFF44336",
+        "StrokeThickness": 8
+      },
+      {
+        "PathData": "M512,420L530,480 580,460 540,512 580,564 530,544 512,604 494,544 444,564 484,512 444,460 494,480z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FFFFEB3B",
+        "StrokeThickness": 1
+      }
+    ]
+  },
+  {
+    "Name": "开关故障",
+    "Items": [
+      {
+        "PathData": "M0,0L1024,0 1024,1024 0,1024z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FF404040",
+        "StrokeThickness": 1
+      },
+      {
+        "PathData": "M40,40L984,40 984,984 40,984z",
+        "StrokeColor": "#FF303030",
+        "FillColor": "#FFFFFFFF",
+        "StrokeThickness": 8
+      },
+      {
+        "PathData": "M80,80L944,80 944,944 80,944z",
+        "StrokeColor": "#FF1E1E1E",
+        "FillColor": "#FF607D8B",
+        "StrokeThickness": 6
+      },
+      {
+        "PathData": "M412,462L412,562 662,562 662,462z",
+        "StrokeColor": "#FFB71C1C",
+        "FillColor": "#FFD32F2F",
+        "StrokeThickness": 6
+      },
+      {
+        "PathData": "M412,512L392,512 292,600",
+        "StrokeColor": "#FFB71C1C",
+        "FillColor": "#00FFFFFF",
+        "StrokeThickness": 12
+      },
+      {
+        "PathData": "M292,600A30,30,0,1,1,292,601z",
+        "StrokeColor": "#FFB71C1C",
+        "FillColor": "#FFD32F2F",
+        "StrokeThickness": 6
+      },
+      {
+        "PathData": "M437,487A10,10,0,1,1,438,487z M437,537A10,10,0,1,1,438,537z M637,487A10,10,0,1,1,638,487z M637,537A10,10,0,1,1,638,537z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FFEF9A9A",
+        "StrokeThickness": 1
+      }
+    ]
+  },
+  {
+    "Name": "通讯离线",
+    "Items": [
+      {
+        "PathData": "M0,0L1024,0 1024,1024 0,1024z",
+        "StrokeColor": "#00FFFFFF",
+        "FillColor": "#FF404040",
+        "StrokeThickness": 1
+      },
+      {
+        "PathData": "M40,40L984,40 984,984 40,984z",
+        "StrokeColor": "#FF303030",
+        "FillColor": "#FFFFFFFF",
+        "StrokeThickness": 8
+      },
+      {
+        "PathData": "M80,80L944,80 944,944 80,944z",
+        "StrokeColor": "#FF1E1E1E",
+        "FillColor": "#FFCFD8DC",
+        "StrokeThickness": 6
+      },
+      {
+        "PathData": "M162,512L450,512 480,440",
+        "StrokeColor": "#FF455A64",
+        "FillColor": "#00FFFFFF",
+        "StrokeThickness": 40
+      },
+      {
+        "PathData": "M862,512L574,512 544,584",
+        "StrokeColor": "#FF455A64",
+        "FillColor": "#00FFFFFF",
+        "StrokeThickness": 40
+      },
+      {
+        "PathData": "M480,440L500,560 520,420 550,580",
+        "StrokeColor": "#FFD32F2F",
+        "FillColor": "#00FFFFFF",
+        "StrokeThickness": 10
+      },
+      {
+        "PathData": "M440,480L460,420 M550,600L580,530 M500,600L520,650 M510,380L530,430",
+        "StrokeColor": "#FFFFC107",
+        "FillColor": "#00FFFFFF",
+        "StrokeThickness": 6
+      }
+    ]
+  }
+]
