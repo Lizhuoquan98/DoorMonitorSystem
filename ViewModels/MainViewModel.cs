@@ -12,6 +12,8 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Collections.Generic;
+using System.Windows.Media;
+using ControlLibrary.Models;
 
 namespace DoorMonitorSystem.ViewModels
 {
@@ -216,12 +218,16 @@ namespace DoorMonitorSystem.ViewModels
 
         public MainViewModel()
         {
+            // 将当前实例注册到全局，以便通讯服务更新
+            GlobalData.MainVm = this;
+
             // 初始化命令
             ClosePopupCommand = new RelayCommand(OnClosePopup);
             OpenDoorDetailCommand = new RelayCommand(OnOpenDoorDetail);
 
             // 加载站台数据（从配置文件或数据库加载）
             LoadStations();
+            Debug.WriteLine($"[MainVM] GraphicDictionary Count: {GlobalData.GraphicDictionary?.Count ?? -1}");
 
             // 启动数据更新循环
             _ = Task.Run(UpdateLoop, _updateLoopTokenSource.Token);
@@ -304,8 +310,7 @@ namespace DoorMonitorSystem.ViewModels
                             {
                                 foreach (var door in doorGroup.Doors)
                                 {
-                                    // TODO: 根据点位值裁决门的显示状态
-                                    // UpdateDoorVisual(door);
+                                    UpdateDoorVisual(door);
                                 }
                             }
 
@@ -313,8 +318,7 @@ namespace DoorMonitorSystem.ViewModels
                             {
                                 foreach (var panel in panelGroup.Panels)
                                 {
-                                    // TODO: 更新面板点位值
-                                    // UpdatePanelBits(panel);
+                                    UpdatePanelVisual(panel);
                                 }
                             }
                         }
@@ -325,6 +329,70 @@ namespace DoorMonitorSystem.ViewModels
                     Debug.WriteLine($"UpdateLoop Error: {ex.Message}");
                 }
             }
+        }
+
+        /// <summary>
+        /// 基于优先级裁决门的最终视觉状态
+        /// </summary>
+        private void UpdateDoorVisual(DoorModel door)
+        {
+            if (door?.Bits == null) return;
+
+            // 1. 头部颜色条裁决 (Header)
+            // 取激活位中优先级最高的一个
+            var headerBit = door.Bits
+                .Where(b => b.BitValue && b.HeaderPriority > 0)
+                .OrderByDescending(b => b.HeaderPriority)
+                .FirstOrDefault();
+
+            door.Visual.HeaderBackground = headerBit?.HeaderColor ?? Brushes.Gray;
+            door.Visual.HeaderText = door.DoorName;
+
+            // 2. 中间图形/图标裁决 (Icons)
+            var imageBit = door.Bits
+                .Where(b => b.BitValue && b.ImagePriority > 0)
+                .OrderByDescending(b => b.ImagePriority)
+                .FirstOrDefault();
+
+            if (imageBit != null && !string.IsNullOrEmpty(imageBit.GraphicName) &&
+                GlobalData.GraphicDictionary != null &&
+                GlobalData.GraphicDictionary.TryGetValue(imageBit.GraphicName, out var iconTemplates))
+            {
+                // 为防止多门引用同一个 Geometry 对象造成并发或着色冲突，进行 Clone 处理
+                var newIcons = new List<IconItem>();
+                foreach (var template in iconTemplates)
+                {
+                    var cloned = template.Clone();
+                    cloned.Fill = imageBit.GraphicColor;
+                    newIcons.Add(cloned);
+                }
+
+                // 只有在图标真正发生变化时才更新（简单判断数量或标志），减少 UI 刷新压力
+                // 这里暂时直接赋值，DoorVisualResult.Icons 设置了 OnPropertyChanged
+                door.Visual.Icons = newIcons;
+            }
+            else
+            {
+                // 若没有匹配到图形点位，清空图标
+                if (door.Visual.Icons != null && door.Visual.Icons.Count > 0)
+                {
+                    door.Visual.Icons = new List<IconItem>();
+                }
+            }
+
+            // 3. 底部颜色条裁决 (Bottom)
+            var bottomBit = door.Bits
+                .Where(b => b.BitValue && b.BottomPriority > 0)
+                .OrderByDescending(b => b.BottomPriority)
+                .FirstOrDefault();
+
+            door.Visual.BottomBackground = bottomBit?.BottomColor ?? Brushes.Green;
+        }
+
+        private void UpdatePanelVisual(PanelModel panel)
+        {
+            // 面板点位目前由其内部 PanelBitConfig.BitValue 驱动 DisplayBrush
+            // 这里暂不需要复杂的裁决逻辑
         }
 
         /// <summary>

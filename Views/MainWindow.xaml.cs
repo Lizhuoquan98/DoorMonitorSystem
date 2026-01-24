@@ -18,10 +18,11 @@ namespace DoorMonitorSystem.Views
         {
             _ = new LoadDefaultData();
 
-            // 启动通信服务
+            // 1. 初始化通信服务实例
             _commService = new DoorMonitorSystem.Assets.Services.DeviceCommunicationService();
-            // 注意：StartAsync 是异步的，这里不等待，让它在后台启动
-            _ = _commService.StartAsync();
+
+            // 2. 注册 Loaded 事件，确保 UI 和 DataContext (MainViewModel) 完全准备好后再启动通讯
+            this.Loaded += MainWindow_Loaded;
 
             InitializeComponent();
 
@@ -33,6 +34,12 @@ namespace DoorMonitorSystem.Views
 
             
             this.Closed += MainWindow_Closed;
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            // 异步启动通讯服务
+            _ = _commService.StartAsync();
         }
 
         private void MainWindow_Closed(object? sender, EventArgs e)

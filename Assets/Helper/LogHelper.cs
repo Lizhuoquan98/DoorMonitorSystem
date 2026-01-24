@@ -41,6 +41,7 @@ namespace DoorMonitorSystem.Assets.Helper
             {
                 lock (_lock)
                 {
+                    /*
                     // 去重逻辑：如果消息内容和等级与上一条完全一致
                     if (message == _lastMessage && level == _lastLevel)
                     {
@@ -50,6 +51,7 @@ namespace DoorMonitorSystem.Assets.Helper
                         _flushTimer.Change(5000, Timeout.Infinite);
                         return;
                     }
+                    */
 
                     // 如果是新消息，先结算上一条的重复记录
                     FlushRepeatedLog();
@@ -105,6 +107,7 @@ namespace DoorMonitorSystem.Assets.Helper
             catch { }
         }
 
+        public static void Debug(string message) => WriteLog(message, "DEBUG");
         public static void Info(string message) => WriteLog(message, "INFO");
         public static void Error(string message) => WriteLog(message, "ERROR");
         public static void Error(string message, Exception ex) => WriteLog($"{message} -> {ex}", "ERROR");

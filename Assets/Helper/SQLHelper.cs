@@ -741,7 +741,17 @@ namespace DoorMonitorSystem.Assets.Helper
                             targetType = Nullable.GetUnderlyingType(targetType);
                         }
 
-                        property.SetValue(entity, Convert.ChangeType(value, targetType));
+                        if (targetType.IsEnum)
+                        {
+                            // Handle Enum conversion from int/string
+                            value = Enum.ToObject(targetType, value);
+                        }
+                        else
+                        {
+                            value = Convert.ChangeType(value, targetType);
+                        }
+
+                        property.SetValue(entity, value);
                     }
                 }
                 result.Add(entity);

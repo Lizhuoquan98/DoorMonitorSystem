@@ -33,95 +33,11 @@ namespace DoorMonitorSystem.Assets.Database
             // 从数据库加载数据
             GetSqlData();
 
-            {
-                //var dllPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Communication.Protocol.dll");
-                //var comm = ProtocolLoader.LoadAllProtocols(dllPath);
-                // 获取插件所在文件夹（假设 Communication.Protocol.dll 就在这个目录下）
-                var pluginFolder = AppDomain.CurrentDomain.BaseDirectory;
-
-                // 加载所有插件
-                GlobalData.ProtocolsPairs = ProtocolLoader.LoadAllProtocols(pluginFolder);
-                if (GlobalData.ProtocolsPairs is null)
-                    return;
-                var protocols = GlobalData.ProtocolsPairs;
-
-                foreach (var dev in GlobalData.ListDveices)
-                {
-                    if (!protocols.TryGetValue(dev.Protocol, out var protocol))
-                    {
-                        Debug.WriteLine($"设备 {dev.Name} 找不到协议 {dev.Protocol}");
-                        continue;
-                    }
-                    protocol.Initialize(dev.CommParsams);
-                    try
-                    {
-                        protocol.Open();
-                        if (!protocol.IsConnected)
-                            continue;
-                        Debug.WriteLine($"{dev.Name} 协议 {dev.Protocol} 打开成功");
-                        /*
-                        // 启动一个独立任务，专门执行协议方法调度
-                        _ = Task.Run(async () =>
-                        {
-                            var methods = protocol.GetSupportedMethods();
-                            // 每个方法各自执行
-                            var tasks = new List<Task>();
-
-                            // Startup 模式执行一次
-                            foreach (var m in methods.Values.Where(m => m.Mode == ExecutionMode.Startup))
-                            {
-                                _ = Task.Run(async () =>
-                                {
-                                    try { await m.InvokeAsync(); }
-                                    catch (Exception ex) { Debug.WriteLine($"Startup {m.Name} error: {ex.Message}"); }
-                                });
-                            }
-                            foreach (var pair in methods)
-                            {
-                                var method = pair.Value;
-                                if (method.Mode == ExecutionMode.Polling)
-                                {
-                                    tasks.Add(Task.Run(async () =>
-                                    {
-                                        while (protocol.IsConnected && method.Enabled)
-                                        {
-                                            try
-                                            {
-                                                var req = (addr: (ushort)1, count: (ushort)5);
-                                                var result = await method.InvokeAsync(req);
-                                                method.IntervalMs = 100;
-                                                if (result is ushort[] words)
-                                                {
-                                                    // 调用业务分发
-                                                    //  GlobalData.UpdateDeviceValues(dev.ID, words);
-                                                }
-
-                                            }
-                                            catch (Exception ex)
-                                            {
-                                                Debug.WriteLine($"[{dev.Name}][{method.Name}] 出错: {ex.Message}");
-                                            }
-                                            await Task.Delay(method.IntervalMs);
-                                        }
-                                    }));
-                                }
-                            }
-                            await Task.WhenAll(tasks);
-                        });
-                        */
-                    }
-                    catch (Exception ex)
-                    {
-
-                        Debug.WriteLine($"{dev.Name} 协议 {dev.Protocol} 通讯建立失败！！");
-                        Debug.WriteLine($"{ex.ToString()}");
-                    }
-
-
-                }
-            }
-
+            // 注意：协议插件的加载和启动已移至 DeviceCommunicationService.StartAsync 中统一管理
+            // 这里仅保留基本数据的加载
         }
+
+        
 
         /// <summary>
         /// 加载滑动门图标数据字典
@@ -233,22 +149,11 @@ namespace DoorMonitorSystem.Assets.Database
             
         }
         /// <summary>
-        /// 从单个字节中获取指定位的值
+        /// 从单字节读取指定位
         /// </summary>
-        /// <param name="data">字节数据</param>
-        /// <param name="bitOffset">位偏移（0-7，0是最低位，7是最高位）</param>
-        /// <returns>位值（true=1, false=0）</returns>
         public static bool GetBitValue(byte data, int bitOffset)
         {
-            if (bitOffset < 0 || bitOffset > 7)
-                throw new ArgumentOutOfRangeException(nameof(bitOffset),
-                    $"位偏移 {bitOffset} 超出范围 [0, 7]");
-
-            // 将指定位右移到最低位，然后与1进行与操作
             return ((data >> bitOffset) & 1) == 1;
         }
-
-
-
     }
 }

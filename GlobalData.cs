@@ -16,36 +16,12 @@ namespace DoorMonitorSystem
 
         #region 门数据 
          
-        /// <summary>
-        /// 所有门集合
-        /// </summary>
-      //  public static List<DoorSet> DoorList { get; set; } = [];
-
-        /// <summary>
-        /// 门点位显示集合
-        /// </summary>
-     //   public static List<DoorBitConfig> DoorBitList { get; set; } = [];
-
-        /// <summary>
-        /// 颜色集合
-        /// </summary>
-  //      public static List<Listcolor> ListColors { get; set; } = [];
-
+         
         /// <summary>
         /// 点位状态颜色集合
         /// </summary>
-        public static List<BitColor> ListBitColor { get; set; } = [];
-
-        /// <summary>
-        /// 主界面分组设备集合
-        /// </summary>
-   //     public static List<DveGroup> ListDveGroup { get; set; } = [];
-
-        /// <summary>
-        /// 主界面分组设备点位集合
-        /// </summary>
-    //    public static List<GroupBit> ListGroupBit { get; set; } = [];
-
+        public static List<BitColor> ListBitColor { get; set; } = []; 
+        
         /// <summary>
         /// 事件记录等级
         /// </summary>
@@ -96,6 +72,10 @@ namespace DoorMonitorSystem
 
 
 
+        /// <summary>
+        /// 全局主界面视图模型引用 (用于通讯服务直接更新 UI)
+        /// </summary>
+        public static DoorMonitorSystem.ViewModels.MainViewModel? MainVm { get; set; }
     }
 
 }
