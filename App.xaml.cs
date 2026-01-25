@@ -17,8 +17,7 @@ namespace DoorMonitorSystem
         {
             base.OnStartup(e);
 
-            // 1. 初始化日志系统
-            DoorMonitorSystem.Assets.Helper.LogHelper.CleanupOldLogs();
+            // 1. 初始化说明：清理任务已移至 DataManager 初始化中，以支持动态配置逻辑。
 
             // 2. 注册 Trace监听器，捕获所有 Debug.WriteLine 输出
             System.Diagnostics.Trace.Listeners.Add(new DoorMonitorSystem.Assets.Helper.LogTraceListener());

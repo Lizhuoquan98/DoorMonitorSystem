@@ -439,6 +439,10 @@
                                     Command="{Binding TestConnectionCommand}"
                                     IsEnabled="{Binding IsTesting, Converter={StaticResource InverseBoolConverter}}"
                                     Margin="0,0,12,0"/>
+                            <Button Content="⏰ 校时配置"
+                                    Style="{StaticResource ModernButtonStyle}"
+                                    Command="{Binding OpenTimeSyncCommand}"
+                                    Margin="0,0,12,0" Background="#673AB7"/>
                             <Button Content="💾 保存配置"
                                     Style="{StaticResource ModernButtonStyle}"
                                     Command="{Binding SaveCommand}"/>

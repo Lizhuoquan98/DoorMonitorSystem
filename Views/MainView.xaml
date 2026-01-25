@@ -241,8 +241,11 @@
             </Grid.Style>
 
             <!-- 主弹窗边框 -->
-            <Border CornerRadius="15" MaxWidth="1200" MaxHeight="650"
+            <Border x:Name="PopupBorder" CornerRadius="15" MaxWidth="1200" MaxHeight="650"
                    Background="#1a1f2e" BorderBrush="#2a5f8f" BorderThickness="1">
+                <Border.RenderTransform>
+                    <TranslateTransform x:Name="PopupTranslateTransform"/>
+                </Border.RenderTransform>
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="20" ShadowDepth="0" Opacity="0.7"/>
                 </Border.Effect>
@@ -254,9 +257,12 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <!-- 标题栏（静态） -->
+                        <!-- 标题栏（可拖动区域） -->
                         <Border Grid.Row="0" CornerRadius="15,15,0,0"
-                                Padding="20,15">
+                                Padding="20,15"
+                                MouseLeftButtonDown="Header_MouseLeftButtonDown"
+                                MouseLeftButtonUp="Header_MouseLeftButtonUp"
+                                MouseMove="Header_MouseMove">
                             <Border.Background>
                                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
                                     <GradientStop Color="#1e3a5f" Offset="0"/>

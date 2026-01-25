@@ -19,30 +19,32 @@ using ControlLibrary.Models;
 namespace DoorMonitorSystem.ViewModels
 {
     /// <summary>
-    /// 主界面视图模型（完全数据驱动）
-    /// 通过 StationViewModel 集合管理所有站台
+    /// 主界面视图模型 (UI 数据驱动核心)
+    /// 管理所有站台 (Stations)、门详情 (SelectedDoor) 以及弹窗逻辑。
+    /// 这里的业务逻辑尽量下沉到 DataManager，保持 VM 轻量化。
     /// </summary>
     public class MainViewModel : NotifyPropertyChanged
     {
-        #region 字段
+        #region Fields (字段)
 
         private CancellationTokenSource _updateLoopTokenSource = new();
         private bool _isPopupOpen;
         private string _popupTitle = "";
         private DoorModel? _selectedDoor;
+        private ObservableCollection<CategoryGroup> _categoryGroups = new();
 
         #endregion
 
-        #region 属性
+        #region Properties (核心属性)
 
         /// <summary>
-        /// 站台视图模型集合（数据驱动核心）
-        /// UI直接绑定此集合，自动渲染所有站台
+        /// 站台视图模型集合 (数据源)
+        /// UI 的 ItemsControl 直接绑定此集合，自动渲染所有站台卡片。
         /// </summary>
         public ObservableCollection<StationViewModel> Stations { get; set; } = new();
 
         /// <summary>
-        /// 弹窗开关状态
+        /// 详情弹窗是否打开
         /// </summary>
         public bool IsPopupOpen
         {
@@ -51,7 +53,7 @@ namespace DoorMonitorSystem.ViewModels
         }
 
         /// <summary>
-        /// 弹窗标题（显示门名称）
+        /// 弹窗标题 (通常显示: 站台名 - 门名称)
         /// </summary>
         public string PopupTitle
         {
@@ -60,33 +62,153 @@ namespace DoorMonitorSystem.ViewModels
         }
 
         /// <summary>
-        /// 当前选中的门（用于弹窗显示详情）
+        /// 当前选中的门 (用于弹窗显示详情数据)
+        /// 设置此属性会自动触发：
+        /// 1. 订阅新门各位的 PropertyChanged 事件 (以便实时刷新聚合统计)
+        /// 2. 刷新分类组 (CategoryGroups)
+        /// 3. 通知聚合属性变更 (ActiveAlarmCount, ActiveStatusCount)
         /// </summary>
         public DoorModel? SelectedDoor
         {
             get => _selectedDoor;
             set
             {
-                if (_selectedDoor != null)
+                if (_selectedDoor != null) // 移除旧订阅
                 {
                     foreach (var b in _selectedDoor.Bits) b.PropertyChanged -= Bit_PropertyChanged;
                 }
 
                 _selectedDoor = value;
 
-                if (_selectedDoor != null)
+                if (_selectedDoor != null) // 添加新订阅
                 {
                     foreach (var b in _selectedDoor.Bits) b.PropertyChanged += Bit_PropertyChanged;
                 }
 
                 OnPropertyChanged();
                 
-                // 缓存并通知
+                // 收到新门后，立即刷新衍生数据
                 RefreshCategoryGroups();
                 NotifyAggregateProperties();
             }
         }
 
+        /// <summary>
+        /// 按分类分组的点位集合 (用于弹窗中的列表动态展示)
+        /// 包含：报警、状态、其它等分组
+        /// </summary>
+        public ObservableCollection<CategoryGroup> CategoryGroups
+        {
+            get => _categoryGroups;
+            private set { _categoryGroups = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>
+        /// 报警类别的点位集合 (兼容旧UI绑定)
+        /// </summary>
+        public ObservableCollection<DoorBitConfig> AlarmBits
+        {
+            get
+            {
+                if (SelectedDoor == null) return new();
+
+                return new ObservableCollection<DoorBitConfig>(
+                    SelectedDoor.Bits
+                        .Where(b => b.Category != null && b.Category.Code == "Alarm")
+                        .OrderBy(b => b.SortOrder)
+                );
+            }
+        }
+
+        /// <summary>
+        /// 状态类别的点位集合 (兼容旧UI绑定)
+        /// </summary>
+        public ObservableCollection<DoorBitConfig> StatusBits
+        {
+            get
+            {
+                if (SelectedDoor == null) return new();
+
+                return new ObservableCollection<DoorBitConfig>(
+                    SelectedDoor.Bits
+                        .Where(b => b.Category != null && b.Category.Code == "Status")
+                        .OrderBy(b => b.SortOrder)
+                );
+            }
+        }
+
+        /// <summary>
+        /// 当前激活的报警数量 (红色徽标计数)
+        /// </summary>
+        public int ActiveAlarmCount
+        {
+            get
+            {
+                if (SelectedDoor == null) return 0;
+                return SelectedDoor.Bits
+                    .Count(b => b.Category != null &&
+                                b.Category.Code == "Alarm" &&
+                                b.BitValue == true);
+            }
+        }
+
+        /// <summary>
+        /// 当前激活的状态数量 (蓝色徽标计数)
+        /// </summary>
+        public int ActiveStatusCount
+        {
+            get
+            {
+                if (SelectedDoor == null) return 0;
+                return SelectedDoor.Bits
+                    .Count(b => b.Category != null &&
+                                b.Category.Code == "Status" &&
+                                b.BitValue == true);
+            }
+        }
+
+        #endregion
+
+        #region Commands (命令)
+
+        /// <summary>
+        /// 关闭弹窗命令
+        /// </summary>
+        public ICommand ClosePopupCommand { get; set; }
+        
+        /// <summary>
+        /// 打开门详情命令 (参数: DoorModel)
+        /// </summary>
+        public ICommand OpenDoorDetailCommand { get; set; }
+
+        #endregion
+
+        #region Constructor (构造函数)
+
+        public MainViewModel()
+        {
+            // 将当前实例注册到全局，以便通讯服务更新 UI
+            GlobalData.MainVm = this;
+
+            // 初始化命令
+            ClosePopupCommand = new RelayCommand(OnClosePopup);
+            OpenDoorDetailCommand = new RelayCommand(OnOpenDoorDetail);
+
+            // 异步加载业务数据 (站台/门/点位)
+            _ = LoadDataAsync();
+
+            // 启动数据更新循环 (目前主要是心跳保活)
+            _ = Task.Run(UpdateLoop, _updateLoopTokenSource.Token);
+        }
+
+        #endregion
+
+        #region Methods (逻辑方法)
+
+        /// <summary>
+        /// 监控点位值变化事件
+        /// 当详情页打开时，任何点位的数值变化都会触发此回调，进而更新统计数字
+        /// </summary>
         private void Bit_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(DoorBitConfig.BitValue))
@@ -95,27 +217,27 @@ namespace DoorMonitorSystem.ViewModels
             }
         }
 
+        /// <summary>
+        /// 批量通知聚合属性更新
+        /// </summary>
         private void NotifyAggregateProperties()
         {
-            OnPropertyChanged(nameof(ActiveAlarmCount));
-            OnPropertyChanged(nameof(ActiveStatusCount));
-            OnPropertyChanged(nameof(AlarmBits));
-            OnPropertyChanged(nameof(StatusBits));
-            // CategoryGroups 内部已经监听了位变化，所以不需要通知集合本身变化
-            // 但如果使用的是实时计算属性，也需要通知
-            OnPropertyChanged(nameof(CategoryGroups)); 
+            // 使用 SafeInvoke 确保 UI 线程安全 (虽然 NotifyPropertyChanged 通常会自动 marshal，但聚合计算最好明确)
+            SafeInvoke(() => 
+            {
+                OnPropertyChanged(nameof(ActiveAlarmCount));
+                OnPropertyChanged(nameof(ActiveStatusCount));
+                OnPropertyChanged(nameof(AlarmBits));
+                OnPropertyChanged(nameof(StatusBits));
+                // CategoryGroups 内部集合元素变化不需要通知 CategoryGroups 本身，但如果在这里重新分组则需要
+                // 目前是只更新数字，CategoryGroups 结构不变
+            });
         }
 
-        private ObservableCollection<CategoryGroup> _categoryGroups = new();
         /// <summary>
-        /// 按分类分组的点位集合（用于弹窗动态显示）
+        /// 重新构建分类组
+        /// 根据 SelectedDoor 的点位配置，动态生成用于弹窗展示的分组列表
         /// </summary>
-        public ObservableCollection<CategoryGroup> CategoryGroups
-        {
-            get => _categoryGroups;
-            private set { _categoryGroups = value; OnPropertyChanged(); }
-        }
-
         private void RefreshCategoryGroups()
         {
             if (SelectedDoor == null)
@@ -137,7 +259,7 @@ namespace DoorMonitorSystem.ViewModels
                 .OrderBy(cg => cg.Category.SortOrder)
                 .ToList();
 
-            // 如果有未分类的点位
+            // 如果有未分类的点位，归入 "其它"
             var uncategorized = SelectedDoor.Bits
                 .Where(b => b.Category == null)
                 .OrderBy(b => b.SortOrder)
@@ -164,101 +286,13 @@ namespace DoorMonitorSystem.ViewModels
         }
 
         /// <summary>
-        /// 报警类别的点位集合（用于UI绑定）
+        /// 异步加载业务数据
         /// </summary>
-        public ObservableCollection<DoorBitConfig> AlarmBits
-        {
-            get
-            {
-                if (SelectedDoor == null) return new();
-
-                return new ObservableCollection<DoorBitConfig>(
-                    SelectedDoor.Bits
-                        .Where(b => b.Category != null && b.Category.Code == "Alarm")
-                        .OrderBy(b => b.SortOrder)
-                );
-            }
-        }
-
-        /// <summary>
-        /// 状态类别的点位集合（用于UI绑定）
-        /// </summary>
-        public ObservableCollection<DoorBitConfig> StatusBits
-        {
-            get
-            {
-                if (SelectedDoor == null) return new();
-
-                return new ObservableCollection<DoorBitConfig>(
-                    SelectedDoor.Bits
-                        .Where(b => b.Category != null && b.Category.Code == "Status")
-                        .OrderBy(b => b.SortOrder)
-                );
-            }
-        }
-
-        /// <summary>
-        /// 激活的报警数量
-        /// </summary>
-        public int ActiveAlarmCount
-        {
-            get
-            {
-                if (SelectedDoor == null) return 0;
-                return SelectedDoor.Bits
-                    .Count(b => b.Category != null &&
-                                b.Category.Code == "Alarm" &&
-                                b.BitValue == true);
-            }
-        }
-
-        /// <summary>
-        /// 激活的状态数量
-        /// </summary>
-        public int ActiveStatusCount
-        {
-            get
-            {
-                if (SelectedDoor == null) return 0;
-                return SelectedDoor.Bits
-                    .Count(b => b.Category != null &&
-                                b.Category.Code == "Status" &&
-                                b.BitValue == true);
-            }
-        }
-
-        #endregion
-
-        #region 命令
-
-        public ICommand ClosePopupCommand { get; set; }
-        public ICommand OpenDoorDetailCommand { get; set; }
-
-        #endregion
-
-        #region 构造函数
-
-        public MainViewModel()
-        {
-            // 将当前实例注册到全局，以便通讯服务更新
-            GlobalData.MainVm = this;
-
-            // 初始化命令
-            ClosePopupCommand = new RelayCommand(OnClosePopup);
-            OpenDoorDetailCommand = new RelayCommand(OnOpenDoorDetail);
-
-            // 异步加载业务数据 (站台/门/点位)
-            _ = LoadDataAsync();
-
-            // 启动数据更新循环
-            _ = Task.Run(UpdateLoop, _updateLoopTokenSource.Token);
-        }
-
         private async Task LoadDataAsync()
         {
             await DataManager.Instance.LoadBusinessDataAsync();
 
-            // 注入命令（避免 XAML 绑定时的 RelativeSource 查找）
+            // 注入命令（避免 XAML 绑定时的 RelativeSource 查找问题）
             foreach (var station in Stations)
             {
                 if (station.Station == null) continue;
@@ -274,86 +308,22 @@ namespace DoorMonitorSystem.ViewModels
             Debug.WriteLine($"[MainVM] Data loading completed. Status: {Stations.Count} stations.");
         }
 
-        #endregion
-
-        #region 数据加载
-
         /// <summary>
-        /// 从数据库加载站台数据
-        /// </summary>
-        private void LoadStations()
-        {
-            // 旧逻辑已由 DataManager.LoadBusinessDataAsync 接管
-        }
-
-        #endregion
-
-        #region 数据更新循环
-
-        /// <summary>
-        /// 主更新循环：持续刷新门和面板状态
+        /// 主更新循环
+        /// 业务逻辑已下沉到 DataManager，由通讯层事件驱动更新，不再需要轮询扫描。
+        /// 保留此循环仅作为心跳检测。
         /// </summary>
         private async Task UpdateLoop()
         {
             var token = _updateLoopTokenSource.Token;
-
             while (!token.IsCancellationRequested)
             {
-                await Task.Delay(300, token);
-
-                // TODO: 从 PLC/设备点位更新门和面板状态
-                // 遍历所有站台 -> 门组 -> 门 -> 点位，更新 BitValue
-                // 然后根据优先级裁决，更新 DoorVisualResult
-
-                try
-                {
-                    SafeInvoke(() =>
-                    {
-                        // 示例：更新门的视觉状态
-                        foreach (var station in Stations)
-                        {
-                            foreach (var doorGroup in station.Station.DoorGroups)
-                            {
-                                foreach (var door in doorGroup.Doors)
-                                {
-                                    UpdateDoorVisual(door);
-                                }
-                            }
-
-                            foreach (var panelGroup in station.Station.PanelGroups)
-                            {
-                                foreach (var panel in panelGroup.Panels)
-                                {
-                                    UpdatePanelVisual(panel);
-                                }
-                            }
-                        }
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"UpdateLoop Error: {ex.Message}");
-                }
+                await Task.Delay(10000, token); // 10秒心跳
             }
         }
 
         /// <summary>
-        /// 基于优先级裁决门的最终视觉状态
-        /// </summary>
-        private void UpdateDoorVisual(DoorModel door)
-        {
-            // 业务逻辑下沉到 DataManager
-            DataManager.Instance.AdjudicateDoorVisual(door);
-        }
-
-        private void UpdatePanelVisual(PanelModel panel)
-        {
-            // 面板点位目前由其内部 PanelBitConfig.BitValue 驱动 DisplayBrush
-            // 这里暂不需要复杂的裁决逻辑
-        }
-
-        /// <summary>
-        /// UI 线程安全调用
+        /// UI 线程安全调用辅助方法
         /// </summary>
         private static void SafeInvoke(Action action)
         {
@@ -371,12 +341,8 @@ namespace DoorMonitorSystem.ViewModels
             }
         }
 
-        #endregion
-
-        #region 命令处理
-
         /// <summary>
-        /// 关闭弹窗
+        /// 关闭弹窗逻辑
         /// </summary>
         private void OnClosePopup(object obj)
         {
@@ -385,7 +351,7 @@ namespace DoorMonitorSystem.ViewModels
         }
 
         /// <summary>
-        /// 打开门详情弹窗
+        /// 打开门详情弹窗逻辑
         /// </summary>
         private void OnOpenDoorDetail(object obj)
         {
@@ -396,7 +362,7 @@ namespace DoorMonitorSystem.ViewModels
                 // 构建完整的标题：站台名称 - 门名称 - 详细信息
                 string stationName = "";
 
-                // 从 Stations 集合中查找包含该门的站台
+                // 从 Stations 集合中查找包含该门的站台 (反向查找)
                 foreach (var station in Stations)
                 {
                     bool foundDoor = false;
@@ -417,10 +383,9 @@ namespace DoorMonitorSystem.ViewModels
             }
         }
 
-        #endregion
-
-        #region 资源释放
-
+        /// <summary>
+        /// 释放资源
+        /// </summary>
         public void Dispose()
         {
             _updateLoopTokenSource?.Cancel();

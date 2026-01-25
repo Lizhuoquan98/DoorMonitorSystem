@@ -47,7 +47,7 @@
                     <Button Content="点表配置" Style="{ StaticResource  ButtonNavigation}"      Command="{Binding NavigationCommand}" CommandParameter="{x:Type dc:DevvarlistViewModel}"  />
                     <Button Content="图形编辑" Style="{ StaticResource  ButtonNavigation}"  Command="{Binding NavigationCommand}" CommandParameter="{x:Type dc:GraphicEditingViewModel}" />
                     <Button Content="设备列表" Style="{ StaticResource  ButtonNavigation}"  Command="{Binding NavigationCommand}" CommandParameter="{x:Type dc:DeployViewModel}" />
-                    <Button Content="测试" Style="{ StaticResource  ButtonNavigation}"  Command="{Binding NavigationCommand}" CommandParameter="{x:Type dc:ConfigureViewModel}" />
+                    <Button Content="系统日志" Style="{ StaticResource  ButtonNavigation}"  Command="{Binding NavigationCommand}" CommandParameter="{x:Type dc:SystemLogViewModel}" />
                 </StackPanel>
 
                 <Grid  Grid.Column="1"    >

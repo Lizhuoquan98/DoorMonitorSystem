@@ -273,6 +273,53 @@ namespace DoorMonitorSystem.Assets.Helper
             return command.ExecuteReader();
         }
 
+        /// <summary>
+        /// 执行自定义 SQL 语句并将结果映射为实体列表
+        /// </summary>
+        public List<T> Query<T>(string sql, params MySqlParameter[] parameters) where T : new()
+        {
+            EnsureConnected();
+            var dataTable = ExecuteQuery(sql, parameters);
+            var result = new List<T>();
+            var type = typeof(T);
+            var properties = type.GetProperties();
+
+            foreach (DataRow row in dataTable.Rows)
+            {
+                var entity = new T();
+                foreach (var property in properties)
+                {
+                    if (property.GetCustomAttribute<NotMappedAttribute>() != null) continue;
+
+                    var columnName = GetColumnName(property);
+                    if (dataTable.Columns.Contains(columnName) && row[columnName] != DBNull.Value)
+                    {
+                        var value = row[columnName];
+                        var targetType = property.PropertyType;
+
+                        if (targetType.IsGenericType && targetType.GetGenericTypeDefinition() == typeof(Nullable<>))
+                            targetType = Nullable.GetUnderlyingType(targetType);
+
+                        if (targetType.IsEnum) value = Enum.ToObject(targetType, value);
+                        else value = Convert.ChangeType(value, targetType);
+
+                        property.SetValue(entity, value);
+                    }
+                }
+                result.Add(entity);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 查询指定表的所有实体
+        /// </summary>
+        public List<T> Query<T>(string tableName, string whereClause, params MySqlParameter[] parameters) where T : new()
+        {
+            string sql = $"SELECT * FROM `{tableName}` WHERE {whereClause}";
+            return Query<T>(sql, parameters);
+        }
+
         #endregion
 
         #region 事务管理
@@ -284,7 +331,6 @@ namespace DoorMonitorSystem.Assets.Helper
         {
             EnsureConnected();
             _transaction = _connection.BeginTransaction();
-            Debug.WriteLine("事务开始");
         }
 
         /// <summary>
@@ -295,7 +341,6 @@ namespace DoorMonitorSystem.Assets.Helper
         {
             EnsureConnected();
             _transaction = _connection.BeginTransaction(isolationLevel);
-            Debug.WriteLine($"事务开始，隔离级别: {isolationLevel}");
         }
 
         /// <summary>
@@ -309,7 +354,6 @@ namespace DoorMonitorSystem.Assets.Helper
             _transaction.Commit();
             _transaction.Dispose();
             _transaction = null;
-            Debug.WriteLine("事务已提交");
         }
 
         /// <summary>
@@ -442,6 +486,15 @@ namespace DoorMonitorSystem.Assets.Helper
         {
             var type = typeof(T);
             var tableName = GetTableName(type);
+            CreateTableFromModel<T>(tableName);
+        }
+
+        /// <summary>
+        /// 根据C#模型类创建数据库表 (支持指定表名)
+        /// </summary>
+        public void CreateTableFromModel<T>(string tableName)
+        {
+            var type = typeof(T);
             var properties = type.GetProperties();
 
             var columns = new List<string>();
@@ -477,8 +530,6 @@ namespace DoorMonitorSystem.Assets.Helper
             // 构建创建表的SQL
             var createTableSql = BuildCreateTableSql(tableName, columns, primaryKeys, foreignKeys);
             ExecuteNonQuery(createTableSql);
-
-            Debug.WriteLine($"表 {tableName} 创建成功");
         }
 
         /// <summary>
@@ -506,6 +557,13 @@ namespace DoorMonitorSystem.Assets.Helper
         {
             var columnName = GetColumnName(property);
             var sqlType = GetSqlType(property.PropertyType);
+
+            // 优先使用 Column 特性指定的 TypeName
+            var columnAttr = property.GetCustomAttribute<ColumnAttribute>();
+            if (columnAttr != null && !string.IsNullOrEmpty(columnAttr.TypeName))
+            {
+                sqlType = columnAttr.TypeName;
+            }
 
             if (sqlType == null) return null;
 
@@ -652,6 +710,15 @@ namespace DoorMonitorSystem.Assets.Helper
         {
             var type = typeof(T);
             var tableName = GetTableName(type);
+            return Insert<T>(entity, tableName);
+        }
+
+        /// <summary>
+        /// 插入实体到指定表
+        /// </summary>
+        public int Insert<T>(T entity, string tableName)
+        {
+            var type = typeof(T);
             var properties = type.GetProperties();
 
             var columns = new List<string>();
@@ -692,6 +759,55 @@ namespace DoorMonitorSystem.Assets.Helper
                       $"VALUES ({string.Join(", ", values)})";
 
             return ExecuteNonQuery(sql, parameters.ToArray());
+        }
+
+        /// <summary>
+        /// 生成插入 SQL 语句 (反射版)
+        /// </summary>
+        public string GetInsertSql<T>(string tableName)
+        {
+            var type = typeof(T);
+            var properties = type.GetProperties();
+            var columns = new List<string>();
+            var values = new List<string>();
+
+            foreach (var property in properties)
+            {
+                if (property.GetCustomAttribute<NotMappedAttribute>() != null) continue;
+                var dbGenAttr = property.GetCustomAttribute<DatabaseGeneratedAttribute>();
+                if (dbGenAttr?.DatabaseGeneratedOption == DatabaseGeneratedOption.Identity) continue;
+                if (!IsSimpleType(property.PropertyType)) continue;
+
+                var columnName = GetColumnName(property);
+                columns.Add(columnName);
+                values.Add($"@{columnName}");
+            }
+
+            return $"INSERT INTO `{tableName}` ({string.Join(", ", columns)}) VALUES ({string.Join(", ", values)})";
+        }
+
+        /// <summary>
+        /// 获取实体对应的参数数组 (反射版)
+        /// </summary>
+        public MySqlParameter[] GetInsertParameters<T>(T entity)
+        {
+            var type = typeof(T);
+            var properties = type.GetProperties();
+            var parameters = new List<MySqlParameter>();
+
+            foreach (var property in properties)
+            {
+                if (property.GetCustomAttribute<NotMappedAttribute>() != null) continue;
+                var dbGenAttr = property.GetCustomAttribute<DatabaseGeneratedAttribute>();
+                if (dbGenAttr?.DatabaseGeneratedOption == DatabaseGeneratedOption.Identity) continue;
+                if (!IsSimpleType(property.PropertyType)) continue;
+
+                var columnName = GetColumnName(property);
+                var value = property.GetValue(entity);
+                parameters.Add(new MySqlParameter($"@{columnName}", value ?? DBNull.Value));
+            }
+
+            return parameters.ToArray();
         }
 
         private bool IsSimpleType(Type type)

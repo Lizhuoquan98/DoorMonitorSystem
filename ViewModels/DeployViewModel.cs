@@ -218,6 +218,46 @@ namespace DoorMonitorSystem.ViewModels
         /// </summary>
         public ICommand TestConnectionCommand => new RelayCommand(async _ => await TestConnection());
 
+        /// <summary>
+        /// 打开校时配置窗口
+        /// </summary>
+        public ICommand OpenTimeSyncCommand => new RelayCommand(_ =>
+        {
+            if (SelectedDevice == null)
+            {
+                MessageBox.Show("请先选择一个设备！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (SelectedDevice.TimeSync == null) SelectedDevice.TimeSync = new TimeSyncConfig();
+
+            // 互斥检查逻辑：除去当前设备外，是否已经有其他设备开启了"受时" (Direction == 1)
+            Func<bool> checkUpstream = () =>
+            {
+                if (Devices == null) return true;
+                foreach (var dev in Devices)
+                {
+                    if (dev.ID == SelectedDevice.ID) continue; // 跳过自己
+                    if (dev.TimeSync != null && dev.TimeSync.Enabled && dev.TimeSync.Direction == 1)
+                    {
+                        return false; // 已有其他设备配置为受时，禁止当前设备配置
+                    }
+                }
+                return true;
+            };
+
+
+
+            // 判断是否为客户端协议 (非SERVER)
+            bool isClient = !SelectedDevice.Protocol.Contains("SERVER", StringComparison.OrdinalIgnoreCase) 
+                         && !SelectedDevice.Protocol.Contains("SLAVE", StringComparison.OrdinalIgnoreCase);
+
+            var vm = new TimeSyncViewModel(SelectedDevice.TimeSync, isClient, checkUpstream);
+            var win = new DoorMonitorSystem.Views.TimeSyncWindow(vm);
+            win.Owner = Application.Current.MainWindow;
+            win.ShowDialog();
+        });
+
         #endregion
 
         #region 构造函数

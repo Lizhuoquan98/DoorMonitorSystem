@@ -12,30 +12,30 @@ using Base;
 
 namespace DoorMonitorSystem.ViewModels
 {
+    /// <summary>
+    /// 主窗口视图模型 (Shell)
+    /// 负责全局导航、界面切换以及顶部/底部状态栏的逻辑。
+    /// </summary>
     public class MainWindowViewModel : NotifyPropertyChanged
     {
-
-
-        #region 字段
+        #region Fields (字段)
+        
         private string _time = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-
         private object _currentViewModel;
-
         private UserControl _currentView;
 
-        // 缓存 ViewModel 实例
+        // 缓存 ViewModel 实例 (单例模式缓存)
         private readonly Dictionary<string, object> ViewModels = [];
 
-        // 缓存 View 实例
+        // 缓存 View 实例 (单例模式缓存)
         private readonly Dictionary<string, UserControl> Views = [];
-
 
         #endregion 
 
-        #region 属性
+        #region Properties (属性)
 
         /// <summary>
-        /// 实时时间显示
+        /// 实时时间显示 (用于界面顶部状态栏)
         /// </summary>
         public string Time
         {
@@ -48,7 +48,7 @@ namespace DoorMonitorSystem.ViewModels
         }
 
         /// <summary>
-        /// 界面切换
+        /// 当前激活的视图模型 (DataTemplate 驱动)
         /// </summary>
         public object CurrentViewModel
         {
@@ -59,28 +59,59 @@ namespace DoorMonitorSystem.ViewModels
                 OnPropertyChanged();
             }
         }
+        
+        /// <summary>
+        /// 导航路径树 (暂未使用)
+        /// </summary>
         public ObservableCollection<PathDirectory> PathTreeList { get; set; } = [];
 
+        /// <summary>
+        /// 当前激活的视图控件 (UserControl)
+        /// </summary>
         public UserControl CurrentView
         {
             get => _currentView;
             set { _currentView = value; OnPropertyChanged(); }
         }
 
-
         #endregion 
 
-        #region 命令
+        #region Commands (命令)
+        
+        /// <summary>
+        /// 执行关闭程序命令
+        /// </summary>
         public ICommand ExecuteCommand { get; private set; }
+        
+        /// <summary>
+        /// 部署/保存命令 (预留)
+        /// </summary>
         public ICommand DeployCommand { get; private set; } 
+        
+        /// <summary>
+        /// 导航切换命令
+        /// 参数: ViewModel 的 Type
+        /// </summary>
         public ICommand NavigationCommand { get; private set; }
 
         #endregion 
       
-        #region 方法 
+        #region Constructor (构造函数)
+
+        public MainWindowViewModel()
+        {
+            TimeUpdateMethod();
+            CommandInit();
+            // 默认显示主界面
+            NavigateToViewModel(typeof(MainViewModel));
+        }
+
+        #endregion
+
+        #region Methods (内部逻辑)
 
         /// <summary>
-        /// 界面实时时间更新方法
+        /// 启动时间更新定时器 (每500ms刷新一次)
         /// </summary>
         void TimeUpdateMethod()
         {
@@ -92,7 +123,7 @@ namespace DoorMonitorSystem.ViewModels
         }
 
         /// <summary>
-        /// 命令初始化
+        /// 初始化绑定命令
         /// </summary>
         void CommandInit() {
             ExecuteCommand = new RelayCommand(ExecuteCommandCallback);
@@ -102,11 +133,13 @@ namespace DoorMonitorSystem.ViewModels
 
         #endregion
 
-        #region 回调
+        #region Callbacks (回调处理)
+        
         private void DeployCommandCallback(object obj)
         {
-
+            // TODO: 实现配置部署逻辑
         }
+        
         private void NavigationCommandCallback(object obj)
         {
             if (obj is Type viewModelType)
@@ -114,6 +147,10 @@ namespace DoorMonitorSystem.ViewModels
                 NavigateToViewModel(viewModelType);
             }
         }
+        
+        /// <summary>
+        /// 处理关闭程序请求
+        /// </summary>
         private void ExecuteCommandCallback(object obj)
         {
             // 显示弹窗，询问用户是否要关闭程序
@@ -127,7 +164,7 @@ namespace DoorMonitorSystem.ViewModels
                 {
                     // 用户点击了确定，获取输入的文本
                     _ = dialog.InputText;
-                    // 显示用户输入的文本                    
+                    // TODO: 验证密码逻辑                  
                 }
 
                 // 关闭程序
@@ -135,11 +172,16 @@ namespace DoorMonitorSystem.ViewModels
             }
         }
 
+        /// <summary>
+        /// 核心导航逻辑：切换 ViewModel 并加载对应的 View
+        /// 约定优于配置：View 类名 = ViewModel 类名将 "ViewModel" 替换为 "View"
+        /// </summary>
+        /// <param name="viewModelType">目标 ViewModel 类型</param>
         private void NavigateToViewModel(Type viewModelType)
         {
             string key = viewModelType.FullName;
 
-            // 获取或创建 ViewModel
+            // 1. 获取或创建 ViewModel (缓存单例)
             if (!ViewModels.TryGetValue(key, out var vm))
             {
                 try
@@ -155,13 +197,12 @@ namespace DoorMonitorSystem.ViewModels
             }
             CurrentViewModel = vm;
 
-            // 获取或创建 View
+            // 2. 获取或创建 View (缓存单例)
             if (!Views.TryGetValue(key, out var view))
             {
                 try
                 {
-                    //DoorMonitorSystem.Views.DevvarlistView
-                    // 约定命名：ViewModel 替换为 View
+                    // 约定命名规则：DoorMonitorSystem.ViewModels.XXXViewModel -> DoorMonitorSystem.Views.XXXView
                     string viewTypeName = key.Replace("ViewModel", "View");
                     Type viewType = Type.GetType(viewTypeName);
 
@@ -185,105 +226,5 @@ namespace DoorMonitorSystem.ViewModels
             CurrentView = view;
         }
         #endregion
-
-        public MainWindowViewModel()
-        {
-            TimeUpdateMethod();
-            CommandInit();
-            // 默认显示主界面
-            NavigateToViewModel(typeof(MainViewModel));
-        }
-
     }
 }
-
-
-
-
-#region  
-/*
- public class MainWindowViewModel : NotifyPropertyChanged
-{
-    private readonly INavigationService _navigationService;
-
-    private string _time = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-    public string Time
-    {
-        get => _time;
-        set { _time = value; OnPropertyChanged(); }
-    }
-
-    public ObservableCollection<PathDirectory> PathTreeList { get; set; } = [];
-
-    public object? CurrentViewModel => _navigationService.CurrentViewModel;
-    public UserControl? CurrentView => _navigationService.CurrentView;
-
-    public ICommand ExecuteCommand { get; private set; }
-    public ICommand DeployCommand { get; private set; }
-    public ICommand NavigationCommand { get; private set; }
-
-    public MainWindowViewModel(INavigationService navigationService)
-    {
-        _navigationService = navigationService;
-
-        TimeUpdateMethod();
-        CommandInit();
-
-        // 默认导航
-        _navigationService.NavigateTo<MainViewModel>();
-    }
-
-    private void TimeUpdateMethod()
-    {
-        var timer = new DispatcherTimer
-        {
-            Interval = TimeSpan.FromSeconds(0.5)
-        };
-        timer.Tick += (s, e) =>
-        {
-            Time = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-        };
-        timer.Start();
-    }
-
-    private void CommandInit()
-    {
-        ExecuteCommand = new RelayCommand(ExecuteCommandCallback);
-        DeployCommand = new RelayCommand(DeployCommandCallback);
-        NavigationCommand = new RelayCommand(NavigationCommandCallback);
-    }
-
-    private void ExecuteCommandCallback(object? obj)
-    {
-        var result = MessageBox.Show("确定要关闭程序吗？", "确认关闭", MessageBoxButton.YesNo, MessageBoxImage.Question);
-
-        if (result == MessageBoxResult.Yes)
-        {
-            var dialog = new InputDialog("输入提示", "请输当前用户密码:");
-            if (dialog.ShowDialog() == true)
-            {
-                // 验证密码...
-            }
-
-            Application.Current.Shutdown();
-        }
-    }
-
-    private void DeployCommandCallback(object? obj)
-    {
-        // 自定义逻辑
-    }
-
-    private void NavigationCommandCallback(object? obj)
-    {
-        if (obj is Type vmType)
-        {
-            var method = typeof(INavigationService).GetMethod(nameof(INavigationService.NavigateTo))!;
-            method = method.MakeGenericMethod(vmType);
-            method.Invoke(_navigationService, null);
-        }
-    }
-}
- 
- */
-#endregion

@@ -16,6 +16,7 @@ using DoorMonitorSystem.ViewModels;
 using DoorMonitorSystem.Assets.Helper;
 using DoorMonitorSystem.Models.system;
 using Communicationlib.config;
+using DoorMonitorSystem.Models;
 
 namespace DoorMonitorSystem.Assets.Services
 {
@@ -41,7 +42,9 @@ namespace DoorMonitorSystem.Assets.Services
         private bool _isCacheBuilt = false;
         private bool _debugKeysPrinted = false;
 
-        // 交互优先模式：当用户拖动弹窗时，暂停数据刷新以保证流畅度
+        /// <summary>
+        /// 交互优先模式：当用户拖动弹窗时，暂停数据刷新以保证流畅度
+        /// </summary>
         public volatile bool IsUIInteractionActive = false;
 
         private DataManager() { }
@@ -54,14 +57,22 @@ namespace DoorMonitorSystem.Assets.Services
         {
             try
             {
-                LogHelper.Info("[DataManager] Static config initialization started.");
+                LogHelper.Info("[DataManager] 静态配置初始化开始。");
                 LoadSystemConfig();
+
+                LoadDebugConfig();
                 LoadGraphicDictionary();
                 LoadDevices();
+                
+                // 确保日志数据库和本月表存在 (如果是首次运行)
+                _ = Task.Run(() => EnsureLogDatabaseExists());
+
+                // 启动日志自动清理调度（包含启动时立即执行一次）
+                StartLogCleanupScheduler();
             }
             catch (Exception ex)
             {
-                LogHelper.Error("[DataManager] Initialization Failed", ex);
+                LogHelper.Error("[DataManager] 初始化失败", ex);
             }
         }
 
@@ -96,17 +107,21 @@ namespace DoorMonitorSystem.Assets.Services
                     });
                     
                     BuildBitCache();
-                    LogHelper.Info($"[DataManager] Business data loaded. Stations: {stations.Count}");
+                    LogHelper.Info($"[DataManager] 业务数据加载完成. 站台数量: {stations.Count}");
                 }
             }
             catch (Exception ex)
             {
-                LogHelper.Error("[DataManager] LoadBusinessDataAsync Failed", ex);
+                LogHelper.Error("[DataManager] 加载业务数据 (LoadBusinessDataAsync) 失败", ex);
             }
         }
 
         #region 配置加载逻辑 (JSON)
 
+        /// <summary>
+        /// 加载系统配置文件 (SystemConfig.json)
+        /// 包含数据库连接字符串、服务器端口等基础配置
+        /// </summary>
         private void LoadSystemConfig()
         {
             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config", "SystemConfig.json");
@@ -114,10 +129,163 @@ namespace DoorMonitorSystem.Assets.Services
             {
                 string json = File.ReadAllText(path);
                 GlobalData.SysCfg = JsonSerializer.Deserialize<SysCfg>(json);
-                LogHelper.Info("[DataManager] SystemConfig loaded.");
+                LogHelper.Info("[DataManager] 系统配置加载完成 (SystemConfig)。");
+            }
+        }
+        
+        /// <summary>
+        /// 加载调试配置 (DebugConfig.json)
+        /// separate file to avoid messing with DB config
+        /// </summary>
+        private void LoadDebugConfig()
+        {
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config", "DebugConfig.json");
+            if (File.Exists(path))
+            {
+                try {
+                    string json = File.ReadAllText(path);
+                    var cfg = JsonSerializer.Deserialize<AppDebugConfig>(json);
+                    if (cfg != null) {
+                        GlobalData.DebugConfig = cfg;
+                        // Apply raw communication log switch
+                        Communicationlib.Protocol.Modbus.ModbusRawLogger.IsEnabled = cfg.Trace_Communication_Raw;
+                    }
+                } catch (Exception ex) {
+                    LogHelper.Error("[DataManager] 加载调试配置失败 (DebugConfig)", ex);
+                }
+            }
+            else
+            {
+                // Create default if not exists
+                try {
+                    string json = JsonSerializer.Serialize(GlobalData.DebugConfig, new JsonSerializerOptions { WriteIndented = true });
+                    // Ensure Config dir exists
+                    string dir = Path.GetDirectoryName(path);
+                    if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                    File.WriteAllText(path, json);
+                } catch { }
             }
         }
 
+        private void StartLogCleanupScheduler()
+        {
+            Task.Run(async () =>
+            {
+                // 1. 启动时立即尝试执行一次 (确保即便夜间没开机，开机也会清)
+                CleanupOldLogTables();
+
+                string lastRunDate = DateTime.Now.ToString("yyyy-MM-dd");
+
+                while (true)
+                {
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromMinutes(1)); // 每分钟检测一次
+
+                        string configTime = GlobalData.DebugConfig?.LogCleanupTime ?? "01:00:00";
+                        if (TimeSpan.TryParse(configTime, out TimeSpan targetTime))
+                        {
+                            var now = DateTime.Now;
+                            // 如果当前时间超过了目标时间，且今天还没运行过
+                            if (now.TimeOfDay >= targetTime && lastRunDate != now.ToString("yyyy-MM-dd"))
+                            {
+                                CleanupOldLogTables();
+                                lastRunDate = now.ToString("yyyy-MM-dd");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogHelper.Error("[DataManager] 定时清理任务调度异常", ex);
+                    }
+                }
+            });
+        }
+
+        private void EnsureLogDatabaseExists()
+        {
+            if (GlobalData.SysCfg == null) return;
+            LogHelper.Info("[DataManager] 正在检查数据库运行环境...");
+            
+            // 1. 检查并确保主业务数据库存在
+            try
+            {
+                using var dbMain = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
+                dbMain.Connect(); // 内部自动建库
+                LogHelper.Info($"[DataManager] 主业务数据库校验通过: {GlobalData.SysCfg.DatabaseName}");
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error($"[DataManager] 主业务数据库初始化失败: {GlobalData.SysCfg.DatabaseName}", ex);
+            }
+
+            // 2. 检查并确保日志数据库存在
+            try
+            {
+                string logDb = GlobalData.SysCfg.LogDatabaseName;
+                using var dbLog = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, logDb);
+                dbLog.Connect(); 
+                
+                // 顺便确保本月的表也存在，方便用户在数据库管理工具中看到
+                string tableName = $"PointLogs_{DateTime.Now:yyyyMM}";
+                dbLog.CreateTableFromModel<PointLogEntity>(tableName);
+                LogHelper.Info($"[DataManager] 日志数据库校验通过: {logDb}, 本月表: {tableName}");
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error($"[DataManager] 日志数据库初始化失败: {GlobalData.SysCfg.LogDatabaseName}", ex);
+            }
+        }
+
+        private void CleanupOldLogTables()
+        {
+            try
+            {
+                if (GlobalData.SysCfg == null) return;
+                string logDb = GlobalData.SysCfg.LogDatabaseName;
+                
+                using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, logDb);
+                db.Connect();
+                
+                var allTables = db.GetTableNames();
+                int retentionMonths = GlobalData.DebugConfig?.LogRetentionMonths ?? 12;
+                
+                // 1. 清理物理日志文件 (.log)
+                LogHelper.CleanupOldLogs(retentionMonths);
+
+                // 2. 清理数据库分表
+                var cutoffDate = DateTime.Now.AddMonths(-retentionMonths);
+                int count = 0;
+
+                foreach (var table in allTables)
+                {
+                    // 格式：PointLogs_yyyyMM
+                    if (table.StartsWith("PointLogs_") && table.Length == 16)
+                    {
+                        string datePart = table.Substring(10); // yyyyMM
+                        if (DateTime.TryParseExact(datePart, "yyyyMM", null, System.Globalization.DateTimeStyles.None, out DateTime tableDate))
+                        {
+                            if (tableDate < new DateTime(cutoffDate.Year, cutoffDate.Month, 1))
+                            {
+                                LogHelper.Info($"[DataManager] 清除过期日志表: {table}");
+                                db.DropTableIfExists(table);
+                                count++;
+                            }
+                        }
+                    }
+                }
+                if (count > 0) LogHelper.Info($"[DataManager] 已清理 {count} 个过期日志分表。");
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error("[DataManager] 清理过期日志表失败", ex);
+            }
+        }
+
+        /// <summary>
+        /// 加载图形字典 (GraphicDictionary.json)
+        /// 将 SVG 路径数据解析为 WPF Geometry 对象并缓存
+        /// </summary>
         private void LoadGraphicDictionary()
         {
             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config", "GraphicDictionary.json");
@@ -153,11 +321,15 @@ namespace DoorMonitorSystem.Assets.Services
                         GlobalData.GraphicDictionary[group.Name] = itemList;
                     }
                     var keys = string.Join(", ", GlobalData.GraphicDictionary.Keys);
-                    LogHelper.Info($"[DataManager] GraphicDictionary loaded. Keys: [{keys}]");
+                    LogHelper.Info($"[DataManager] 图形字典加载完成. 包含键: [{keys}]");
                 }
             }
         }
 
+        /// <summary>
+        /// 加载设备列表 (devices.json)
+        /// 定义了所有连接的 PLC/仪表设备及其通讯参数
+        /// </summary>
         private void LoadDevices()
         {
             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config", "devices.json");
@@ -165,7 +337,7 @@ namespace DoorMonitorSystem.Assets.Services
             {
                 string json = File.ReadAllText(path);
                 GlobalData.ListDveices = JsonSerializer.Deserialize<List<ConfigEntity>>(json) ?? new List<ConfigEntity>();
-                LogHelper.Info($"[DataManager] Devices loaded: {GlobalData.ListDveices.Count} devices.");
+                LogHelper.Info($"[DataManager] 设备列表加载完成: {GlobalData.ListDveices.Count} 台设备。");
             }
         }
 
@@ -176,13 +348,21 @@ namespace DoorMonitorSystem.Assets.Services
         /// <summary>
         /// 通用点位值更新入口
         /// </summary>
-        // UI批量更新队列
+        /// <summary>
+        /// UI批量更新队列
+        ///用于缓冲来自通讯层的快速状态变更，避免UI线程过载
+        /// </summary>
         private readonly System.Collections.Concurrent.ConcurrentQueue<(int targetObjId, int bitConfigId, TargetType targetType, bool value)> _uiUpdateQueue = new();
         private bool _isBatchLoopRunning = false;
 
         /// <summary>
         /// 通用点位值更新入口（改为批量缓冲模式）
+        /// 通讯层接收到新数据后调用此方法，将变更压入队列
         /// </summary>
+        /// <param name="targetObjId">目标对象ID (DoorId 或 PanelId)</param>
+        /// <param name="bitConfigId">点位配置ID</param>
+        /// <param name="targetType">目标类型 (门/面板)</param>
+        /// <param name="value">新的布尔值</param>
         public void UpdatePointValue(int targetObjId, int bitConfigId, TargetType targetType, bool value)
         {
             if (!_isCacheBuilt) BuildBitCache();
@@ -197,6 +377,10 @@ namespace DoorMonitorSystem.Assets.Services
         }
 
 
+        /// <summary>
+        /// 启动批量更新循环
+        /// 后台线程每100ms处理一次队列，将变更合并后调度到UI线程
+        /// </summary>
         private void StartBatchUpdateLoop()
         {
             _isBatchLoopRunning = true;
@@ -208,7 +392,7 @@ namespace DoorMonitorSystem.Assets.Services
                     {
                         if (_uiUpdateQueue.IsEmpty)
                         {
-                            await Task.Delay(50); // 空闲时等待
+                            await Task.Delay(200); // 空闲时等待
                             continue;
                         }
 
@@ -267,12 +451,13 @@ namespace DoorMonitorSystem.Assets.Services
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"[DataManager] Batch Update Error: {ex.Message}");
+                        Debug.WriteLine($"[DataManager] 批量更新错误: {ex.Message}");
                     }
                     
-                    // 控制刷新频率: 30FPS (33ms/帧)
-                    // 既保证视觉流畅，又留出足够的空闲时间给 UI 响应鼠标事件
-                    await Task.Delay(33);
+                    // 控制刷新频率: 10FPS (100ms/帧)
+                    // 对于工业监控界面，10FPS 的刷新率已经足够流畅，
+                    // 相比 33ms(30FPS)，这能显著降低 UI 线程的 CPU 占用
+                    await Task.Delay(100);
                 }
             });
         }
@@ -318,7 +503,7 @@ namespace DoorMonitorSystem.Assets.Services
                     }
                 }
                 _isCacheBuilt = true;
-                LogHelper.Info($"[DataManager] BitCache Built. DoorBits={_doorBitCache.Count}, Doors={_doorCache.Count}");
+                LogHelper.Info($"[DataManager] 点位缓存构建完成。门点位={_doorBitCache.Count}, 门数量={_doorCache.Count}");
             });
         }
 
@@ -389,13 +574,13 @@ namespace DoorMonitorSystem.Assets.Services
                     {
                         // 详细调试：打印名称长度和不可见字符
                         var name = imageBit.GraphicName;
-                        LogHelper.Debug($"[Visual-Err] Graphic NOT found. Name:'{name}' Len:{name.Length} Door:{door.DoorName}");
+                        LogHelper.Debug($"[Visual-Err] 找不到图形. 名称:'{name}' 长度:{name.Length} 门:{door.DoorName}");
                         
                         // 仅在首次失败时打印一次字典键，避免刷屏
                         if (!_debugKeysPrinted && GlobalData.GraphicDictionary != null)
                         {
                             var keys = string.Join(",", GlobalData.GraphicDictionary.Keys);
-                            LogHelper.Debug($"[Visual-Err] Available Keys: [{keys}]");
+                            LogHelper.Debug($"[Visual-Err] 可用键列表: [{keys}]");
                             _debugKeysPrinted = true;
                         }
                     }

@@ -62,6 +62,16 @@ namespace DoorMonitorSystem
         /// 
         /// </summary>
         public static  SysCfg? SysCfg { get; set; } 
+        
+        /// <summary>
+        /// NTP 服务配置 (NtpConfig.json)
+        /// </summary>
+        public static NtpConfig? NtpConfig { get; set; } 
+        
+        /// <summary>
+        /// 调试配置 (DebugConfig.json)
+        /// </summary>
+        public static AppDebugConfig DebugConfig { get; set; } = new AppDebugConfig();
 
         /// <summary>
         /// 加载所有通讯协议插件

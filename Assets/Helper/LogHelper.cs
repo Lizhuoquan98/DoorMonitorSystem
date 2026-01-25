@@ -18,6 +18,12 @@ namespace DoorMonitorSystem.Assets.Helper
         private static DateTime _lastOccurTime;
         private static readonly Timer _flushTimer;
 
+        // Log Rotation Config
+        private const long MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+        private static int _currentFileIndex = 0;
+        private static string _lastFileMonth = "";
+        private static long _currentFileSize = 0;
+
         static LogHelper()
         {
             // 初始化定时器，用于在日志停止刷新一段时间后自动写入汇总
@@ -41,18 +47,6 @@ namespace DoorMonitorSystem.Assets.Helper
             {
                 lock (_lock)
                 {
-                    /*
-                    // 去重逻辑：如果消息内容和等级与上一条完全一致
-                    if (message == _lastMessage && level == _lastLevel)
-                    {
-                        _repeatCount++;
-                        _lastOccurTime = DateTime.Now;
-                        // 重置定时器 (5秒后无新日志则强制刷新)
-                        _flushTimer.Change(5000, Timeout.Infinite);
-                        return;
-                    }
-                    */
-
                     // 如果是新消息，先结算上一条的重复记录
                     FlushRepeatedLog();
 
@@ -96,26 +90,62 @@ namespace DoorMonitorSystem.Assets.Helper
         {
             try
             {
-                string dirPath = Path.Combine(BaseLogDir, time.ToString("yyyy"), time.ToString("MM"), time.ToString("dd"));
-                string filePath = Path.Combine(dirPath, $"{time.ToString("HH")}.log");
-
+                // Folder: Logs/YYYY/MM/
+                string dirPath = Path.Combine(BaseLogDir, time.ToString("yyyy"), time.ToString("MM"));
                 if (!Directory.Exists(dirPath)) Directory.CreateDirectory(dirPath);
 
+                string monthStr = time.ToString("MM");
+
+                // Check month rollover
+                if (monthStr != _lastFileMonth)
+                {
+                    _lastFileMonth = monthStr;
+                    _currentFileIndex = 0;
+                    _currentFileSize = 0;
+                }
+
+                // File: System_00.log (Monthly file, rotated by size)
+                string fileName = $"System_{_currentFileIndex:D2}.log";
+                string filePath = Path.Combine(dirPath, fileName);
+
+                // Initial Size Check
+                if (_currentFileSize == 0 && File.Exists(filePath))
+                {
+                    _currentFileSize = new FileInfo(filePath).Length;
+                }
+
+                // Check size limit (Starts new file System_01.log if > 20MB)
+                if (_currentFileSize >= MAX_FILE_SIZE)
+                {
+                    _currentFileIndex++;
+                    _currentFileSize = 0;
+                    fileName = $"System_{_currentFileIndex:D2}.log";
+                    filePath = Path.Combine(dirPath, fileName);
+                }
+
                 string logContent = $"[{time:yyyy-MM-dd HH:mm:ss.fff}] [{level}] {message}{Environment.NewLine}";
-                File.AppendAllText(filePath, logContent, Encoding.UTF8);
+                byte[] bytes = Encoding.UTF8.GetBytes(logContent);
+                
+                using (var fs = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.Read))
+                {
+                   fs.Write(bytes, 0, bytes.Length);
+                }
+
+                _currentFileSize += bytes.Length;
             }
             catch { }
         }
 
         public static void Debug(string message) => WriteLog(message, "DEBUG");
         public static void Info(string message) => WriteLog(message, "INFO");
+        public static void Warn(string message) => WriteLog(message, "WARN");
         public static void Error(string message) => WriteLog(message, "ERROR");
         public static void Error(string message, Exception ex) => WriteLog($"{message} -> {ex}", "ERROR");
 
         /// <summary>
-        /// 清理超过1年的日志文件
+        /// 清理过期日志文件
         /// </summary>
-        public static void CleanupOldLogs()
+        public static void CleanupOldLogs(int retentionMonths = 12)
         {
             Task.Run(() =>
             {
@@ -123,7 +153,7 @@ namespace DoorMonitorSystem.Assets.Helper
                 {
                     if (!Directory.Exists(BaseLogDir)) return;
 
-                    var cutoffDate = DateTime.Now.AddIndexedYears(-1); // 1年前
+                    var cutoffDate = DateTime.Now.AddMonths(-retentionMonths); 
 
                     // 遍历年份文件夹
                     foreach (var yearDir in Directory.GetDirectories(BaseLogDir))
@@ -138,7 +168,7 @@ namespace DoorMonitorSystem.Assets.Helper
                                 continue;
                             }
 
-                            // 如果是同一年，或者去年的，深入检查月份
+                            // 深入检查月份
                             foreach (var monthDir in Directory.GetDirectories(yearDir))
                             {
                                 var monthName = Path.GetFileName(monthDir);
@@ -164,7 +194,7 @@ namespace DoorMonitorSystem.Assets.Helper
             });
         }
     }
-    
+
     // 扩展方法
     public static class DateTimeExtensions
     {

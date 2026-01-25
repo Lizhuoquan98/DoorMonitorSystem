@@ -60,9 +60,19 @@
                     <StackPanel Margin="0,0,15,10">
                         <TextBlock Text="数据类型 (Type)" Foreground="#AAAAAA" FontSize="12" Margin="0,0,0,3"/>
                         <ComboBox Width="100" Text="{Binding NewPoint.DataType}" IsEditable="True">
-                            <ComboBoxItem Content="Word"/>
+                            <ComboBoxItem Content="Bit"/>
                             <ComboBoxItem Content="Bool"/>
+                            <ComboBoxItem Content="Byte"/>
+                            <ComboBoxItem Content="Word"/>
+                            <ComboBoxItem Content="UInt16"/>
+                            <ComboBoxItem Content="Int16"/>
+                            <ComboBoxItem Content="Short"/>
+                            <ComboBoxItem Content="DWord"/>
+                            <ComboBoxItem Content="UInt32"/>
+                            <ComboBoxItem Content="Int32"/>
+                            <ComboBoxItem Content="Integer"/>
                             <ComboBoxItem Content="Float"/>
+                            <ComboBoxItem Content="Real"/>
                         </ComboBox>
                     </StackPanel>
 

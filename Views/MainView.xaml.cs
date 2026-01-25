@@ -60,11 +60,55 @@ namespace DoorMonitorSystem.Views
             }
         }
 
-        private void Popup_KeyDown(object sender, KeyEventArgs e)
+
+        // --- 拖动逻辑 ---
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            // 不再需要这个方法，已改用 MainView_PreviewKeyDown
+            var header = sender as Border;
+            if (header != null)
+            {
+                _isDragging = true;
+                _startPoint = e.GetPosition(this); // 相对于整个 UserControl 的坐标
+                header.CaptureMouse();
+                
+                // 通知 DataManager 暂停高频刷新（让路给 UI 渲染）
+                DataManager.Instance.IsUIInteractionActive = true;
+            }
         }
 
+        private void Header_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (_isDragging)
+            {
+                var currentPoint = e.GetPosition(this);
+                double offsetX = currentPoint.X - _startPoint.X;
+                double offsetY = currentPoint.Y - _startPoint.Y;
 
+                // 获取 Transform 对象 (在 XAML 中已定义 x:Name="PopupTranslateTransform")
+                var transform = this.FindName("PopupTranslateTransform") as TranslateTransform;
+                if (transform != null)
+                {
+                    transform.X += offsetX;
+                    transform.Y += offsetY;
+                }
+
+                // 更新起始点，防止累积误差
+                _startPoint = currentPoint;
+            }
+        }
+
+        private void Header_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_isDragging)
+            {
+                _isDragging = false;
+                var header = sender as Border;
+                header?.ReleaseMouseCapture();
+                
+                // 恢复数据刷新
+                DataManager.Instance.IsUIInteractionActive = false;
+            }
+        }
     }
 }
