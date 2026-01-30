@@ -114,12 +114,12 @@
                 <Border Background="#1e3a5f" CornerRadius="8" Padding="15,12" Margin="0,0,0,20">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="📁" FontSize="20" Margin="0,0,10,0"/>
-                        <TextBlock Text="SVG 图形导入" FontSize="18" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="SVG 矢量图导入" FontSize="18" FontWeight="Bold" Foreground="White"/>
                     </StackPanel>
                 </Border>
 
                 <!-- 导入 SVG 按钮 -->
-                <Button Content="📂 选择 SVG 文件导入"
+                <Button Content="📂 加载 SVG 文件"
                         Style="{StaticResource SuccessButtonStyle}"
                         Command="{Binding ImportSvgCommand}"
                         Height="50"
@@ -127,14 +127,14 @@
                         Margin="0,0,0,20"/>
 
                 <!-- 图形名称输入 -->
-                <TextBlock Text="图形名称:" Foreground="#a0b0c0" FontSize="13" Margin="0,0,0,8"/>
+                <TextBlock Text="图标标识:" Foreground="#a0b0c0" FontSize="13" Margin="0,0,0,8"/>
                 <TextBox Style="{StaticResource DarkTextBoxStyle}"
                          Text="{Binding IconName, UpdateSourceTrigger=PropertyChanged}"
                          Height="45"
                          Margin="0,0,0,20"/>
 
                 <!-- 保存按钮 -->
-                <Button Content="💾 保存到图形字典"
+                <Button Content="💾 存入组件库"
                         Style="{StaticResource DarkButtonStyle}"
                         Command="{Binding SaveCommand}"
                         Height="45"
@@ -142,7 +142,7 @@
                         Margin="0,0,0,20"/>
 
                 <!-- 图形预览 -->
-                <TextBlock Text="图形预览:" Foreground="#a0b0c0" FontSize="13" Margin="0,0,0,8"/>
+                <TextBlock Text="效果预览:" Foreground="#a0b0c0" FontSize="13" Margin="0,0,0,8"/>
                 <Border BorderBrush="#2a5f8f" BorderThickness="2" CornerRadius="8"
                         Background="#1a1f2e"  > 
                     <Viewbox  Grid.Row="1" Margin="5"  >
@@ -169,7 +169,7 @@
                 </Border>
 
                 <!-- 提示信息 -->
-                <TextBlock Text="💡 支持从 Inkscape、Figma、Adobe Illustrator 等工具导出的 SVG 文件"
+                <TextBlock Text="💡 支持导入标准 SVG 矢量图形（兼容 Inkscape, Figma, Illustrator 等导出格式）"
                           Foreground="#7b8a9a" FontSize="11"
                           Margin="0,15,0,0" TextWrapping="Wrap"/>
             </StackPanel>
@@ -192,18 +192,17 @@
                 <Border Grid.Row="0" Background="#1e3a5f" CornerRadius="8" Padding="15,12" Margin="0,0,0,15">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="📚" FontSize="20" Margin="0,0,10,0"/>
-                        <TextBlock Text="图形字典" FontSize="18" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="图形组件库" FontSize="18" FontWeight="Bold" Foreground="White"/>
                     </StackPanel>
                 </Border>
 
-                <!-- 操作按钮 -->
                 <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,15">
-                    <Button Content="💾 导出字典"
+                    <Button Content="💾 同步至数据库"
                             Style="{StaticResource DarkButtonStyle}"
                             Command="{Binding ExportDictionaryCommand}"
                             Padding="15,8"
                             Margin="0,0,10,0"/>
-                    <Button Content="📥 导入字典"
+                    <Button Content="� 从文件导入"
                             Style="{StaticResource DarkButtonStyle}"
                             Command="{Binding ImportDictionaryCommand}"
                             Padding="15,8"/>

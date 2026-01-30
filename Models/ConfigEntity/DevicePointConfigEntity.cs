@@ -18,6 +18,11 @@ namespace DoorMonitorSystem.Models.ConfigEntity
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int Id { get => _id; set { _id = value; OnPropertyChanged(); } }
 
+        private string _category;
+        /// <summary>分类 (用于筛选日志等)</summary>
+        [StringLength(50)]
+        public string Category { get => _category; set { _category = value; OnPropertyChanged(); } }
+
         #region 数据源配置 (From)
 
         private int _sourceDeviceId;
@@ -100,7 +105,7 @@ namespace DoorMonitorSystem.Models.ConfigEntity
         /// <summary>是否开启日志记录</summary>
         public bool IsLogEnabled { get => _isLogEnabled; set { _isLogEnabled = value; OnPropertyChanged(); } }
 
-        private int _logTypeId;
+        private int _logTypeId = 1;
         /// <summary>日志类型 (1=普通记录, 2=报警记录)</summary>
         public int LogTypeId { get => _logTypeId; set { _logTypeId = value; OnPropertyChanged(); } }
 
@@ -112,6 +117,40 @@ namespace DoorMonitorSystem.Models.ConfigEntity
         /// <summary>日志内容模板 (为空则使用Description)</summary>
         [StringLength(200)]
         public string LogMessage { get => _logMessage; set { _logMessage = value; OnPropertyChanged(); } }
+        
+        private double? _logDeadband;
+        /// <summary>记录阈值/死区 (仅模拟量，变化超过此值才记录)</summary>
+        public double? LogDeadband { get => _logDeadband; set { _logDeadband = value; OnPropertyChanged(); } }
+
+        #endregion
+
+        #region 模拟量报警配置 (Analog Alarm)
+
+        private double? _highLimit;
+        /// <summary>高限报警值 (仅模拟量)</summary>
+        public double? HighLimit { get => _highLimit; set { _highLimit = value; OnPropertyChanged(); } }
+
+        private double? _lowLimit;
+        /// <summary>低限报警值 (仅模拟量)</summary>
+        public double? LowLimit { get => _lowLimit; set { _lowLimit = value; OnPropertyChanged(); } }
+
+        #endregion
+
+        #region 开关量状态描述 (Boolean State)
+
+        private string _state0Desc;
+        /// <summary>状态0描述 (例如: 停止, 关)</summary>
+        [StringLength(50)]
+        public string State0Desc { get => _state0Desc; set { _state0Desc = value; OnPropertyChanged(); } }
+
+        private string _state1Desc;
+        /// <summary>状态1描述 (例如: 运行, 开)</summary>
+        [StringLength(50)]
+        public string State1Desc { get => _state1Desc; set { _state1Desc = value; OnPropertyChanged(); } }
+
+        private int? _alarmTargetValue;
+        /// <summary>报警目标值 (0或1, 哪个值代表报警)</summary>
+        public int? AlarmTargetValue { get => _alarmTargetValue; set { _alarmTargetValue = value; OnPropertyChanged(); } }
 
         #endregion
 
@@ -124,6 +163,26 @@ namespace DoorMonitorSystem.Models.ConfigEntity
         /// <summary>备注说明</summary>
         [StringLength(200)]
         public string Description { get => _description; set { _description = value; OnPropertyChanged(); } }
+
+        #region Display Properties (Not Mapped)
+
+        private string _targetObjName;
+        [NotMapped]
+        public string TargetObjName { get => _targetObjName; set { _targetObjName = value; OnPropertyChanged(); } }
+
+        private string _targetBitConfigName;
+        [NotMapped]
+        public string TargetBitConfigName { get => _targetBitConfigName; set { _targetBitConfigName = value; OnPropertyChanged(); } }
+
+        private string _syncTargetDeviceName;
+        [NotMapped]
+        public string SyncTargetDeviceName { get => _syncTargetDeviceName; set { _syncTargetDeviceName = value; OnPropertyChanged(); } }
+
+        private int _rowIndex;
+        [NotMapped]
+        public int RowIndex { get => _rowIndex; set { _rowIndex = value; OnPropertyChanged(); } }
+
+        #endregion
     }
 
     public enum TargetType

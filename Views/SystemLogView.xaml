@@ -21,6 +21,17 @@
             <Setter Property="HorizontalAlignment" Value="Left"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Padding" Value="10,0"/>
+        </Style>
+
+        <Style x:Key="LeftHeaderStyle" TargetType="DataGridColumnHeader">
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Background" Value="#1e2430"/>
+            <Setter Property="Foreground" Value="#a0b0c0"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="BorderBrush" Value="#2a3f5f"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
     </UserControl.Resources>
 
@@ -41,33 +52,113 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- 左侧筛选区 -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="开始时间:" Foreground="#a0b0c0" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                    <DatePicker SelectedDate="{Binding StartDate}" Width="110" Height="28" VerticalContentAlignment="Center" Margin="0,0,2,0"/>
-                    <TextBox Text="{Binding SearchStartTime}" Width="70" Height="28" VerticalContentAlignment="Center" 
-                             Background="#11FFFFFF" Foreground="White" BorderBrush="#44FFFFFF" Padding="2,0" Margin="0,0,15,0"
-                             ToolTip="格式 HH:mm:ss"/>
+                <!-- 左侧筛选区 (使用 WrapPanel 避免窄屏下被截断) -->
+                <WrapPanel Grid.Column="0" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Margin="0,5,15,5">
+                        <TextBlock Text="开始时间:" Foreground="#a0b0c0" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <DatePicker SelectedDate="{Binding StartDate}" Width="110" Height="28" VerticalContentAlignment="Center" Margin="0,0,2,0"/>
+                        <TextBox Text="{Binding SearchStartTime}" Width="70" Height="28" VerticalContentAlignment="Center" 
+                                 Background="#11FFFFFF" Foreground="White" BorderBrush="#44FFFFFF" Padding="2,0"
+                                 ToolTip="格式 HH:mm:ss"/>
+                    </StackPanel>
 
-                    <TextBlock Text="结束时间:" Foreground="#a0b0c0" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                    <DatePicker SelectedDate="{Binding EndDate}" Width="110" Height="28" VerticalContentAlignment="Center" Margin="0,0,2,0"/>
-                    <TextBox Text="{Binding SearchEndTime}" Width="70" Height="28" VerticalContentAlignment="Center" 
-                             Background="#11FFFFFF" Foreground="White" BorderBrush="#44FFFFFF" Padding="2,0" Margin="0,0,15,0"
-                             ToolTip="格式 HH:mm:ss"/>
-                    
-                    <TextBlock Text="关键字:" Foreground="#a0b0c0" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                    <TextBox Text="{Binding Keyword}" Width="180" Height="28" VerticalContentAlignment="Center" 
-                             Background="#11FFFFFF" Foreground="White" BorderBrush="#44FFFFFF" Padding="5,0"/>
-                </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,5,15,5">
+                        <TextBlock Text="结束时间:" Foreground="#a0b0c0" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <DatePicker SelectedDate="{Binding EndDate}" Width="110" Height="28" VerticalContentAlignment="Center" Margin="0,0,2,0"/>
+                        <TextBox Text="{Binding SearchEndTime}" Width="70" Height="28" VerticalContentAlignment="Center" 
+                                 Background="#11FFFFFF" Foreground="White" BorderBrush="#44FFFFFF" Padding="2,0"
+                                 ToolTip="格式 HH:mm:ss"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,5,15,5"
+                                Visibility="{Binding HasAnalogPoints, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock Text="日志类型:" Foreground="#a0b0c0" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <ComboBox ItemsSource="{Binding LogTableTypes}" SelectedItem="{Binding SelectedTableType}" Width="110" Height="28" 
+                                  VerticalContentAlignment="Center"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,5,15,5">
+                        <TextBlock Text="分组:" Foreground="#a0b0c0" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <ComboBox ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}" 
+                                  Width="120" Height="28" 
+                                  IsEditable="True" MaxDropDownHeight="300"
+                                  IsTextSearchEnabled="True" TextSearch.TextPath="."
+                                  IsTextSearchCaseSensitive="False"
+                                  VirtualizingPanel.IsVirtualizing="True"
+                                  VerticalContentAlignment="Center">
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,5,15,5">
+                        <TextBlock Text="等级:" Foreground="#a0b0c0" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <ComboBox ItemsSource="{Binding LogLevelOptions}" SelectedItem="{Binding SelectedLogLevel}" Width="80" Height="28" 
+                                  VerticalContentAlignment="Center"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,5,15,5">
+                        <TextBlock Text="关键字:" Foreground="#a0b0c0" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <Grid>
+                            <TextBox x:Name="KeywordBox" Text="{Binding Keyword, UpdateSourceTrigger=PropertyChanged}" 
+                                     Width="150" Height="28" VerticalContentAlignment="Center" 
+                                     Background="#11FFFFFF" Foreground="White" BorderBrush="#44FFFFFF" Padding="5,0,25,0"/>
+                            <Button HorizontalAlignment="Right" VerticalAlignment="Center" Width="20" Height="28"
+                                    Margin="0,0,2,0" Background="Transparent" BorderThickness="0" Foreground="#88FFFFFF"
+                                    FontSize="14" Cursor="Hand" Click="ClearKeyword_Click">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Content" Value="×"/>
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border Background="Transparent">
+                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Style.Triggers>
+                                            <!-- 当文本为空时隐藏按钮 -->
+                                            <DataTrigger Binding="{Binding Text, ElementName=KeywordBox}" Value="">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Text, ElementName=KeywordBox}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Foreground" Value="White"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                </WrapPanel>
 
                 <!-- 右侧按钮区 -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="查询" Command="{Binding SearchCommand}" 
-                            Style="{StaticResource ActionButton}" Background="#1976d2" BorderThickness="0" Width="80"/>
-                    <Button Content="重置" Command="{Binding ResetCommand}" 
-                            Style="{StaticResource ActionButton}" Background="#455a64" BorderThickness="0" Width="80"/>
-                    <Button Content="导出" Command="{Binding ExportCommand}" 
-                            Style="{StaticResource ActionButton}" Background="#2e7d32" BorderThickness="0" Width="80"/>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Bottom" Margin="0,0,0,5">
+                    <Button Command="{Binding SearchCommand}" 
+                            Style="{StaticResource ActionButton}" Background="#1976d2" BorderThickness="0" Width="90">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔍" Margin="0,0,5,0" VerticalAlignment="Center" FontSize="12"/>
+                            <TextBlock Text="查询" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding ResetCommand}" 
+                            Style="{StaticResource ActionButton}" Background="#455a64" BorderThickness="0" Width="90">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔄" Margin="0,0,5,0" VerticalAlignment="Center" FontSize="12"/>
+                            <TextBlock Text="重置" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding ExportCommand}" 
+                            Style="{StaticResource ActionButton}" Background="#2e7d32" BorderThickness="0" Width="90">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📥" Margin="0,0,5,0" VerticalAlignment="Center" FontSize="12"/>
+                            <TextBlock Text="导出" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </Grid>
         </Border>
@@ -75,6 +166,7 @@
         <!-- 2. 数据表格 -->
         <DataGrid Grid.Row="1" ItemsSource="{Binding Logs}" AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
                   HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                  CanUserSortColumns="False"
                   Background="#151921" BorderThickness="1" BorderBrush="#2a3f5f"
                   RowHeight="35" FontSize="14">
             <DataGrid.ColumnHeaderStyle>
@@ -85,6 +177,7 @@
                     <Setter Property="BorderThickness" Value="0,0,0,1"/>
                     <Setter Property="BorderBrush" Value="#2a3f5f"/>
                     <Setter Property="FontWeight" Value="SemiBold"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
                 </Style>
             </DataGrid.ColumnHeaderStyle>
             <DataGrid.RowStyle>
@@ -101,13 +194,24 @@
             </DataGrid.RowStyle>
             
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Log ID" Binding="{Binding ID}" Width="80" ElementStyle="{StaticResource CenterText}"/>
-                <DataGridTextColumn Header="记录时间" Binding="{Binding LogTime, StringFormat='yyyy-MM-dd HH:mm:ss'}" Width="180" ElementStyle="{StaticResource CenterText}"/>
+                <DataGridTextColumn Header="序号" Binding="{Binding RowIndex}" Width="60" ElementStyle="{StaticResource CenterText}"/>
+                <DataGridTextColumn Header="记录时间" Binding="{Binding LogTime, StringFormat='yyyy-MM-dd HH:mm:ss.fff'}" Width="190" ElementStyle="{StaticResource CenterText}"/>
                 <DataGridTextColumn Header="类型" Binding="{Binding LogTypeDisplay}" Width="80" ElementStyle="{StaticResource CenterText}"/>
-                <DataGridTextColumn Header="设备" Binding="{Binding DeviceID}" Width="80" ElementStyle="{StaticResource CenterText}"/>
-                <DataGridTextColumn Header="地址" Binding="{Binding Address}" Width="120" ElementStyle="{StaticResource CenterText}"/>
+                <!-- Configured to show Category/UserName instead of Device/Address -->
+                <DataGridTextColumn Header="分组" Binding="{Binding Category}" Width="100" ElementStyle="{StaticResource CenterText}"/>
+                <DataGridTextColumn Header="用户名" Binding="{Binding UserName}" Width="100" ElementStyle="{StaticResource CenterText}"/>
+                
                 <DataGridTextColumn Header="值" Binding="{Binding ValDisplay}" Width="60" ElementStyle="{StaticResource CenterText}"/>
-                <DataGridTextColumn Header="消息内容" Binding="{Binding Message}" Width="*" ElementStyle="{StaticResource LeftText}"/>
+                <DataGridTextColumn Header="消息内容" Binding="{Binding Message}" Width="*" HeaderStyle="{StaticResource LeftHeaderStyle}">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="HorizontalAlignment" Value="Left"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                            <Setter Property="Padding" Value="10,0"/>
+                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
             </DataGrid.Columns>
         </DataGrid>
 

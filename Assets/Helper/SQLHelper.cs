@@ -18,8 +18,8 @@ namespace DoorMonitorSystem.Assets.Helper
     {
         #region 私有字段和属性
 
-        private MySqlConnection _connection;
-        private MySqlTransaction _transaction;
+        private MySqlConnection? _connection;
+        private MySqlTransaction? _transaction;
         private readonly string _server;
         private readonly string _userId;
         private readonly string _password;
@@ -53,7 +53,7 @@ namespace DoorMonitorSystem.Assets.Helper
         /// <summary>
         /// 获取当前事务（如果有）
         /// </summary>
-        public MySqlTransaction CurrentTransaction => _transaction;
+        public MySqlTransaction? CurrentTransaction => _transaction;
 
         #endregion
 
@@ -204,12 +204,16 @@ namespace DoorMonitorSystem.Assets.Helper
         public int ExecuteNonQuery(string sql, params MySqlParameter[] parameters)
         {
             EnsureConnected();
+            if (_connection == null) throw new InvalidOperationException("Connection is null");
 
             using var command = new MySqlCommand(sql, _connection);
             if (_transaction != null)
                 command.Transaction = _transaction;
 
-            command.Parameters.AddRange(parameters);
+            if (parameters != null)
+            {
+                command.Parameters.AddRange(parameters);
+            }
             return command.ExecuteNonQuery();
         }
 
@@ -222,12 +226,16 @@ namespace DoorMonitorSystem.Assets.Helper
         public DataTable ExecuteQuery(string sql, params MySqlParameter[] parameters)
         {
             EnsureConnected();
+            if (_connection == null) throw new InvalidOperationException("Connection is null");
 
             using var command = new MySqlCommand(sql, _connection);
             if (_transaction != null)
                 command.Transaction = _transaction;
 
-            command.Parameters.AddRange(parameters);
+            if (parameters != null)
+            {
+                command.Parameters.AddRange(parameters);
+            }
 
             using var adapter = new MySqlDataAdapter(command);
             var dataTable = new DataTable();
@@ -245,12 +253,16 @@ namespace DoorMonitorSystem.Assets.Helper
         public object ExecuteScalar(string sql, params MySqlParameter[] parameters)
         {
             EnsureConnected();
+            if (_connection == null) throw new InvalidOperationException("Connection is null");
 
             using var command = new MySqlCommand(sql, _connection);
             if (_transaction != null)
                 command.Transaction = _transaction;
 
-            command.Parameters.AddRange(parameters);
+            if (parameters != null)
+            {
+                command.Parameters.AddRange(parameters);
+            }
             return command.ExecuteScalar();
         }
 
@@ -264,12 +276,16 @@ namespace DoorMonitorSystem.Assets.Helper
         public MySqlDataReader ExecuteReader(string sql, params MySqlParameter[] parameters)
         {
             EnsureConnected();
+            if (_connection == null) throw new InvalidOperationException("Connection is null");
 
             var command = new MySqlCommand(sql, _connection);
             if (_transaction != null)
                 command.Transaction = _transaction;
 
-            command.Parameters.AddRange(parameters);
+            if (parameters != null)
+            {
+                command.Parameters.AddRange(parameters);
+            }
             return command.ExecuteReader();
         }
 
@@ -316,7 +332,12 @@ namespace DoorMonitorSystem.Assets.Helper
         /// </summary>
         public List<T> Query<T>(string tableName, string whereClause, params MySqlParameter[] parameters) where T : new()
         {
-            string sql = $"SELECT * FROM `{tableName}` WHERE {whereClause}";
+            string sql;
+            if (string.IsNullOrWhiteSpace(whereClause))
+                sql = $"SELECT * FROM `{tableName}`";
+            else
+                sql = $"SELECT * FROM `{tableName}` WHERE {whereClause}";
+                
             return Query<T>(sql, parameters);
         }
 
@@ -330,6 +351,7 @@ namespace DoorMonitorSystem.Assets.Helper
         public void BeginTransaction()
         {
             EnsureConnected();
+            if (_connection == null) throw new InvalidOperationException("Connection is null");
             _transaction = _connection.BeginTransaction();
         }
 
@@ -340,6 +362,7 @@ namespace DoorMonitorSystem.Assets.Helper
         public void BeginTransaction(IsolationLevel isolationLevel)
         {
             EnsureConnected();
+            if (_connection == null) throw new InvalidOperationException("Connection is null");
             _transaction = _connection.BeginTransaction(isolationLevel);
         }
 
@@ -351,8 +374,8 @@ namespace DoorMonitorSystem.Assets.Helper
             if (_transaction == null)
                 throw new InvalidOperationException("没有活动的事务可以提交");
 
-            _transaction.Commit();
-            _transaction.Dispose();
+            _transaction?.Commit();
+            _transaction?.Dispose();
             _transaction = null;
         }
 
@@ -364,8 +387,8 @@ namespace DoorMonitorSystem.Assets.Helper
             if (_transaction == null)
                 throw new InvalidOperationException("没有活动的事务可以回滚");
 
-            _transaction.Rollback();
-            _transaction.Dispose();
+            _transaction?.Rollback();
+            _transaction?.Dispose();
             _transaction = null;
             Debug.WriteLine("事务已回滚");
         }
@@ -433,7 +456,7 @@ namespace DoorMonitorSystem.Assets.Helper
             var dataTable = ExecuteQuery(sql, parameters);
             foreach (DataRow row in dataTable.Rows)
             {
-                tableNames.Add(row["table_name"].ToString());
+                tableNames.Add(row["table_name"].ToString() ?? string.Empty);
             }
 
             return tableNames;
@@ -553,7 +576,7 @@ namespace DoorMonitorSystem.Assets.Helper
         /// <summary>
         /// 获取列定义
         /// </summary> 
-        private string GetColumnDefinition(PropertyInfo property)
+        private string? GetColumnDefinition(PropertyInfo property)
         {
             var columnName = GetColumnName(property);
             var sqlType = GetSqlType(property.PropertyType);
@@ -613,7 +636,7 @@ namespace DoorMonitorSystem.Assets.Helper
         /// <summary>
         /// 获取SQL类型映射
         /// </summary>
-        private string GetSqlType(Type type)
+        private string? GetSqlType(Type type)
         {
             // 处理可空类型
             if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
@@ -949,7 +972,7 @@ namespace DoorMonitorSystem.Assets.Helper
             var tableName = GetTableName(type);
 
             // 查找主键属性
-            PropertyInfo keyProperty = null;
+            PropertyInfo? keyProperty = null;
             foreach (var property in type.GetProperties())
             {
                 if (property.GetCustomAttribute<KeyAttribute>() != null)
@@ -972,7 +995,7 @@ namespace DoorMonitorSystem.Assets.Helper
 
             var dataTable = ExecuteQuery(sql, parameters);
             if (dataTable.Rows.Count == 0)
-                return default(T);
+                return default(T)!;
 
             var row = dataTable.Rows[0];
             var entity = new T();
@@ -1024,7 +1047,7 @@ namespace DoorMonitorSystem.Assets.Helper
             var properties = type.GetProperties();
 
             // 查找主键属性
-            PropertyInfo keyProperty = null;
+            PropertyInfo? keyProperty = null;
             foreach (var property in properties)
             {
                 if (property.GetCustomAttribute<KeyAttribute>() != null)
@@ -1080,7 +1103,7 @@ namespace DoorMonitorSystem.Assets.Helper
             var tableName = GetTableName(type);
 
             // 查找主键属性
-            PropertyInfo keyProperty = null;
+            PropertyInfo? keyProperty = null;
             foreach (var property in type.GetProperties())
             {
                 if (property.GetCustomAttribute<KeyAttribute>() != null)

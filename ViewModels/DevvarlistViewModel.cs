@@ -56,15 +56,89 @@ namespace DoorMonitorSystem.ViewModels
         // 目标类型下拉框
         public List<TargetType> TargetTypes { get; } = Enum.GetValues(typeof(TargetType)).Cast<TargetType>().ToList();
 
+        // Editing State
+        private bool _isEditing;
+        public bool IsEditing
+        {
+            get => _isEditing;
+            set 
+            { 
+                _isEditing = value; 
+                OnPropertyChanged(); 
+                OnPropertyChanged(nameof(ActionName)); // "添加" vs "保存"
+            }
+        }
+
+        public string ActionName => IsEditing ? "保存" : "添加";
+
         // Commands
         public ICommand LoadDevicesCommand => new RelayCommand(o => LoadDevices());
         public ICommand AddPointCommand => new RelayCommand(AddPoint);
         public ICommand DeletePointCommand => new RelayCommand(DeletePoint);
-        public ICommand SaveChangesCommand => new RelayCommand(SaveChanges);
+
+        
+        public ICommand StartEditCommand => new RelayCommand(StartEdit);
+        public ICommand CancelEditCommand => new RelayCommand(CancelEdit);
 
         public DevvarlistViewModel()
         {
+            CheckSchema();
             LoadDevices();
+        }
+
+        private void CheckSchema()
+        {
+            try
+            {
+                using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
+                if (!db.DatabaseExists()) return; // Database might not exist yet
+                db.Connect();
+
+                if (!db.TableExists("DevicePointConfig")) return; // Table not created yet
+
+                var columns = db.GetTableColumns("DevicePointConfig");
+                var columnNames = new HashSet<string>();
+                foreach (System.Data.DataRow row in columns.Rows)
+                {
+                    columnNames.Add(row["列名"].ToString());
+                }
+
+                // Auto-add missing columns
+                // LogDeadband
+                if (!columnNames.Contains("LogDeadband")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `LogDeadband` DOUBLE DEFAULT NULL;");
+
+                // Category
+                if (!columnNames.Contains("Category")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `Category` VARCHAR(50) DEFAULT NULL;");
+
+                // Analog Alarm
+                if (!columnNames.Contains("HighLimit")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `HighLimit` DOUBLE DEFAULT NULL;");
+                if (!columnNames.Contains("LowLimit")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `LowLimit` DOUBLE DEFAULT NULL;");
+                
+                // Boolean State
+                if (!columnNames.Contains("State0Desc")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `State0Desc` VARCHAR(50) DEFAULT NULL;");
+                if (!columnNames.Contains("State1Desc")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `State1Desc` VARCHAR(50) DEFAULT NULL;");
+                if (!columnNames.Contains("AlarmTargetValue")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `AlarmTargetValue` INT DEFAULT NULL;");
+                
+                // Missing Sync/Log fields from previous manual checks
+                if (!columnNames.Contains("SyncMode")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `SyncMode` INT DEFAULT 0;");
+                if (!columnNames.Contains("SyncTargetBitIndex")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `SyncTargetBitIndex` INT DEFAULT NULL;");
+                if (!columnNames.Contains("SyncMode")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `SyncMode` INT DEFAULT 0;");
+                if (!columnNames.Contains("SyncTargetBitIndex")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `SyncTargetBitIndex` INT DEFAULT NULL;");
+
+                // Panel Table Upgrade
+                if (db.TableExists("Panel"))
+                {
+                    var pCols = db.GetTableColumns("Panel");
+                    var pColNames = new HashSet<string>();
+                    foreach (System.Data.DataRow row in pCols.Rows) pColNames.Add(row["列名"].ToString());
+                    if (!pColNames.Contains("PanelTypeId")) db.ExecuteNonQuery("ALTER TABLE `Panel` ADD COLUMN `PanelTypeId` INT DEFAULT 0;");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Silent catch or log? Better to log or ignore during development if DB isn't ready
+                System.Diagnostics.Debug.WriteLine($"Schema Check Failed: {ex.Message}");
+            }
         }
 
         private void LoadDevices()
@@ -90,8 +164,39 @@ namespace DoorMonitorSystem.ViewModels
                 using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
                 db.Connect();
                 var list = db.FindAll<DevicePointConfigEntity>("SourceDeviceId = @sid", new MySqlParameter("@sid", SelectedDevice.ID));
+
+                // Pre-load lookups
+                var doors = db.FindAll<DoorEntity>().ToDictionary(d => d.Id);
+                var panels = db.FindAll<PanelEntity>().ToDictionary(p => p.Id);
+                var doorConfigs = db.FindAll<DoorBitConfigEntity>().ToDictionary(c => c.Id);
+                var panelConfigs = db.FindAll<PanelBitConfigEntity>().ToDictionary(c => c.Id);
+
+                int index = 1;
                 foreach (var p in list)
                 {
+                    // 1. Virtual Row Index
+                    p.RowIndex = index++;
+
+                    // 2. Resolve Reader-Friendly Names
+                    if (p.TargetType == TargetType.Door && doors.ContainsKey(p.TargetObjId))
+                    {
+                         p.TargetObjName = doors[p.TargetObjId].DoorName;
+                         if (doorConfigs.ContainsKey(p.TargetBitConfigId))
+                             p.TargetBitConfigName = doorConfigs[p.TargetBitConfigId].Description;
+                    }
+                    else if (p.TargetType == TargetType.Panel && panels.ContainsKey(p.TargetObjId))
+                    {
+                         p.TargetObjName = panels[p.TargetObjId].PanelName;
+                         if (panelConfigs.ContainsKey(p.TargetBitConfigId))
+                             p.TargetBitConfigName = panelConfigs[p.TargetBitConfigId].Description;
+                    }
+
+                    if (p.IsSyncEnabled && p.SyncTargetDeviceId.HasValue)
+                    {
+                        var dev = Devices.FirstOrDefault(d => d.ID == p.SyncTargetDeviceId.Value);
+                        if (dev != null) p.SyncTargetDeviceName = dev.Name;
+                    }
+
                     Points.Add(p);
                 }
             }
@@ -99,6 +204,76 @@ namespace DoorMonitorSystem.ViewModels
             {
                 MessageBox.Show($"加载点表失败: {ex.Message}");
             }
+        }
+
+        private void StartEdit(object obj)
+        {
+            if (SelectedPoint == null)
+            {
+                MessageBox.Show("请先选择要修改的点位");
+                return;
+            }
+
+            // Copy SelectedPoint to NewPoint for editing
+            NewPoint = new DevicePointConfigEntity
+            {
+                Id = SelectedPoint.Id,
+                SourceDeviceId = SelectedPoint.SourceDeviceId,
+                Address = SelectedPoint.Address,
+                DataType = SelectedPoint.DataType,
+                FunctionCode = SelectedPoint.FunctionCode,
+                BitIndex = SelectedPoint.BitIndex,
+                
+                TargetType = SelectedPoint.TargetType,
+                TargetObjId = SelectedPoint.TargetObjId,
+                TargetBitConfigId = SelectedPoint.TargetBitConfigId,
+                TargetObjName = SelectedPoint.TargetObjName,
+                TargetBitConfigName = SelectedPoint.TargetBitConfigName,
+                
+                IsSyncEnabled = SelectedPoint.IsSyncEnabled,
+                SyncTargetDeviceId = SelectedPoint.SyncTargetDeviceId,
+                SyncTargetAddress = SelectedPoint.SyncTargetAddress,
+                SyncTargetBitIndex = SelectedPoint.SyncTargetBitIndex,
+                SyncMode = SelectedPoint.SyncMode,
+                SyncTargetDeviceName = SelectedPoint.SyncTargetDeviceName,
+                
+                IsLogEnabled = SelectedPoint.IsLogEnabled,
+                LogTypeId = SelectedPoint.LogTypeId,
+                LogTriggerState = SelectedPoint.LogTriggerState,
+                LogMessage = SelectedPoint.LogMessage,
+                LogDeadband = SelectedPoint.LogDeadband,
+                Category = SelectedPoint.Category,
+                
+                HighLimit = SelectedPoint.HighLimit,
+                LowLimit = SelectedPoint.LowLimit,
+                
+                State0Desc = SelectedPoint.State0Desc,
+                State1Desc = SelectedPoint.State1Desc,
+                AlarmTargetValue = SelectedPoint.AlarmTargetValue,
+                
+                Description = SelectedPoint.Description
+            };
+
+            IsEditing = true;
+        }
+
+        private void CancelEdit(object obj)
+        {
+             ResetForm();
+        }
+
+        private void ResetForm()
+        {
+            if (SelectedDevice == null) return;
+            
+            IsEditing = false;
+            NewPoint = new DevicePointConfigEntity 
+            { 
+                SourceDeviceId = SelectedDevice.ID,
+                DataType = "Word",
+                TargetType = TargetType.None,
+                IsSyncEnabled = false
+            };
         }
 
         private void AddPoint(object obj)
@@ -124,101 +299,69 @@ namespace DoorMonitorSystem.ViewModels
                 MessageBox.Show("开启同步时，必须指定目标设备和同步地址");
                 return;
             }
-
-            // 检查同一设备下地址是否重复 (SourceDeviceId + Address + BitIndex)
-            var existing = Points.FirstOrDefault(p => p.SourceDeviceId == NewPoint.SourceDeviceId && 
-                                                   p.Address == NewPoint.Address && 
-                                                   p.BitIndex == NewPoint.BitIndex);
-            if (existing != null)
+            
+            // Set Sync Device Name for display
+            if (NewPoint.IsSyncEnabled && NewPoint.SyncTargetDeviceId.HasValue)
             {
-                 MessageBox.Show($"该设备下地址 '{NewPoint.Address}' (Bit {NewPoint.BitIndex}) 已存在，不能重复添加！");
-                 return;
+                 var dev = Devices.FirstOrDefault(d => d.ID == NewPoint.SyncTargetDeviceId.Value);
+                 if (dev != null) NewPoint.SyncTargetDeviceName = dev.Name;
+            }
+
+            // check duplication if inserting (not editing)
+            if (!IsEditing)
+            {
+                var existing = Points.FirstOrDefault(p => p.SourceDeviceId == NewPoint.SourceDeviceId && 
+                                                       p.Address == NewPoint.Address && 
+                                                       p.BitIndex == NewPoint.BitIndex);
+                if (existing != null)
+                {
+                     MessageBox.Show($"该设备下地址 '{NewPoint.Address}' (Bit {NewPoint.BitIndex}) 已存在！");
+                     return;
+                }
             }
 
             try
             {
                 using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
                 db.Connect();
-                db.Insert(NewPoint);
-                
-                // 刷新列表
-                Points.Add(NewPoint);
-                
-                // 重置 NewPoint，保留部分通用属性方便连续录入
-                NewPoint = new DevicePointConfigEntity 
-                { 
-                    SourceDeviceId = SelectedDevice.ID,
-                    DataType = NewPoint.DataType,
-                    TargetType = NewPoint.TargetType
-                };
-            }
-            catch (MySqlException ex)
-            {
-                if (ex.Number == 1054)
+
+                if (IsEditing)
                 {
-                    try
+                    // Update
+                    db.Update(NewPoint);
+                    
+                    // Refresh List Item
+                    var itemToUpdate = Points.FirstOrDefault(p => p.Id == NewPoint.Id);
+                    if (itemToUpdate != null)
                     {
-                        var msg = ex.Message;
-                        using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
-                        db.Connect(); // Ensure connection is open for NonQuery
-                        
-                        if (msg.Contains("TargetType"))
-                            db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `TargetType` INT DEFAULT 0;");
-                        
-                        if (msg.Contains("IsSyncEnabled"))
-                            db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `IsSyncEnabled` TINYINT(1) DEFAULT 0;");
-                            
-                        if (msg.Contains("SyncTargetDeviceId"))
-                            db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `SyncTargetDeviceId` INT DEFAULT NULL;");
-                            
-                        if (msg.Contains("SyncTargetAddress"))
-                            db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `SyncTargetAddress` INT DEFAULT NULL;"); // Use INT for ushort? to be safe or SMALLINT UNSIGNED
-                            
-                        if (msg.Contains("SyncMode"))
-                            db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `SyncMode` INT DEFAULT 0;");
-
-                        if (msg.Contains("SyncTargetBitIndex"))
-                            db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `SyncTargetBitIndex` INT DEFAULT NULL;");
-                        
-                        // New Logging Columns
-                        if (msg.Contains("IsLogEnabled"))
-                            db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `IsLogEnabled` TINYINT(1) DEFAULT 0;");
-                        if (msg.Contains("LogTypeId"))
-                            db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `LogTypeId` INT DEFAULT 1;");
-                        if (msg.Contains("LogTriggerState"))
-                             db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `LogTriggerState` INT DEFAULT 1;");
-                        if (msg.Contains("LogMessage"))
-                             db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `LogMessage` VARCHAR(200);");
-
-                        // 重试添加
-                        using var dbRetry = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
-                        dbRetry.Insert(NewPoint);
-                        
-                        Points.Add(NewPoint);
-                        
-                        // 重置
-                         NewPoint = new DevicePointConfigEntity 
-                        { 
-                            SourceDeviceId = SelectedDevice.ID,
-                            DataType = NewPoint.DataType,
-                            TargetType = NewPoint.TargetType,
-                            IsSyncEnabled = false
-                        };
-                        return;
+                        var index = Points.IndexOf(itemToUpdate);
+                        // Update properties manually or replace
+                        NewPoint.RowIndex = itemToUpdate.RowIndex; // Keep Index
+                        Points[index] = NewPoint; 
                     }
-                    catch (Exception innerEx)
-                    {
-                        MessageBox.Show($"尝试修复数据库失败: {innerEx.Message}\n请联系管理员手动检查表结构。");
-                    }
+                    MessageBox.Show("修改成功");
+                    ResetForm();
                 }
                 else
                 {
-                    MessageBox.Show($"添加失败: {ex.Message}");
+                    // Insert
+                    db.Insert(NewPoint);
+                    // Refresh List
+                    NewPoint.RowIndex = Points.Count + 1;
+                    Points.Add(NewPoint);
+                    // Reset, keep some fields
+                    NewPoint = new DevicePointConfigEntity 
+                    { 
+                        SourceDeviceId = SelectedDevice.ID,
+                        DataType = NewPoint.DataType,
+                        TargetType = NewPoint.TargetType,
+                        IsSyncEnabled = false
+                    };
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"添加失败: {ex.Message}");
+                 MessageBox.Show($"{(IsEditing ? "修改" : "添加")}失败: {ex.Message}");
             }
         }
 
@@ -242,27 +385,7 @@ namespace DoorMonitorSystem.ViewModels
             }
         }
 
-        private void SaveChanges(object obj)
-        {
-            // 保存列表中的修改 (Row Editing)
-            // 目前 SQLHelper 可能没有批量更新，这里演示简单的单条更新或提示
-            // 实际操作中，DataGrid 编辑通常是实时的或需要 RowEditEnding 事件
-            // 这里我们假设用户点击保存时，更新当前选中的点位 (或者遍历所有)
-            
-            if (SelectedPoint == null) return;
 
-            try
-            {
-                using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
-                db.Connect();
-                db.Update(SelectedPoint);
-                MessageBox.Show("保存成功");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"保存失败: {ex.Message}");
-            }
-        }
         // Tree Selector
         public ObservableCollection<SelectorNode> SelectorTree { get; set; } = new ObservableCollection<SelectorNode>();
         
@@ -340,6 +463,7 @@ namespace DoorMonitorSystem.ViewModels
                                              { 
                                                  Name = cfg.Description,
                                                  FullDescription = $"{station.StationName}_{door.DoorName}_{cfg.Description}",
+                                                 ObjectName = door.DoorName, // Set Object Name
                                                  NodeType = "Config", 
                                                  Id = cfg.Id,              
                                                  ExtendedId = door.Id,     
@@ -368,23 +492,13 @@ namespace DoorMonitorSystem.ViewModels
                                 {
                                     var panelNode = new SelectorNode { Name = panel.PanelName, NodeType = "Panel", Id = panel.Id };
                                     
-                                    if (panelBitConfigs.Count > 0)
+                                    // 修正逻辑: 数据库现有设计中，PanelBitConfig.PanelTypeId 实际上存储的是 Panel.Id
+                                    // 参见 StationDataService.cs Line 389: new { PanelTypeId = panelId }
+                                    if (panelBitConfigs.ContainsKey(panel.Id))
                                     {
-                                        // Flatten all available panel configs for now as we lack the link
-                                        foreach(var typeGroup in panelBitConfigs)
+                                        foreach(var cfg in panelBitConfigs[panel.Id])
                                         {
-                                            foreach(var cfg in typeGroup.Value)
-                                            {
-                                                panelNode.Children.Add(new SelectorNode
-                                                {
-                                                    Name = cfg.Description,
-                                                    FullDescription = $"{station.StationName}_{panel.PanelName}_{cfg.Description}",
-                                                    NodeType = "Config", 
-                                                    Id = cfg.Id,
-                                                    ExtendedId = panel.Id,
-                                                    Tag = TargetType.Panel
-                                                });
-                                            }
+                                            AddPanelConfigNode(panelNode, station, panel, cfg);
                                         }
                                     }
                                     groupNode.Children.Add(panelNode);
@@ -403,6 +517,20 @@ namespace DoorMonitorSystem.ViewModels
             }
         }
 
+        private void AddPanelConfigNode(SelectorNode parentNode, StationEntity station, PanelEntity panel, PanelBitConfigEntity cfg)
+        {
+            parentNode.Children.Add(new SelectorNode
+            {
+                Name = cfg.Description,
+                FullDescription = $"{station.StationName}_{panel.PanelName}_{cfg.Description}",
+                ObjectName = panel.PanelName,
+                NodeType = "Config",
+                Id = cfg.Id,
+                ExtendedId = panel.Id,
+                Tag = TargetType.Panel
+            });
+        }
+
         private void SelectNode(object obj)
         {
             if (obj is SelectorNode node && node.NodeType == "Config")
@@ -411,6 +539,10 @@ namespace DoorMonitorSystem.ViewModels
                 NewPoint.TargetObjId = node.ExtendedId;
                 NewPoint.TargetBitConfigId = node.Id;
                 
+                // Display Names
+                NewPoint.TargetObjName = node.ObjectName;
+                NewPoint.TargetBitConfigName = node.Name;
+
                 // Always update Description with full context as requested
                 NewPoint.Description = node.FullDescription;
                 
@@ -418,12 +550,23 @@ namespace DoorMonitorSystem.ViewModels
                 IsPopupOpen = false;
             }
         }
+
+        public ICommand ClearBindingCommand => new RelayCommand(ClearBinding);
+
+        private void ClearBinding(object obj)
+        {
+            NewPoint.TargetType = TargetType.None;
+            NewPoint.TargetObjId = 0;
+            NewPoint.TargetBitConfigId = 0;
+            // Optional: Clear Description? No, keep it as user might want to keep the text.
+        }
     }
 
     public class SelectorNode
     {
         public string Name { get; set; }
         public string FullDescription { get; set; } // Station_Door_Config
+        public string ObjectName { get; set; } // New Property for Name Lookup
         public string NodeType { get; set; } // Station, Group, Door, Config
         public int Id { get; set; }
         public int ExtendedId { get; set; } // For storing Parent Obj Id

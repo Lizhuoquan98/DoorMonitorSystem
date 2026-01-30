@@ -29,8 +29,8 @@ namespace DoorMonitorSystem.Assets.Services
         // 日志缓冲队列：通讯线程只管往里塞，后台线程负责异步写库，不阻塞采集。
         private readonly BlockingCollection<PointLogEntity> _logQueue = new();
         
-        // 缓存点位的最后一次状态，用于“变位触发”判断（只有不同于上次才记录）。
-        private readonly ConcurrentDictionary<int, bool> _lastValues = new();
+        // 缓存点位的最后一次状态 (改为 object 以支持模拟量)
+        private readonly ConcurrentDictionary<int, object> _lastValues = new();
         
         private bool _isLogConsumerRunning = false;
         private Task? _logConsumerTask;
@@ -46,43 +46,133 @@ namespace DoorMonitorSystem.Assets.Services
         /// 处理点位日志逻辑：评估当前值是否满足“变位触发”或“指定状态触发”的记录条件。
         /// </summary>
         /// <param name="p">点位配置实体</param>
-        /// <param name="currentValue">当前读取到的原始位值 (True/False)</param>
-        public void ProcessLogging(DevicePointConfigEntity p, bool currentValue)
+        /// <param name="bitValue">当前读取到的位值 (用于开关量判定)</param>
+        /// <param name="rawValue">当前读取到的原始值 (用于模拟量判定)</param>
+        public void ProcessLogging(DevicePointConfigEntity p, bool bitValue, object rawValue)
         {
-            // 0. 权限检查：如果点位对象为空，或者未在配置中勾选“开启日志记录”，则不处理。
+            // 0. 权限检查
             if (p == null || !p.IsLogEnabled) return;
 
-            // 1. 获取旧值并更新 (TryGetValue 返回 False 表示系统刚启动，此为第一次赋值)
-            bool isFirstTime = !_lastValues.TryGetValue(p.Id, out bool lastValue);
-            _lastValues[p.Id] = currentValue;
+            string dType = p.DataType?.ToLower() ?? "";
+            bool isDigital = dType.Contains("bool") || dType.Contains("bit"); // 归一化判定
+            object currentValue = isDigital ? (object)bitValue : rawValue;
+            
+            // 1. 获取旧值
+            bool isFirstTime = !_lastValues.TryGetValue(p.Id, out object lastValue);
 
-            // 2. 如果值没变，则无需记录
-            if (!isFirstTime && currentValue == lastValue) return;
+            // 2. 变位判定逻辑
+            bool isChanged = false;
+            if (isFirstTime)
+            {
+                isChanged = true;
+            }
+            else
+            {
+                if (isDigital)
+                {
+                    isChanged = (bool)lastValue != bitValue;
+                }
+                else
+                {
+                    // 模拟量判定 (支持死区)
+                    if (p.LogDeadband.HasValue && p.LogDeadband.Value > 0)
+                    {
+                        try 
+                        {
+                            double d1 = Convert.ToDouble(lastValue);
+                            double d2 = Convert.ToDouble(rawValue);
+                            if (Math.Abs(d2 - d1) >= p.LogDeadband.Value) isChanged = true;
+                        }
+                        catch 
+                        {
+                            // 转换失败则退化为字符串比对
+                            isChanged = lastValue.ToString() != rawValue.ToString();
+                        }
+                    }
+                    else
+                    {
+                        // 无死区，直接比对字符串 (避免浮点微小差异，也可直接 Equals)
+                        isChanged = lastValue.ToString() != rawValue.ToString();
+                    }
+                }
+            }
 
-            // 3. 评估触发逻辑 (LogTriggerState 定义：0=False触发, 1=True触发, 2=两者均触发/变位触发)
+            // 更新缓存 (如果变了)
+            if (isChanged) _lastValues[p.Id] = currentValue;
+            else return; // 没变就不记录
+
+            // 3. 评估触发/记录内容
+            // 3.1 模拟量总是记录 (只要变了)，且检查报警
+            // 3.2 开关量需检查 LogTriggerState
+            
             bool shouldLog = false;
-            if (p.LogTriggerState == 2) shouldLog = true;
-            else if (p.LogTriggerState == 1 && currentValue) shouldLog = true;
-            else if (p.LogTriggerState == 0 && !currentValue) shouldLog = true;
+            int logType = p.LogTypeId <= 0 ? 1 : p.LogTypeId; // 默认使用配置的类型，如果是0则修正为1
+
+            if (!isDigital)
+            {
+                // --- 模拟量逻辑 ---
+                shouldLog = true; // 只要变了且过了死区就记录
+
+                // 检查高低限报警
+                try 
+                {
+                    double val = Convert.ToDouble(rawValue);
+                    if (p.HighLimit.HasValue && val >= p.HighLimit.Value) 
+                    {
+                         logType = 2; // 强制报警类型
+                    }
+                    else if (p.LowLimit.HasValue && val <= p.LowLimit.Value)
+                    {
+                         logType = 2; // 强制报警类型
+                    }
+                } 
+                catch {}
+            }
+            else
+            {
+                // --- 开关量逻辑 ---
+                if (p.LogTriggerState == 2) shouldLog = true;
+                else if (p.LogTriggerState == 1 && bitValue) shouldLog = true;
+                else if (p.LogTriggerState == 0 && !bitValue) shouldLog = true;
+            }
 
             if (shouldLog)
             {
-                // 解析消息模板 (支持 {Value} 占位符替换为 ON/OFF)
                 string logMsg = string.IsNullOrWhiteSpace(p.LogMessage) ? p.Description : p.LogMessage;
-                logMsg = logMsg?.Replace("{Value}", currentValue ? "ON" : "OFF") ?? "";
+                string valText = "";
+
+                if (isDigital)
+                {
+                    valText = bitValue ? 
+                        (!string.IsNullOrWhiteSpace(p.State1Desc) ? p.State1Desc : "ON") : 
+                        (!string.IsNullOrWhiteSpace(p.State0Desc) ? p.State0Desc : "OFF");
+                }
+                else
+                {
+                     // 模拟量文本
+                     valText = rawValue.ToString();
+                     
+                     // 如果触发了高低限，可在消息中追加提示? 用户只说要记录值。
+                     // 日志消息模板替换
+                }
+
+                logMsg = logMsg?.Replace("{Value}", valText) ?? "";
 
                 var entity = new PointLogEntity
                 {
                     PointID = p.Id,
                     DeviceID = p.SourceDeviceId,
                     Address = $"{p.Address}.{p.BitIndex}",
-                    Val = currentValue ? 1 : 0,
-                    LogType = p.LogTypeId, // 1=报警, 其他=状态
+                    Val = bitValue ? 1 : 0, // 仅保留位状态
+                    ValText = valText,      // 核心：存储实际文本
+                    LogType = logType,      // 可能被高低限覆盖
                     Message = logMsg,
-                    LogTime = DateTime.Now
+                    Category = p.Category, 
+                    UserName = GlobalData.CurrentUser?.Username ?? "System",
+                    LogTime = DateTime.Now,
+                    IsAnalog = !isDigital // 标记来源
                 };
 
-                // 将日志抛入队列，由后台任务异步持久化
                 _logQueue.Add(entity);
             }
         }
@@ -98,6 +188,9 @@ namespace DoorMonitorSystem.Assets.Services
 
             // 启动脱机日志自动寻回/恢复任务 (每30秒跑一次)
             _ = StartOfflineRecoveryLoop();
+
+            // 检查并升级当前月表的Schema (确保毫秒精度)
+            _ = CheckAndUpgradeSchemaAsync();
 
             _logConsumerTask = Task.Run(async () =>
             {
@@ -178,8 +271,9 @@ namespace DoorMonitorSystem.Assets.Services
                         db.BeginTransaction();
                         foreach (var entity in batch)
                         {
-                            // 动态路由表名：PointLogs_202401
-                            string tableName = $"PointLogs_{entity.LogTime:yyyyMM}";
+                            // 动态路由表名：PointLogs_202401 或 AnalogLogs_202401
+                            string prefix = entity.IsAnalog ? "AnalogLogs" : "PointLogs";
+                            string tableName = $"{prefix}_{entity.LogTime:yyyyMM}";
                             db.Insert(entity, tableName);
                         }
                         db.CommitTransaction();
@@ -190,16 +284,49 @@ namespace DoorMonitorSystem.Assets.Services
                         // 保护：如果判定为表不存在，则触发分表创建逻辑并重试一次
                         if (ex.Message.Contains("Table") && ex.Message.Contains("doesn't exist"))
                         {
-                            var firstEntity = batch[0];
-                            EnsureShardTableExists(db, firstEntity.LogTime);
+                            // 确保批处理中涉及的所有表都已创建
+                            var tables = batch.Select(x => new { Prefix = x.IsAnalog ? "AnalogLogs" : "PointLogs", Time = x.LogTime })
+                                             .GroupBy(x => $"{x.Prefix}_{x.Time:yyyyMM}")
+                                             .Select(g => g.First());
+                            
+                            foreach (var t in tables)
+                            {
+                                EnsureShardTableExists(db, t.Time, t.Prefix);
+                            }
 
                             db.BeginTransaction();
                             foreach (var entity in batch)
                             {
-                                string tableName = $"PointLogs_{entity.LogTime:yyyyMM}";
+                                string TablePrefix = entity.IsAnalog ? "AnalogLogs" : "PointLogs";
+                                string tableName = $"{TablePrefix}_{entity.LogTime:yyyyMM}";
                                 db.Insert(entity, tableName);
                             }
                             db.CommitTransaction();
+                        }
+                        // 保护: 如果是新增字段导致的错误 (如 ValText)
+                        else if (ex.Message.Contains("Unknown column")) 
+                        {
+                             // 确保批处理中涉及的所有表都进行补丁
+                             var tables = batch.Select(x => new { Prefix = x.IsAnalog ? "AnalogLogs" : "PointLogs", Time = x.LogTime })
+                                              .GroupBy(x => $"{x.Prefix}_{x.Time:yyyyMM}")
+                                              .Select(g => g.First());
+
+                             foreach (var t in tables)
+                             {
+                                 string tableName = $"{t.Prefix}_{t.Time:yyyyMM}";
+                                 try { db.ExecuteNonQuery($"ALTER TABLE `{tableName}` ADD COLUMN ValText VARCHAR(50);"); } catch { }
+                                 try { db.ExecuteNonQuery($"ALTER TABLE `{tableName}` ADD COLUMN Category VARCHAR(50);"); } catch { }
+                                 try { db.ExecuteNonQuery($"ALTER TABLE `{tableName}` ADD COLUMN UserName VARCHAR(50);"); } catch { }
+                             }
+
+                             db.BeginTransaction();
+                             foreach (var entity in batch)
+                             {
+                                 string TablePrefix = entity.IsAnalog ? "AnalogLogs" : "PointLogs";
+                                 string tableName = $"{TablePrefix}_{entity.LogTime:yyyyMM}";
+                                 db.Insert(entity, tableName);
+                             }
+                             db.CommitTransaction();
                         }
                         else throw;
                     }
@@ -238,11 +365,15 @@ namespace DoorMonitorSystem.Assets.Services
                 MiniExcelLibs.MiniExcel.SaveAs(path, batch.Select(x => new {
                     x.PointID,
                     x.DeviceID,
-                    x.Address,
+                    x.Address, 
                     x.Val,
+                    x.ValText,
                     x.LogType,
                     x.Message,
-                    x.LogTime
+                    x.Category,
+                    x.UserName,
+                    x.LogTime,
+                    x.IsAnalog
                 }));
 
                 LogHelper.Info($"[LogService] 数据库脱机，已暂存 {batch.Count} 条记录至本地: {fileName}");
@@ -302,14 +433,59 @@ namespace DoorMonitorSystem.Assets.Services
         }
 
         /// <summary>
-        /// 确保日志分表（如 PointLogs_202401）在数据库中存在
+        /// 确保日志分表（如 PointLogs_202401 或 AnalogLogs_202401）在数据库中存在
         /// </summary>
-        private void EnsureShardTableExists(SQLHelper db, DateTime date)
+        private void EnsureShardTableExists(SQLHelper db, DateTime date, string prefix = "PointLogs")
         {
             try
             {
-                string tableName = $"PointLogs_{date:yyyyMM}";
+                string tableName = $"{prefix}_{date:yyyyMM}";
                 db.CreateTableFromModel<PointLogEntity>(tableName);
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// 检查当前月表的 Schema，确保 LogTime 字段具有毫秒精度
+        /// </summary>
+        private async Task CheckAndUpgradeSchemaAsync()
+        {
+            try
+            {
+                if (GlobalData.SysCfg == null) return;
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.LogDatabaseName);
+                        db.Connect();
+
+                        string[] prefixes = { "PointLogs", "AnalogLogs" };
+                        foreach (var pfx in prefixes)
+                        {
+                            string tableName = $"{pfx}_{DateTime.Now:yyyyMM}";
+                            if (db.TableExists(tableName))
+                            {
+                                var dt = db.ExecuteQuery($"SHOW COLUMNS FROM `{tableName}` WHERE Field='LogTime'");
+                                if (dt.Rows.Count > 0)
+                                {
+                                    string type = dt.Rows[0]["Type"].ToString()?.ToLower() ?? "";
+                                    // 如果当前不仅是 datetime(3) (例如 datetime, 或 datetime(0))
+                                    if (!type.Contains("datetime(3)"))
+                                    {
+                                        // 升级字段精度
+                                        db.ExecuteNonQuery($"ALTER TABLE `{tableName}` MODIFY COLUMN LogTime DATETIME(3)");
+                                        LogHelper.Info($"[LogService] 已自动升级表 {tableName} schema: LogTime -> DATETIME(3)");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogHelper.Error("[LogService] Schema 检查/升级失败", ex);
+                    }
+                });
             }
             catch { }
         }

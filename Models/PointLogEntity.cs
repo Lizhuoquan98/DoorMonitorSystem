@@ -33,12 +33,41 @@ namespace DoorMonitorSystem.Models
         [Column(TypeName = "MEDIUMTEXT")]
         public string? Message { get; set; }
         
+        /// <summary>
+        /// 值文本 (如: 恢复/触发) - 冗余存储，提高查询效率
+        /// </summary>
+        [StringLength(50)]
+        public string? ValText { get; set; }
+
+        /// <summary>
+        /// 分类 (来自 DevicePointConfig.Category)
+        /// </summary>
+        [StringLength(50)]
+        public string? Category { get; set; }
+
+        /// <summary>
+        /// 用户名 (记录产生时的操作员)
+        /// </summary>
+        [StringLength(50)]
+        public string? UserName { get; set; }
+
+        [Column(TypeName = "DATETIME(3)")]
         public DateTime LogTime { get; set; }
 
         // --- 辅助显示属性 ---
         [NotMapped]
-        public string LogTypeDisplay => LogType == 1 ? "报警" : "状态";
+        public string LogTypeDisplay => LogType == 2 ? "报警" : "状态";
+        
         [NotMapped]
-        public string ValDisplay => Val == 1 ? "ON" : "OFF";
+        public string ValDisplay => !string.IsNullOrEmpty(ValText) ? ValText : (Val == 1 ? "ON" : "OFF");
+
+        [NotMapped]
+        public int RowIndex { get; set; }
+
+        /// <summary>
+        /// 是否为模拟量 (瞬时值)
+        /// </summary>
+        [NotMapped]
+        public bool IsAnalog { get; set; }
     }
 }

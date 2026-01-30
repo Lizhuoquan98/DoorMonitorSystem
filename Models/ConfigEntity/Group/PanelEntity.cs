@@ -15,6 +15,9 @@ namespace DoorMonitorSystem.Models.ConfigEntity.Group
         [Required]
         public int PanelGroupId { get; set; }
 
+        /// <summary>面板类型ID (关联 PanelBitConfig)</summary>
+        public int PanelTypeId { get; set; }
+
         /// <summary>面板名称</summary>
         [Required, StringLength(100)]
         public string PanelName { get; set; } = "";

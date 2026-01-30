@@ -86,21 +86,8 @@ namespace DoorMonitorSystem.Assets.Services
                 // --- NTP Service Integration ---
                 try 
                 {
-                    string ntpPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config", "NtpConfig.json");
-                    if (System.IO.File.Exists(ntpPath))
-                    {
-                        string json = System.IO.File.ReadAllText(ntpPath);
-                        GlobalData.NtpConfig = Newtonsoft.Json.JsonConvert.DeserializeObject<DoorMonitorSystem.Models.system.NtpConfig>(json);
-                    }
-                    else
-                    {
-                        // Create default if missing
-                        GlobalData.NtpConfig = new DoorMonitorSystem.Models.system.NtpConfig();
-                        string json = Newtonsoft.Json.JsonConvert.SerializeObject(GlobalData.NtpConfig, Newtonsoft.Json.Formatting.Indented);
-                        // Ensure directory exists
-                        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(ntpPath));
-                        System.IO.File.WriteAllText(ntpPath, json);
-                    }
+                    // Config is already loaded in DataManager
+                    if (GlobalData.NtpConfig == null) GlobalData.NtpConfig = new DoorMonitorSystem.Models.system.NtpConfig();
 
                     // Start NTP Service
                     await NtpService.Instance.StartAsync();
@@ -177,6 +164,10 @@ namespace DoorMonitorSystem.Assets.Services
                                 if (!paramDict.ContainsKey("寄存器数量")) finalParams.Add(new CommParamEntity { Name = "寄存器数量", Value = calcCount.ToString() });
                             }
                             slavePlugin.Initialize(finalParams);
+                            
+                            // 绑定 Server 数据接收事件 (用于驱动 UI 更新)
+                             slavePlugin.OnDataReceived += (s, args) => _dataProcessor?.ProcessData(dev.ID, args.AddressTag, args.Data);
+
                             slavePlugin.Open();
                             _slaves[dev.ID] = slavePlugin;
                             LogHelper.Info($"[CommService] 已启动从站设备: {dev.Name}");

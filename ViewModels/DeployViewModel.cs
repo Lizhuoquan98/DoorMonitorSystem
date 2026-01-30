@@ -13,6 +13,8 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using DoorMonitorSystem.Assets.Helper;
+using DoorMonitorSystem.Models.system;
 
 namespace DoorMonitorSystem.ViewModels
 {
@@ -211,7 +213,7 @@ namespace DoorMonitorSystem.ViewModels
         /// <summary>
         /// 保存命令，将 Devices 集合保存为 JSON 文件
         /// </summary>
-        public ICommand SaveCommand => new RelayCommand(SaveToJson);
+        public ICommand SaveCommand => new RelayCommand(SaveToDatabase);
 
         /// <summary>
         /// 测试连接命令
@@ -267,7 +269,7 @@ namespace DoorMonitorSystem.ViewModels
         /// </summary>
         public DeployViewModel()
         {
-            LoadFromJson();
+            LoadFromGlobal();
             LoadProtocolKeys();
         }
 
@@ -324,16 +326,19 @@ namespace DoorMonitorSystem.ViewModels
         }
 
         /// <summary>
-        /// 从 JSON 文件加载设备配置
+        /// 从全局缓存加载设备配置 (已由 DataManager 从数据库从读取)
         /// </summary>
-        private void LoadFromJson()
+        private void LoadFromGlobal()
         {
             try
             {
-                if (File.Exists("Config/devices.json"))
+                if (GlobalData.ListDveices != null)
                 {
-                    var json = File.ReadAllText("Config/devices.json");
+                    // Deep Clone to avoid modifying global state directly until Save
+                    // 简单的序列化克隆，防止直接引用修改
+                    var json = JsonSerializer.Serialize(GlobalData.ListDveices);
                     var list = JsonSerializer.Deserialize<List<ConfigEntity>>(json);
+                    
                     if (list != null)
                     {
                         Devices = new ObservableCollection<ConfigEntity>(list);
@@ -347,29 +352,87 @@ namespace DoorMonitorSystem.ViewModels
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"加载配置文件失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"加载设备列表失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         /// <summary>
-        /// 将设备配置保存为 JSON 文件
+        /// 保存设备配置到数据库
         /// </summary>
-        private void SaveToJson(object obj)
+        private void SaveToDatabase(object obj)
         {
+            if (MessageBox.Show("确定要保存当前配置到数据库吗？这将会覆盖数据库中的原有配置。", "确认保存", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
             try
             {
-                if (SelectedDevice == null || SelectedDeviceIndex < 0 || SelectedDeviceIndex >= Devices.Count)
+                // 如果有选中的设备，先将其变更更新到列表中
+                if (SelectedDevice != null && SelectedDeviceIndex >= 0 && SelectedDeviceIndex < Devices.Count)
                 {
-                    // 直接保存整个列表
-                    ConvertDataToJsoncs.SaveDataToJson(Devices, "Config/devices.json");
-                    MessageBox.Show("配置保存成功！", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                    Devices[SelectedDeviceIndex] = SelectedDevice;
+                }
+
+                if (GlobalData.SysCfg == null)
+                {
+                    MessageBox.Show("系统配置未加载，无法连接数据库", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
 
-                // 更新当前选中的设备
-                Devices[SelectedDeviceIndex] = SelectedDevice;
-                ConvertDataToJsoncs.SaveDataToJson(Devices, "Config/devices.json");
-                MessageBox.Show("配置保存成功！", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
+                db.Connect();
+
+                // 使用事务保证一致性
+                db.BeginTransaction();
+                try 
+                {
+                    // 1. 清空旧数据 (先删子表 Param，再删主表 Device)
+                    db.ExecuteNonQuery("DELETE FROM SysDeviceParamEntity");
+                    db.ExecuteNonQuery("DELETE FROM SysDeviceEntity");
+
+                    // 2. 插入新数据
+                    foreach (var dev in Devices)
+                    {
+                        // 插入主表
+                        var devEntity = new SysDeviceEntity
+                        {
+                            DeviceId = dev.ID,
+                            Name = dev.Name,
+                            Protocol = dev.Protocol,
+                            TimeSyncJson = JsonSerializer.Serialize(dev.TimeSync),
+                            Description = "" 
+                        };
+                        db.Insert(devEntity, "SysDeviceEntity");
+
+                        // 插入参数表
+                        if (dev.CommParsams != null)
+                        {
+                            foreach (var p in dev.CommParsams)
+                            {
+                                var paramEntity = new SysDeviceParamEntity
+                                {
+                                    DeviceId = dev.ID,
+                                    ParamName = p.Name,
+                                    ParamValue = p.Value
+                                };
+                                db.Insert(paramEntity, "SysDeviceParamEntity");
+                            }
+                        }
+                    }
+
+                    db.CommitTransaction();
+                    
+                    // 3. 更新全局缓存
+                    GlobalData.ListDveices = Devices.ToList();
+
+                    MessageBox.Show("配置已成功保存到数据库！", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch
+                {
+                    db.RollbackTransaction();
+                    throw;
+                }
             }
             catch (Exception ex)
             {

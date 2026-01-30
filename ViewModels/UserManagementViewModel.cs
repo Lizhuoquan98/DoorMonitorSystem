@@ -1,0 +1,282 @@
+using Base;
+using DoorMonitorSystem.Assets.Helper;
+using DoorMonitorSystem.Base;
+using DoorMonitorSystem.Models.system;
+using System;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Input;
+
+namespace DoorMonitorSystem.ViewModels
+{
+    public class UserManagementViewModel : NotifyPropertyChanged
+    {
+        private ObservableCollection<UserEntity> _users = new();
+        private UserEntity? _selectedUser;
+        private bool _isEditing;
+        private string _editTitle = "用户详情";
+        
+        // Form Fields
+        private int _formId;
+        private string _formUsername = "";
+        private string _formRealName = "";
+        private string _formRole = "User";
+        private bool _formIsEnabled = true;
+        // Password is handled separately or via PasswordBox binding helper, for simplicity we use plain property here
+        private string _formPassword = ""; 
+
+        #region Properties
+
+        public ObservableCollection<UserEntity> Users
+        {
+            get => _users;
+            set { _users = value; OnPropertyChanged(); }
+        }
+
+        public UserEntity? SelectedUser
+        {
+            get => _selectedUser;
+            set
+            {
+                _selectedUser = value;
+                OnPropertyChanged();
+                if (_selectedUser != null && !_isEditing)
+                {
+                    LoadForm(_selectedUser);
+                }
+            }
+        }
+
+        public bool IsEditing
+        {
+            get => _isEditing;
+            set 
+            { 
+                _isEditing = value; 
+                OnPropertyChanged(); 
+                // Toggle ReadOnly state logic if needed
+            }
+        }
+
+        public string EditTitle
+        {
+            get => _editTitle;
+            set { _editTitle = value; OnPropertyChanged(); }
+        }
+
+        public string FormUsername
+        {
+            get => _formUsername;
+            set { _formUsername = value; OnPropertyChanged(); }
+        }
+
+        public string FormRealName
+        {
+            get => _formRealName;
+            set { _formRealName = value; OnPropertyChanged(); }
+        }
+
+        public string FormRole
+        {
+            get => _formRole;
+            set { _formRole = value; OnPropertyChanged(); }
+        }
+
+        public bool FormIsEnabled
+        {
+            get => _formIsEnabled;
+            set { _formIsEnabled = value; OnPropertyChanged(); }
+        }
+
+        public string FormPassword
+        {
+            get => _formPassword;
+            set { _formPassword = value; OnPropertyChanged(); }
+        }
+
+        // Roles Selection
+        public ObservableCollection<string> Roles { get; } = new ObservableCollection<string> { "Admin", "Operator", "Viewer" };
+
+        #endregion
+
+        #region Commands
+
+        public ICommand CreateCommand { get; }
+        public ICommand SaveCommand { get; }
+        public ICommand DeleteCommand { get; }
+        public ICommand CancelCommand { get; }
+
+        #endregion
+
+        public UserManagementViewModel()
+        {
+            CreateCommand = new RelayCommand(OnCreate);
+            SaveCommand = new RelayCommand(OnSave);
+            DeleteCommand = new RelayCommand(OnDelete);
+            CancelCommand = new RelayCommand(OnCancel);
+
+            LoadData();
+        }
+
+        private void LoadData()
+        {
+            Task.Run(() =>
+            {
+                try
+                {
+                    if (GlobalData.SysCfg == null) return;
+                     using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
+                    db.Connect();
+                    var list = db.FindAll<UserEntity>(); // Or Query<UserEntity>("Sys_Users", "1=1");
+                    
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        Users = new ObservableCollection<UserEntity>(list);
+                    });
+                }
+                catch (Exception ex)
+                {
+                    LogHelper.Error("[UserVM] Load Failed", ex);
+                }
+            });
+        }
+
+        private void LoadForm(UserEntity user)
+        {
+            _formId = user.Id;
+            FormUsername = user.Username;
+            FormRealName = user.RealName ?? "";
+            FormRole = user.Role ?? "User";
+            FormIsEnabled = user.IsEnabled;
+            FormPassword = user.Password; // Usually we don't load password back, but for simple editing we might show it or leave empty
+            IsEditing = true;
+            EditTitle = $"编辑用户: {user.Username}";
+        }
+
+        private void OnCreate(object obj)
+        {
+            SelectedUser = null; // Clear selection
+            _formId = 0;
+            FormUsername = "";
+            FormRealName = "";
+            FormRole = "Operator";
+            FormIsEnabled = true;
+            FormPassword = "";
+            IsEditing = true;
+            EditTitle = "新建用户";
+        }
+
+        private void OnSave(object obj)
+        {
+            if (string.IsNullOrWhiteSpace(FormUsername))
+            {
+                MessageBox.Show("用户名不能为空");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(FormPassword))
+            {
+                MessageBox.Show("密码不能为空");
+                return;
+            }
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    
+                    if (GlobalData.SysCfg == null) return;
+                    using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
+                    db.Connect();
+
+                    var user = new UserEntity
+                    {
+                        Id = _formId,
+                        Username = FormUsername,
+                        RealName = FormRealName,
+                        Role = FormRole,
+                        Password = FormPassword,
+                        IsEnabled = FormIsEnabled,
+                        LastLoginTime = DateTime.Now 
+                    };
+
+                    if (_formId == 0)
+                    {
+                        // Check duplicate
+                        var exist = db.Query<UserEntity>("Sys_Users", "Username = @u", new MySql.Data.MySqlClient.MySqlParameter("@u", FormUsername));
+                        if (exist.Count > 0)
+                        {
+                            MessageBox.Show("用户名已存在");
+                            return;
+                        }
+                        
+                        user.CreateTime = DateTime.Now;
+                        db.Insert(user);
+                    }
+                    else
+                    {
+                        var original = db.SelectById<UserEntity>(_formId);
+                        if(original != null)
+                        {
+                             user.CreateTime = original.CreateTime; // Keep original create time
+                        }
+                        db.Update(user);
+                    }
+
+                    LoadData();
+                    MessageBox.Show("保存成功");
+                }
+                catch (Exception ex)
+                {
+                    LogHelper.Error("[UserVM] Save Failed", ex);
+                    MessageBox.Show("保存失败: " + ex.Message);
+                }
+            });
+        }
+
+        private void OnDelete(object obj)
+        {
+            if (_formId == 0) return;
+            
+            if (MessageBox.Show($"确定要删除用户 {FormUsername} 吗?", "确认", MessageBoxButton.YesNo) != MessageBoxResult.Yes)
+                return;
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    if (GlobalData.SysCfg == null) return;
+                    using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
+                    db.Connect();
+                    
+                    var user = new UserEntity { Id = _formId };
+                    db.Delete(user);
+                    
+                    LoadData();
+                    IsEditing = false; // Close form logic
+                    _formId = 0;
+                }
+                catch (Exception ex)
+                {
+                    LogHelper.Error("[UserVM] Delete Failed", ex);
+                    MessageBox.Show("删除失败");
+                }
+            });
+        }
+
+        private void OnCancel(object obj)
+        {
+            if (SelectedUser != null)
+            {
+                LoadForm(SelectedUser);
+            }
+            else
+            {
+                IsEditing = false;
+                _formId = 0;
+            }
+        }
+    }
+}

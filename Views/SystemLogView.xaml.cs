@@ -11,5 +11,13 @@ namespace DoorMonitorSystem.Views
         {
             InitializeComponent();
         }
+
+        private void ClearKeyword_Click(object sender, System.Windows.RoutedEventArgs e)
+        {
+            if (this.DataContext is ViewModels.SystemLogViewModel viewModel)
+            {
+                viewModel.Keyword = "";
+            }
+        }
     }
 }

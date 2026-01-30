@@ -8,7 +8,7 @@
         WindowStyle="None" 
         AllowsTransparency="True"
         Background="Transparent"
-        Height="180" Width="360"
+        Height="180" Width="300"
         ResizeMode="NoResize">
 
     <Border Background="#1a1f2e" 
@@ -36,15 +36,28 @@
 
             <!-- 输入框 -->
             <Border Grid.Row="1" Background="#0f121a" CornerRadius="6" BorderBrush="#3a4555" BorderThickness="1" Margin="0,0,0,20">
-                <TextBox x:Name="txtInput" 
-                         Background="Transparent" 
-                         BorderThickness="0" 
-                         Foreground="White" 
-                         CaretBrush="White"
-                         Padding="1"
-                         FontSize="14"
-                         VerticalContentAlignment="Center"
-                         KeyDown="txtInput_KeyDown"/>
+                <Grid>
+                    <TextBox x:Name="txtInput" 
+                             Background="Transparent" 
+                             BorderThickness="0" 
+                             Foreground="White" 
+                             CaretBrush="White"
+                             Padding="5,1"
+                             FontSize="18"
+                             VerticalContentAlignment="Center"
+                             KeyDown="txtInput_KeyDown"/>
+                    
+                    <PasswordBox x:Name="txtPassword"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 Foreground="White"
+                                 CaretBrush="White"
+                                 Padding="5,1"
+                                 FontSize="18"
+                                 VerticalContentAlignment="Center"
+                                 KeyDown="txtPassword_KeyDown"
+                                 Visibility="Collapsed"/>
+                </Grid>
             </Border>
 
             <!-- 按钮组 -->

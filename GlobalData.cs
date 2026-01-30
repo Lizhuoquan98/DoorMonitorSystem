@@ -86,6 +86,11 @@ namespace DoorMonitorSystem
         /// 全局主界面视图模型引用 (用于通讯服务直接更新 UI)
         /// </summary>
         public static DoorMonitorSystem.ViewModels.MainViewModel? MainVm { get; set; }
+
+        /// <summary>
+        /// 当前登录用户
+        /// </summary>
+        public static UserEntity? CurrentUser { get; set; }
     }
 
 }

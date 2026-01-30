@@ -8,6 +8,7 @@ using System.Windows.Input;
 using System.Collections.Generic;
 using Base;
 using System.Linq;
+using DoorMonitorSystem.Models.ConfigEntity;
 
 namespace DoorMonitorSystem.ViewModels
 {
@@ -42,13 +43,62 @@ namespace DoorMonitorSystem.ViewModels
             set { _isLoading = value; OnPropertyChanged(); }
         }
 
+        // 分类筛选
+        public ObservableCollection<string> Categories { get; set; } = new ObservableCollection<string>();
+        
+        private string _selectedCategory = "全部";
+        public string SelectedCategory
+        {
+            get => _selectedCategory;
+            set { _selectedCategory = value; OnPropertyChanged(); }
+        }
+
+        // 记录等级筛选 (1=状态, 2=报警)
+        public List<string> LogLevelOptions { get; set; } = new List<string> { "全部", "状态", "报警" };
+
+        private string _selectedLogLevel = "全部";
+        public string SelectedLogLevel
+        {
+            get => _selectedLogLevel;
+            set
+            {
+                _selectedLogLevel = value;
+                OnPropertyChanged();
+                CurrentPage = 1;
+                _ = LoadLogsAsync();
+            }
+        }
+
+        // 日志表类型切换
+        public List<string> LogTableTypes { get; set; } = new List<string> { "系统日志", "模拟量数据" };
+        
+        private string _selectedTableType = "系统日志";
+        public string SelectedTableType
+        {
+            get => _selectedTableType;
+            set 
+            { 
+                _selectedTableType = value; 
+                OnPropertyChanged();
+                CurrentPage = 1;
+                _ = LoadLogsAsync();
+            }
+        }
+
+        private bool _hasAnalogPoints = false;
+        public bool HasAnalogPoints
+        {
+            get => _hasAnalogPoints;
+            set { _hasAnalogPoints = value; OnPropertyChanged(); }
+        }
+
         public ObservableCollection<PointLogEntity> Logs { get; set; } = new ObservableCollection<PointLogEntity>();
 
         // 分页属性
         private int _currentPage = 1;
         private int _totalPages = 1;
         private int _totalCount = 0;
-        private int _pageSize = 50;
+        private int _pageSize = 1000;
 
         public int CurrentPage
         {
@@ -99,6 +149,11 @@ namespace DoorMonitorSystem.ViewModels
             ResetCommand = new RelayCommand(OnReset);
             ExportCommand = new RelayCommand(OnExport);
 
+            ExportCommand = new RelayCommand(OnExport);
+
+            // 加载分类
+            LoadCategories();
+
             // 默认加载
             _ = LoadLogsAsync();
         }
@@ -134,6 +189,13 @@ namespace DoorMonitorSystem.ViewModels
             SearchStartTime = "00:00:00";
             SearchEndTime = "23:59:59";
             Keyword = "";
+            SelectedCategory = "全部";
+            SelectedLogLevel = "全部";
+            
+            // 内部字段赋值以避免触发多次 LoadLogsAsync
+            _selectedTableType = "系统日志"; 
+            OnPropertyChanged(nameof(SelectedTableType));
+            
             CurrentPage = 1;
             _ = LoadLogsAsync();
         }
@@ -148,7 +210,8 @@ namespace DoorMonitorSystem.ViewModels
 
             var saveFileDialog = new Microsoft.Win32.SaveFileDialog();
             saveFileDialog.Filter = "Excel表格文件 (*.xlsx)|*.xlsx|CSV表格文件 (*.csv)|*.csv";
-            saveFileDialog.FileName = $"系统日志_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+            string prefix = SelectedTableType == "模拟量数据" ? "模拟量数据" : "系统日志";
+            saveFileDialog.FileName = $"{prefix}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
             
             if (saveFileDialog.ShowDialog() == true)
             {
@@ -169,9 +232,10 @@ namespace DoorMonitorSystem.ViewModels
                         // 1. 判定表名集合
                         List<string> tableList = new();
                         DateTime d = new DateTime(StartDate.Year, StartDate.Month, 1);
+                        string tablePrefix = SelectedTableType == "模拟量数据" ? "AnalogLogs" : "PointLogs";
                         while (d <= EndDate)
                         {
-                            string tableName = $"PointLogs_{d:yyyyMM}";
+                            string tableName = $"{tablePrefix}_{d:yyyyMM}";
                             if (db.TableExists(tableName)) tableList.Add(tableName);
                             d = d.AddMonths(1);
                         }
@@ -187,7 +251,21 @@ namespace DoorMonitorSystem.ViewModels
                         string baseWhere = $"LogTime BETWEEN '{startDt}' AND '{endDt}'";
                         if (!string.IsNullOrWhiteSpace(Keyword))
                         {
-                            baseWhere += $" AND (Message LIKE '%{Keyword}%' OR Address LIKE '%{Keyword}%')";
+                            baseWhere += $" AND (Message LIKE '%{Keyword}%' OR Address LIKE '%{Keyword}%' OR ValText LIKE '%{Keyword}%')";
+                        }
+
+                        if (!string.IsNullOrEmpty(SelectedCategory) && SelectedCategory != "全部")
+                        {
+                            baseWhere += $" AND Category = '{SelectedCategory}'";
+                        }
+
+                        if (SelectedLogLevel == "状态")
+                        {
+                            baseWhere += " AND LogType <> 2";
+                        }
+                        else if (SelectedLogLevel == "报警")
+                        {
+                            baseWhere += " AND LogType = 2";
                         }
 
                         // 2. 查询所有匹配项
@@ -200,7 +278,7 @@ namespace DoorMonitorSystem.ViewModels
                             // 转换为具有中文名称的可读对象列表
                             var exportData = result.Select(x => new
                             {
-                                时间 = x.LogTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                                时间 = x.LogTime.ToString("yyyy-MM-dd HH:mm:ss.fff"),
                                 类型 = x.LogTypeDisplay,
                                 设备ID = x.DeviceID,
                                 地址 = x.Address,
@@ -218,7 +296,7 @@ namespace DoorMonitorSystem.ViewModels
                                 sw.WriteLine("时间,类型,设备ID,地址,状态值,日志消息");
                                 foreach (var log in result)
                                 {
-                                    sw.WriteLine($"{log.LogTime:yyyy-MM-dd HH:mm:ss},{log.LogTypeDisplay},{log.DeviceID},{EscapeCsv(log.Address ?? "")},{log.ValDisplay},{EscapeCsv(log.Message ?? "")}");
+                                    sw.WriteLine($"{log.LogTime:yyyy-MM-dd HH:mm:ss.fff},{log.LogTypeDisplay},{log.DeviceID},{EscapeCsv(log.Address ?? "")},{log.ValDisplay},{EscapeCsv(log.Message ?? "")}");
                                 }
                             }
                         }
@@ -280,9 +358,10 @@ namespace DoorMonitorSystem.ViewModels
                         // 2. 根据起止时间判定涉及的分表 (1周最多跨2个月)
                         List<string> tableList = new();
                         DateTime d = new DateTime(StartDate.Year, StartDate.Month, 1);
+                        string tablePrefix = SelectedTableType == "模拟量数据" ? "AnalogLogs" : "PointLogs";
                         while (d <= EndDate)
                         {
-                            string tableName = $"PointLogs_{d:yyyyMM}";
+                            string tableName = $"{tablePrefix}_{d:yyyyMM}";
                             if (db.TableExists(tableName)) tableList.Add(tableName);
                             d = d.AddMonths(1);
                         }
@@ -302,7 +381,21 @@ namespace DoorMonitorSystem.ViewModels
                         string baseWhere = $"LogTime BETWEEN '{startDt}' AND '{endDt}'";
                         if (!string.IsNullOrWhiteSpace(Keyword))
                         {
-                            baseWhere += $" AND (Message LIKE '%{Keyword}%' OR Address LIKE '%{Keyword}%')";
+                            baseWhere += $" AND (Message LIKE '%{Keyword}%' OR Address LIKE '%{Keyword}%' OR ValText LIKE '%{Keyword}%')";
+                        }
+
+                        if (!string.IsNullOrEmpty(SelectedCategory) && SelectedCategory != "全部")
+                        {
+                            baseWhere += $" AND Category = '{SelectedCategory}'";
+                        }
+
+                        if (SelectedLogLevel == "状态")
+                        {
+                            baseWhere += " AND LogType <> 2";
+                        }
+                        else if (SelectedLogLevel == "报警")
+                        {
+                            baseWhere += " AND LogType = 2";
                         }
 
                         // 5. 查询总条数
@@ -330,7 +423,12 @@ namespace DoorMonitorSystem.ViewModels
                         
                         System.Windows.Application.Current.Dispatcher.Invoke(() =>
                         {
-                            foreach (var log in result) Logs.Add(log);
+                            int index = 1; /* Reset index for each page */
+                            foreach (var log in result) 
+                            {
+                                log.RowIndex = index++;
+                                Logs.Add(log);
+                            }
                         });
                     });
                 }
@@ -342,6 +440,76 @@ namespace DoorMonitorSystem.ViewModels
             finally
             {
                 IsLoading = false;
+            }
+        }
+
+        private void LoadCategories()
+        {
+            try
+            {
+                Categories.Clear();
+                Categories.Add("全部");
+
+                if (GlobalData.SysCfg != null)
+                {
+                    using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
+                    db.Connect();
+                    
+                    // 从点位配置表中获取所有已配置的分类
+                    string sql = "SELECT DISTINCT Category FROM DevicePointConfig WHERE Category IS NOT NULL AND Category != ''";
+                    var dt = db.ExecuteQuery(sql);
+                    
+                    foreach (System.Data.DataRow row in dt.Rows)
+                    {
+                        string cat = row["Category"].ToString();
+                        if (!Categories.Contains(cat)) { Categories.Add(cat); }
+                    }
+
+                    // 检查是否存在开启了记录功能的模拟量点位 (排除 bool/bit 类型，且 IsLogEnabled = 1)
+                    // 使用 LOWER() 确保大小写兼容
+                    var aDt = db.ExecuteQuery("SELECT COUNT(*) FROM DevicePointConfig WHERE LOWER(DataType) NOT LIKE '%bool%' AND LOWER(DataType) NOT LIKE '%bit%' AND IsLogEnabled = 1");
+                    if (aDt.Rows.Count > 0)
+                    {
+                        HasAnalogPoints = Convert.ToInt32(aDt.Rows[0][0]) > 0;
+                    }
+
+                    // --- Schema Patch for Log DB ---
+                    Task.Run(() => 
+                    {
+                        try 
+                        {
+                            string logDb = GlobalData.SysCfg.LogDatabaseName;
+                            using var ldb = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, logDb);
+                            ldb.Connect();
+                            
+                            // 补丁：同时检查 PointLogs 和 AnalogLogs 两类表
+                            string[] prefixes = { "PointLogs", "AnalogLogs" };
+                            foreach (var pfx in prefixes)
+                            {
+                                var tables = ldb.ExecuteQuery($"SHOW TABLES LIKE '{pfx}_%'");
+                                foreach (System.Data.DataRow r in tables.Rows)
+                                {
+                                    string tName = r[0].ToString();
+                                    
+                                    // Check & Add Category
+                                    try { ldb.ExecuteNonQuery($"ALTER TABLE `{tName}` ADD COLUMN Category VARCHAR(50);"); } catch { }
+                                    // Check & Add UserName
+                                    try { ldb.ExecuteNonQuery($"ALTER TABLE `{tName}` ADD COLUMN UserName VARCHAR(50);"); } catch { }
+                                    // Check & Add ValText
+                                    try { ldb.ExecuteNonQuery($"ALTER TABLE `{tName}` ADD COLUMN ValText VARCHAR(50);"); } catch { }
+                                }
+                            }
+                        }
+                        catch (Exception ex) 
+                        {
+                            LogHelper.Error("Log Schema Patch Failed", ex);
+                        }
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error("Load Categories Failed", ex);
             }
         }
     }

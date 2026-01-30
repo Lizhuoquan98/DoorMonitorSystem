@@ -150,7 +150,7 @@ namespace DoorMonitorSystem.Assets.Services
         private void ExecutePipeline(DevicePointConfigEntity p, object rawObjValue, bool bitValue)
         {
             // 1. 发射到 UI DataManager：让全局画面动起来，这一步进入 UI 缓冲队列
-            DataManager.Instance.UpdatePointValue(p.TargetObjId, p.Id, p.TargetType, bitValue);
+            DataManager.Instance.UpdatePointValue(p.TargetObjId, p.TargetBitConfigId, p.TargetType, bitValue);
 
             // 2. 发射到转发引擎：如果点位开启了转发，则尝试操作目标设备
             if (p.IsSyncEnabled)
@@ -159,7 +159,7 @@ namespace DoorMonitorSystem.Assets.Services
             }
 
             // 3. 发射到日志引擎：评估是否变位，若满足规则则执行落盘
-            LogService.Instance.ProcessLogging(p, bitValue);
+            LogService.Instance.ProcessLogging(p, bitValue, rawObjValue);
         }
     }
 }

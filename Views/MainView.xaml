@@ -167,7 +167,7 @@
 
     <Grid>
         <!-- 主内容区 - 站台列表（全屏显示） -->
-        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10"
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="5,1"
                      Background="Transparent">
             <ItemsControl ItemsSource="{Binding Stations}">
                 <ItemsControl.ItemsPanel>

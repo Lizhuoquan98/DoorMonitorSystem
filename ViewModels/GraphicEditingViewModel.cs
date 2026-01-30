@@ -16,6 +16,8 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
+using DoorMonitorSystem.Assets.Helper;
+using DoorMonitorSystem.Models.system;
 
 namespace DoorMonitorSystem.ViewModels
 {
@@ -46,7 +48,7 @@ namespace DoorMonitorSystem.ViewModels
         {
             // 初始化命令
             SaveCommand = new RelayCommand(SavePaths);
-            ExportDictionaryCommand = new RelayCommand(ExportGraphicDictionary);
+            ExportDictionaryCommand = new RelayCommand(SaveDictionaryToDatabase);
             ImportDictionaryCommand = new RelayCommand(ImportGraphicDictionary);
             ImportSvgCommand = new RelayCommand(ImportSvgFile);
             DeleteGraphicCommand = new RelayCommand(DeleteGraphic);  // 删除图形命令
@@ -200,19 +202,19 @@ namespace DoorMonitorSystem.ViewModels
         {
             if (string.IsNullOrWhiteSpace(IconName))
             {
-                MessageBox.Show("图形名称不能为空！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("图标标识不能为空！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             if (PathItems.Count == 0)
             {
-                MessageBox.Show("请先导入 SVG 文件！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("请先加载 SVG 文件！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             if (GlobalData.GraphicDictionary.ContainsKey(IconName))
             {
-                MessageBox.Show("图形名称已存在，请修改后保存！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("该标识已存在，请修改后保存！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -229,7 +231,7 @@ namespace DoorMonitorSystem.ViewModels
                 Items = snapshot
             });
 
-            MessageBox.Show($"图形 \"{IconName}\" 已成功保存到字典！", "保存成功", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show($"组件 \"{IconName}\" 已成功存入库中！", "保存成功", MessageBoxButton.OK, MessageBoxImage.Information);
 
             // 清空输入
             PathItems.Clear();
@@ -262,45 +264,79 @@ namespace DoorMonitorSystem.ViewModels
                         GraphicGroups.Remove(groupToRemove);
                     }
 
-                    MessageBox.Show($"图形 \"{graphicName}\" 已成功删除！", "删除成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show($"组件 \"{graphicName}\" 已成功删除！", "删除成功", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
         }
 
-        // 导出图形到 JSON 文件
-        private void ExportGraphicDictionary(object obj)
+        // 保存图形字典到数据库
+        private void SaveDictionaryToDatabase(object obj)
         {
+            if (MessageBox.Show("确定要将当前组件库同步到数据库吗？这将会覆盖数据库中的原有配置。", "确认同步", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            if (GlobalData.SysCfg == null)
+            {
+                MessageBox.Show("系统配置未加载，无法连接数据库", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
             try
             {
-                string directory = AppDomain.CurrentDomain.BaseDirectory; // 程序运行目录
-                string filePath = Path.Combine(directory, "GraphicDictionary.json");
+                using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
+                db.Connect();
+                db.BeginTransaction();
 
-                var exportData = GlobalData.GraphicDictionary.Select(kvp => new SerializableGraphicGroup
+                try
                 {
-                    Name = kvp.Key,
-                    Items = kvp.Value.Select(i => new SerializableIconItem
+                    // 1. 清空旧数据
+                    db.ExecuteNonQuery("DELETE FROM SysGraphicItemEntity");
+                    db.ExecuteNonQuery("DELETE FROM SysGraphicGroupEntity");
+
+                    // 2. 插入新数据
+                    foreach (var kvp in GlobalData.GraphicDictionary)
                     {
-                        // 直接使用 ToString()，因为导入时已经将 Transform 烘焙到坐标中了
-                        PathData = i.Data?.ToString() ?? "",
-                        StrokeColor = ((SolidColorBrush)i.Stroke).Color.ToString(),
-                        FillColor = ((SolidColorBrush)i.Fill).Color.ToString(),
-                        StrokeThickness = i.StrokeThickness
-                    }).ToList()
-                }).ToList();
+                        string groupName = kvp.Key;
+                        var items = kvp.Value;
 
-                //var json = JsonSerializer.Serialize(exportData, new JsonSerializerOptions { WriteIndented = true });
-                var json = JsonSerializer.Serialize(exportData, new JsonSerializerOptions
+                        // Insert Group
+                        db.ExecuteNonQuery("INSERT INTO SysGraphicGroupEntity (GroupName) VALUES (@Name)", new MySql.Data.MySqlClient.MySqlParameter("@Name", groupName));
+                        
+                        // Get ID
+                        var idObj = db.ExecuteScalar("SELECT LAST_INSERT_ID()");
+                        int groupId = Convert.ToInt32(idObj);
+
+                        // Insert Items
+                        int sortIndex = 0;
+                        foreach (var item in items)
+                        {
+                            var itemEntity = new SysGraphicItemEntity
+                            {
+                                GroupId = groupId,
+                                PathData = item.Data?.ToString() ?? "",
+                                StrokeColor = ((SolidColorBrush)item.Stroke).Color.ToString(),
+                                FillColor = ((SolidColorBrush)item.Fill).Color.ToString(),
+                                StrokeThickness = item.StrokeThickness,
+                                SortIndex = sortIndex++
+                            };
+                            db.Insert(itemEntity, "SysGraphicItemEntity");
+                        }
+                    }
+
+                    db.CommitTransaction();
+                    MessageBox.Show("组件库已成功同步至数据库！", "同步成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch
                 {
-                    WriteIndented = true,
-                    Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping // ✅ 保留中文字符
-                });
-                File.WriteAllText(filePath, json);
-
-                MessageBox.Show($"图形字典已成功导出到：\n{filePath}", "导出成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                    db.RollbackTransaction();
+                    throw;
+                }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"导出失败：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"保存失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -321,11 +357,21 @@ namespace DoorMonitorSystem.ViewModels
 
                     if (imported != null)
                     {
-                        GlobalData.GraphicDictionary.Clear();
-                        GraphicGroups.Clear();
+                        // GlobalData.GraphicDictionary.Clear(); // 移除清空操作，改为追加模式
+                        // GraphicGroups.Clear();
 
+                        int importedCount = 0;
                         foreach (var group in imported)
                         {
+                            // 冲突检测与重命名策略
+                            string uniqueName = group.Name;
+                            int suffix = 1;
+                            while (GlobalData.GraphicDictionary.ContainsKey(uniqueName))
+                            {
+                                uniqueName = $"{group.Name}_{suffix}";
+                                suffix++;
+                            }
+
                             var itemList = new List<IconItem>();
                             foreach (var item in group.Items)
                             {
@@ -339,11 +385,12 @@ namespace DoorMonitorSystem.ViewModels
                                 });
                             }
 
-                            GlobalData.GraphicDictionary[group.Name] = itemList;
-                            GraphicGroups.Add(new GraphicGroup { Name = group.Name, Items = itemList });
+                            GlobalData.GraphicDictionary[uniqueName] = itemList;
+                            GraphicGroups.Add(new GraphicGroup { Name = uniqueName, Items = itemList });
+                            importedCount++;
                         }
 
-                        MessageBox.Show("图形字典导入成功！");
+                        MessageBox.Show($"组件库导入成功！已追加导入 {importedCount} 组组件。\n如有重名已自动重命名。", "导入完成", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                 }
                 catch (Exception ex)
@@ -376,7 +423,7 @@ namespace DoorMonitorSystem.ViewModels
 
                     if (svgPaths == null || svgPaths.Count == 0)
                     {
-                        MessageBox.Show("未能从 SVG 文件中找到有效的 Path 元素。", "导入失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        MessageBox.Show("未能从 SVG 文件中解析出有效的矢量路径。", "加载失败", MessageBoxButton.OK, MessageBoxImage.Warning);
                         return;
                     }
 
@@ -461,7 +508,7 @@ namespace DoorMonitorSystem.ViewModels
                     }
 
                     MessageBox.Show(
-                        $"SVG 导入成功！\n\n" +
+                        $"SVG 加载成功！\n\n" +
                         $"文件: {Path.GetFileName(openDialog.FileName)}\n" +
                         $"成功导入: {successCount} 个图形元素\n" +
                         $"总共发现: {svgPaths.Count} 个 Path 元素",

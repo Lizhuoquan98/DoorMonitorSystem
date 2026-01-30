@@ -39,6 +39,33 @@ namespace DoorMonitorSystem.Views
         /// </summary>
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            try
+            {
+                // Multi-monitor support
+                int monitorIndex = GlobalData.SysCfg.MonitorIndex;
+                var screens = System.Windows.Forms.Screen.AllScreens;
+
+                if (monitorIndex >= 0 && monitorIndex < screens.Length)
+                {
+                    var screen = screens[monitorIndex];
+                    var workingArea = screen.WorkingArea; // or screen.Bounds for full screen coverage
+
+                    // Reset state to Normal before moving to ensure it moves correctly
+                    this.WindowState = WindowState.Normal;
+                    this.Left = workingArea.Left;
+                    this.Top = workingArea.Top;
+                    this.Width = workingArea.Width;
+                    this.Height = workingArea.Height;
+
+                    // Maximize on the target screen
+                    this.WindowState = WindowState.Maximized;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error settings window location: {ex.Message}");
+            }
+
             _ = _commService.StartAsync();
         }
 

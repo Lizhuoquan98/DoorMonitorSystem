@@ -19,8 +19,12 @@ namespace DoorMonitorSystem.ViewModels
     public class MainWindowViewModel : NotifyPropertyChanged
     {
         #region Fields (字段)
-        
+
         private string _time = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        private string _stationName = "XX监测站";
+        private string _currentUserName = "未登录"; // Default
+        private string _loginButtonText = "登入";
+
         private object _currentViewModel;
         private UserControl _currentView;
 
@@ -59,7 +63,7 @@ namespace DoorMonitorSystem.ViewModels
                 OnPropertyChanged();
             }
         }
-        
+
         /// <summary>
         /// 导航路径树 (暂未使用)
         /// </summary>
@@ -74,33 +78,55 @@ namespace DoorMonitorSystem.ViewModels
             set { _currentView = value; OnPropertyChanged(); }
         }
 
-        #endregion 
+        public string StationName
+        {
+            get => _stationName;
+            set { _stationName = value; OnPropertyChanged(); }
+        }
+
+        public string CurrentUserName
+        {
+            get => _currentUserName;
+            set { _currentUserName = value; OnPropertyChanged(); }
+        }
+
+        public string LoginButtonText
+        {
+            get => _loginButtonText;
+            set { _loginButtonText = value; OnPropertyChanged(); }
+        }
+
+        #endregion
 
         #region Commands (命令)
-        
+
         /// <summary>
         /// 执行关闭程序命令
         /// </summary>
         public ICommand ExecuteCommand { get; private set; }
-        
+
         /// <summary>
         /// 部署/保存命令 (预留)
         /// </summary>
-        public ICommand DeployCommand { get; private set; } 
-        
+        public ICommand DeployCommand { get; private set; }
+
         /// <summary>
         /// 导航切换命令
         /// 参数: ViewModel 的 Type
         /// </summary>
         public ICommand NavigationCommand { get; private set; }
+        public ICommand OpenUserInfoCommand { get; private set; }
 
-        #endregion 
-      
+        #endregion
+
         #region Constructor (构造函数)
 
         public MainWindowViewModel()
         {
             TimeUpdateMethod();
+
+            // Try Auto Login on Startup
+            TryAutoLogin();
             CommandInit();
             // 默认显示主界面
             NavigateToViewModel(typeof(MainViewModel));
@@ -111,35 +137,177 @@ namespace DoorMonitorSystem.ViewModels
         #region Methods (内部逻辑)
 
         /// <summary>
+        /// 刷新配置信息 (站名/用户)
+        /// </summary>
+        public void RefreshConfigInfo()
+        {
+            if (GlobalData.SysCfg != null)
+            {
+                StationName = GlobalData.SysCfg.StationName;
+            }
+
+            if (GlobalData.CurrentUser != null)
+            {
+                // User requested to show Username instead of RealName
+                CurrentUserName = GlobalData.CurrentUser.Username; 
+                LoginButtonText = "切换账号";
+            }
+            else
+            {
+                CurrentUserName = "未登录";
+                LoginButtonText = "登入";
+            }
+        }
+
+        /// <summary>
         /// 启动时间更新定时器 (每500ms刷新一次)
         /// </summary>
         void TimeUpdateMethod()
         {
-            var timer = new DispatcherTimer {
-                Interval = TimeSpan.FromSeconds(0.5F)  };
-            timer.Tick += (sender, e) => {
-                Time = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");  };
+            var timer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(0.5F)
+            };
+            timer.Tick += (sender, e) =>
+            {
+                Time = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            };
             timer.Start();
         }
 
         /// <summary>
         /// 初始化绑定命令
         /// </summary>
-        void CommandInit() {
+        void CommandInit()
+        {
             ExecuteCommand = new RelayCommand(ExecuteCommandCallback);
             DeployCommand = new RelayCommand(DeployCommandCallback);
             NavigationCommand = new RelayCommand(NavigationCommandCallback);
-        } 
+            OpenUserInfoCommand = new RelayCommand(OpenUserInfoCallback);
+
+
+        }
+
+        /// <summary>
+        /// 自动尝试登录默认用户 (Operator/Guest)
+        /// </summary>
+        private void TryAutoLogin()
+        {
+            try
+            {
+                using var db = new Assets.Helper.SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
+                db.Connect();
+                if (db.IsConnected)
+                {
+                    // Try to find a default low-level user, e.g., 'level 1' or Role 'Operator'
+                    // Strategy: Find any user that is NOT Admin, or specifically named 'Operator'
+                    // If none found, create a default 'Operator' user.
+
+                    var operators = db.Query<Models.system.UserEntity>("Sys_Users", "Role='Operator' OR Role='Guest' OR Username='Operator'");
+
+                    if (operators != null && operators.Count > 0)
+                    {
+                        // Auto login the first found operator
+                        GlobalData.CurrentUser = operators[0];
+                        Assets.Services.DataManager.Instance.LogOperation("AutoLogin", $"自动登录成功: {operators[0].Username}");
+                    }
+                    else
+                    {
+                        // If no operator exists, check if ANY user exists?
+                        // Or create a default 'Operator' user for convenience
+                        var anyUser = db.Query<Models.system.UserEntity>("Sys_Users", "");
+                        if (anyUser == null || anyUser.Count == 0)
+                        {
+                            // Create default Admin and Operator if empty
+                            var admin = new Models.system.UserEntity { Username = "Admin", Password = "123", RealName = "System Administrator", Role = "Admin", IsEnabled = true };
+                            var op = new Models.system.UserEntity { Username = "Operator", Password = "123", RealName = "Default Operator", Role = "Operator", IsEnabled = true };
+
+                            db.Insert(admin);
+                            db.Insert(op);
+
+                            GlobalData.CurrentUser = op; // Logic as Operator
+                        }
+                        else
+                        {
+                            // Users exist but no explicit Operator found.
+                            // Login as the user with lowest ID that is not Admin? Or just stay logged out?
+                            // User asked for "lowest level default direct login".
+                            // Let's look for non-admin
+                            var nonAdmins = db.Query<Models.system.UserEntity>("Sys_Users", "Role<>'Admin'");
+                            if (nonAdmins != null && nonAdmins.Count > 0)
+                            {
+                                GlobalData.CurrentUser = nonAdmins[0];
+                            }
+                            else
+                            {
+                                // Only admins exist?
+                                // Stay logged out or login as Admin (unsafe)? 
+                                // Better stay logged out or ask user to create operator.
+                                // For now, let's create an Operator.
+                                var op = new Models.system.UserEntity { Username = "Operator", Password = "123", RealName = "Default Operator", Role = "Operator", IsEnabled = true };
+                                db.Insert(op);
+                                GlobalData.CurrentUser = op;
+                            }
+                        }
+                    }
+                }
+
+                RefreshConfigInfo();
+            }
+            catch (Exception ex)
+            {
+                // Auto login failed (maybe DB not ready), ignore
+                System.Diagnostics.Debug.WriteLine("Auto login failed: " + ex.Message);
+            }
+        }
 
         #endregion
 
         #region Callbacks (回调处理)
-        
+
         private void DeployCommandCallback(object obj)
         {
-            // TODO: 实现配置部署逻辑
+            // Switch User Logic using proper LoginWindow
+            Views.LoginWindow loginWin = new Views.LoginWindow();
+            if (loginWin.ShowDialog() == true)
+            {
+                if (loginWin.LoggedInUser != null)
+                {
+                    GlobalData.CurrentUser = loginWin.LoggedInUser;
+                    RefreshConfigInfo();
+
+                    // Optional: Navigate to Main View on fresh login
+                    NavigateToViewModel(typeof(MainViewModel));
+                }
+            }
         }
-        
+
+        private void OpenUserInfoCallback(object obj)
+        {
+            if (GlobalData.CurrentUser == null)
+            {
+                // If not logged in, go straight to login
+                DeployCommandCallback(null);
+                return;
+            }
+
+            var win = new Views.UserInfoWindow(GlobalData.CurrentUser);
+            if (win.ShowDialog() == true)
+            {
+                if (win.IsSwitchRequested)
+                {
+                    // Trigger Login Logic
+                    DeployCommandCallback(null);
+                }
+                else if (win.IsManageRequested)
+                {
+                    // Navigate to User Management Window
+                    Views.UserManagementWindow manageWin = new Views.UserManagementWindow();
+                    manageWin.ShowDialog();
+                }
+            }
+        }
+
         private void NavigationCommandCallback(object obj)
         {
             if (obj is Type viewModelType)
@@ -147,28 +315,40 @@ namespace DoorMonitorSystem.ViewModels
                 NavigateToViewModel(viewModelType);
             }
         }
-        
+
         /// <summary>
         /// 处理关闭程序请求
         /// </summary>
         private void ExecuteCommandCallback(object obj)
         {
-            // 显示弹窗，询问用户是否要关闭程序
-            var result = System.Windows.MessageBox.Show("确定要关闭程序吗？", "确认关闭", MessageBoxButton.YesNo, MessageBoxImage.Question);
-
-            if (result == MessageBoxResult.Yes)
+            // 如果当前未登录，直接允许退出? 
+            // 用户要求"当前用户的密码"。
+            // 假设必须登录才能退出 (或者没登录就直接退出)
+            if (GlobalData.CurrentUser != null)
             {
-                InputDialog dialog = new("输入提示", "请输当前用户密码:");
-                // 显示对话框并等待用户操作
-                if (dialog.ShowDialog() == true)
-                {
-                    // 用户点击了确定，获取输入的文本
-                    _ = dialog.InputText;
-                    // TODO: 验证密码逻辑                  
-                }
-
-                // 关闭程序
-                System.Windows.Application.Current.Shutdown();
+                 InputDialog dialog = new("身份验证", $"请输入用户[{GlobalData.CurrentUser.Username}]的密码以退出:", true);
+                 if (dialog.ShowDialog() == true)
+                 {
+                     string input = dialog.InputText;
+                     if (input == GlobalData.CurrentUser.Password)
+                     {
+                         // 密码正确
+                         Assets.Services.DataManager.Instance.LogOperation("SystemExit", "用户验证密码后退出系统");
+                         System.Windows.Application.Current.Shutdown();
+                     }
+                     else
+                     {
+                         MessageBox.Show("密码错误，禁止退出。", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                         Assets.Services.DataManager.Instance.LogOperation("ExitFailed", "退出系统时密码验证失败", "Failed");
+                     }
+                 }
+            }
+            else
+            {
+                 // 无用户登录时直接退出? 或者禁止?
+                 // 通常无用户时(比如在登录界面)可以直接关
+                 Assets.Services.DataManager.Instance.LogOperation("SystemExit", "系统直接退出(无登录用户)");
+                 System.Windows.Application.Current.Shutdown();
             }
         }
 

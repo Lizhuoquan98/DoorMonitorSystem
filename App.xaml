@@ -6,7 +6,7 @@
     <Application.Resources>
         <!-- 导航按钮样式 -->
         <Style x:Key="ButtonNavigation" TargetType="Button">
-            <Setter Property="Width" Value="110"/>
+           
             <Setter Property="FontSize" Value="20"/>
             <Setter Property="FontFamily" Value="Microsoft YaHei"/>
             <Setter Property="FontWeight" Value="Bold"/>
@@ -16,7 +16,7 @@
             <Setter Property="BorderBrush" Value="White"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Margin" Value="10,0"/>
-            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Padding" Value="1"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -39,6 +39,62 @@
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="Border" Property="Background" Value="#66FFFFFF"/>
                                 <Setter TargetName="Border" Property="BorderBrush" Value="Black"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 导航单选按钮样式 (带选中状态) -->
+        <Style x:Key="NavRadioButtonStyle" TargetType="RadioButton">
+            <Setter Property="Width" Value="110"/>
+            <Setter Property="Height" Value="35"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontFamily" Value="Microsoft YaHei"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#CCCCCC"/>
+            <Setter Property="BorderBrush" Value="#66FFFFFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Margin" Value="5,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <Grid>
+                                <!-- 选中时的高亮背景/辉光 -->
+                                <Border x:Name="Glow" Background="#3300FFFF" Opacity="0" CornerRadius="4" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
+                                <!-- 选中时的底部指示条 -->
+                                <Rectangle x:Name="Indicator" Fill="#00FFFF" Height="3" VerticalAlignment="Bottom" Margin="10,0" Opacity="0" RadiusX="1.5" RadiusY="1.5"/>
+                                
+                                <ContentPresenter x:Name="ContentPresenter"
+                                                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                  TextBlock.Foreground="{TemplateBinding Foreground}"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#FFFFFFFF"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter TargetName="Glow" Property="Opacity" Value="0.2"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#00FFFF"/>
+                                <Setter TargetName="Border" Property="Background" Value="#2200FFFF"/>
+                                <Setter Property="Foreground" Value="#00FFFF"/>
+                                <Setter TargetName="Glow" Property="Opacity" Value="0.4"/>
+                                <Setter TargetName="Indicator" Property="Opacity" Value="1"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Glow" Property="Opacity" Value="0.6"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
