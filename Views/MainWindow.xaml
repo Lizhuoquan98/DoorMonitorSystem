@@ -104,6 +104,8 @@
                                  Command="{Binding NavigationCommand}" CommandParameter="{x:Type dc:MainViewModel}" />
                     <RadioButton Content="点表配置" GroupName="NavGroup" Style="{StaticResource NavRadioButtonStyle}"
                                  Command="{Binding NavigationCommand}" CommandParameter="{x:Type dc:DevvarlistViewModel}" />
+                    <RadioButton Content="参数设置" GroupName="NavGroup" Style="{StaticResource NavRadioButtonStyle}"
+                                 Command="{Binding NavigationCommand}" CommandParameter="{x:Type dc:ParameterSettingViewModel}" />
                     <RadioButton Content="图形编辑" GroupName="NavGroup" Style="{StaticResource NavRadioButtonStyle}"
                                  Command="{Binding NavigationCommand}" CommandParameter="{x:Type dc:GraphicEditingViewModel}" />
                     <RadioButton Content="设备列表" GroupName="NavGroup" Style="{StaticResource NavRadioButtonStyle}" 

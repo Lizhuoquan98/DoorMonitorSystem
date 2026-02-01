@@ -6,6 +6,7 @@ using DoorMonitorSystem.Models.ConfigEntity;
 using Communicationlib.TaskEngine;
 using DoorMonitorSystem;
 using DoorMonitorSystem.Models.RunModels;
+using DoorMonitorSystem.Assets.Helper;
 
 namespace DoorMonitorSystem.Assets.Services
 {
@@ -66,6 +67,16 @@ namespace DoorMonitorSystem.Assets.Services
             // --- 场景 B: Modbus 协议 (核心聚合算法) ---
             if (points == null || points.Count == 0) return tasks;
 
+            // 获取通用参数，支持通过配置 "MaxGap" 来控制聚合粒度
+            var paramsDict = device.CommParsams?.ToDictionary(p => p.Name, p => p.Value) ?? new Dictionary<string, string>();
+            int maxGap = 20; // 默认智能聚合 (允许最大 20 个寄存器的空洞)
+            if (paramsDict.TryGetValue("MaxGap", out var val) && int.TryParse(val, out int gap))
+            {
+                maxGap = gap;
+            }
+
+            LogHelper.Info($"[TaskGen] 设备 '{device.Name}' 生成任务开始. 点位数:{points.Count}, 聚合阈值(MaxGap):{maxGap}");
+
             // 1. 按功能码分组处理 (Modbus 03 Holding / 04 Input)
             var groups = points.GroupBy(p => AutoMapFunctionCode(p.Address));
 
@@ -83,7 +94,6 @@ namespace DoorMonitorSystem.Assets.Services
 
                 int blockStart = addresses[0];
                 int lastAddr = addresses[0];
-                int maxGap = 20;      // 最大合并间隔 (如果两个地址距离超过 20，则另开一个包)
                 int maxBlockSize = 100; // 单包最大长度 (Modbus 标准建议不超过 125 个寄存器)
 
                 for (int i = 1; i <= addresses.Count; i++)
@@ -91,28 +101,26 @@ namespace DoorMonitorSystem.Assets.Services
                     bool isLast = (i == addresses.Count);
                     int currentAddr = isLast ? -1 : addresses[i];
 
-                    // 计算当前块的结束界限 (考虑最后一个点位可能是 32 位，需多读一个寄存器)
-                    // 逻辑修正：可能有多个点位对应同一个地址，取其中“占用寄存器最多”的那个类型
-                    // 注意：必须对 lastAddr (当前块的尾部) 进行计算，无论是否到达列表末尾
+                    // 计算当前块的结束界限
                     int lastAddrSize = 1;
                     var pointsAtLastAddr = group.Where(p => NormalizeAddress(p.Address) == lastAddr).ToList();
                     
                     foreach (var p in pointsAtLastAddr)
                     {
                         string dt = p.DataType?.ToLower() ?? "word";
-                        if (dt.Contains("float") || dt.Contains("real") || dt.Contains("dword") || dt.Contains("int32") || dt.Contains("integer"))
+                        if (dt.Contains("float") || dt.Contains("real") || dt.Contains("dword") || dt.Contains("int32") || dt.Contains("uint32") || dt.Contains("integer"))
                         {
                             lastAddrSize = 2;
-                            break; // 只要发现有一个是32位的，该地址就至少占2个寄存器
+                            break;
                         }
                     }
 
                     int currentBlockLen = (lastAddr - blockStart + lastAddrSize);
 
-                    // 判定是否需要闭合当前任务块并生成 Task
+                    // 判定是否需要闭合当前任务块
                     if (isLast || (currentAddr - lastAddr > maxGap) || (currentBlockLen > maxBlockSize))
                     {
-                        tasks.Add(new ProtocolTaskConfig
+                        var newTask = new ProtocolTaskConfig
                         {
                             Type = TaskType.Read,
                             FunctionCode = functionCode,
@@ -121,7 +129,11 @@ namespace DoorMonitorSystem.Assets.Services
                             Interval = intervalMs,
                             Enabled = true,
                             Description = $"AutoMerged-FC{functionCode}"
-                        });
+                        };
+                        tasks.Add(newTask);
+
+                        // 输出生成的任务详情 (不区分设备，统一记录)
+                        LogHelper.Info($"[TaskGen] -> 生成任务: {device.Name} [FC{functionCode}] Addr:{blockStart} Len:{currentBlockLen}");
 
                         if (!isLast) blockStart = currentAddr;
                     }

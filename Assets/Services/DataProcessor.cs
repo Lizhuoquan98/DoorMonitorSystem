@@ -149,6 +149,15 @@ namespace DoorMonitorSystem.Assets.Services
         /// </summary>
         private void ExecutePipeline(DevicePointConfigEntity p, object rawObjValue, bool bitValue)
         {
+            // 0. 更新实时值缓存 (用于参数界面回显)
+            p.LastValue = rawObjValue;
+            
+            // 降噪：仅在开启详细调试时才打印每帧更新日志
+            if (p.UiBinding != null && GlobalData.DebugConfig != null && GlobalData.DebugConfig.Trace_Communication_Raw)
+            {
+                 LogHelper.Debug($"[DataProc] Set LastValue for {p.UiBinding} = {rawObjValue} (ObjHash: {p.GetHashCode()})");
+            }
+
             // 1. 发射到 UI DataManager：让全局画面动起来，这一步进入 UI 缓冲队列
             DataManager.Instance.UpdatePointValue(p.TargetObjId, p.TargetBitConfigId, p.TargetType, bitValue);
 

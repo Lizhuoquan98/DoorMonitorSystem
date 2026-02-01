@@ -1,0 +1,112 @@
+<UserControl x:Class="DoorMonitorSystem.Views.ParameterSettingView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:DoorMonitorSystem.Views"
+             xmlns:uc="clr-namespace:DoorMonitorSystem.UControl"
+             xmlns:vm="clr-namespace:DoorMonitorSystem.ViewModels"
+             mc:Ignorable="d" 
+             d:DesignHeight="800" d:DesignWidth="1200">
+    <Grid Margin="10">
+        <!-- 
+            【多站台紧凑化控制台布局】
+            使用 Grid 替代 UniformGrid，通过设置列宽占比及缩减间距，消除大量留白。
+        -->
+        <ItemsControl ItemsSource="{Binding StationSettings}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:StationParameterViewModel}">
+                    <!-- 缩小 Margin 和 Padding 提升密度 -->
+                    <Border Background="#1a1f2e" CornerRadius="12" Margin="5" Padding="15" Width="550">
+                        <Grid   >
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/> <!-- 标题区 -->
+                                <RowDefinition Height="Auto"/> <!-- 通讯配置区 -->
+                                <RowDefinition Height="*"/>    <!-- 参数垂直列表区 -->
+                            </Grid.RowDefinitions>
+
+                            <!-- [1] 站台名称头 -->
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,15">
+                                <Rectangle Width="4" Height="20" Fill="#00E5FF" Margin="0,0,10,0" RadiusX="2" RadiusY="2"/>
+                                <TextBlock Text="{Binding StationName}" 
+                                           Foreground="#00E5FF" 
+                                           FontSize="18" 
+                                           FontWeight="Black" 
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- [2] 顶部通讯头：型号与门号 (横向紧凑布局) -->
+                            <Border Grid.Row="1" Background="#0FFFFFFF" CornerRadius="8" Padding="10,8" Margin="0,0,0,15">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <!-- 型号选择 -->
+                                        <StackPanel Margin="0,0,12,0">
+                                            <TextBlock Text="站台模型" Foreground="#888888" FontSize="11" Margin="0,0,0,4"/>
+                                            <ComboBox Width="130" Height="30" VerticalContentAlignment="Center"
+                                                      ItemsSource="{Binding AsdModels}"
+                                                      SelectedItem="{Binding SelectedAsdModel}"
+                                                      DisplayMemberPath="DisplayName"
+                                                      FontSize="15" FontWeight="Bold"
+                                                      Background="#151515" BorderBrush="#44FFFFFF"/>
+                                        </StackPanel>
+                                        
+                                        <!-- 物理 ID -->
+                                        <StackPanel>
+                                            <TextBlock Text="门号(PHYS)" Foreground="#888888" FontSize="11" Margin="0,0,0,4"/>
+                                            <TextBox Width="70" Height="30" VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
+                                                     Text="{Binding DoorId}"
+                                                     FontSize="16" FontWeight="Black"
+                                                     Background="#050505" Foreground="White" 
+                                                     BorderBrush="#00E5FF" />
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <!-- 操作按钮组 -->
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Content="读取" Command="{Binding ReadCommand}"
+                                                Width="85" Height="30" Background="#37474F" 
+                                                Style="{StaticResource ActionButton}" FontWeight="Bold" FontSize="13" Margin="0,0,8,0"/>
+                                        <Button Content="写入" Command="{Binding SaveCommand}"
+                                                Width="85" Height="30" Background="#0D47A1" 
+                                                Style="{StaticResource ActionButton}" FontWeight="Bold" FontSize="13"/>
+                                        <Button Content="清空" Command="{Binding ResetCommand}"
+                                                Width="55" Height="28" Background="#B71C1C" Opacity="0.5"
+                                                Style="{StaticResource ActionButton}" FontWeight="Medium" FontSize="11" Margin="15,0,0,0"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- [3] 详细参数编辑：垂直回正布局 -->
+                            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"   Height="auto">
+                                <ItemsControl ItemsSource="{Binding ParameterList}" HorizontalAlignment="Stretch">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Vertical"  />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <uc:SettingItem Label="{Binding Label, StringFormat='{}{0} :'}" 
+                                                            Value="{Binding Value, Mode=TwoWay}"
+                                                            ReadbackValue="{Binding ReadbackValue}" 
+                                                            Unit="{Binding Unit}" 
+                                                            Hint="{Binding Hint}" 
+                                                            ToolTip="{Binding DebugInfo}"
+                                                            Margin="0,0,0,6"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </Grid>
+</UserControl>

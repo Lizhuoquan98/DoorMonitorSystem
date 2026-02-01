@@ -1,0 +1,113 @@
+<UserControl x:Class="DoorMonitorSystem.UControl.SettingItem"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:DoorMonitorSystem.UControl"
+             mc:Ignorable="d" 
+             d:DesignHeight="40" d:DesignWidth="600">
+    <UserControl.Resources>
+        <!-- 基础文本样式 -->
+        <Style x:Key="BaseTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+
+        <!-- 输入框样式：极高对比度 -->
+        <Style x:Key="SettingTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="#0A0A0A"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#00E5FF"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="ExtraBold"/>
+            <Setter Property="CaretBrush" Value="#00E5FF"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                Background="{TemplateBinding Background}" SnapsToDevicePixels="True"
+                                CornerRadius="2">
+                            <ScrollViewer x:Name="PART_ContentHost" Focusable="false" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="true">
+                                <Setter Property="BorderBrush" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsFocused" Value="true">
+                                <Setter Property="BorderBrush" Value="White"/>
+                                <Setter Property="Background" Value="#1A1A1A"/>
+                                <Setter Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect BlurRadius="10" Color="#00E5FF" ShadowDepth="0" Opacity="0.5"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 反馈框样式：只读，视觉弱化 -->
+        <Style x:Key="ReadbackTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource SettingTextBoxStyle}">
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="BorderBrush" Value="#44FFFFFF"/>
+            <Setter Property="Foreground" Value="#00E5FF"/>
+            <Setter Property="Background" Value="#11FFFFFF"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                Background="{TemplateBinding Background}" SnapsToDevicePixels="True"
+                                CornerRadius="2">
+                            <ScrollViewer x:Name="PART_ContentHost" Focusable="false" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden"
+                                          VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="0,3">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="180"/> <!-- 标签：缩窄以减少留白 -->
+            <ColumnDefinition Width="100"/> <!-- 设定框 -->
+            <ColumnDefinition Width="8"/>   <!-- 间距：缩窄 -->
+            <ColumnDefinition Width="100"/> <!-- 反馈框 -->
+            <ColumnDefinition Width="Auto"/> <!-- 单位 & 提示 -->
+        </Grid.ColumnDefinitions>
+
+        <!-- 参数名称 -->
+        <TextBlock Text="{Binding Label, RelativeSource={RelativeSource AncestorType={x:Type local:SettingItem}}}" 
+                   Style="{StaticResource BaseTextStyle}" 
+                   HorizontalAlignment="Right" Margin="0,0,12,0"/>
+
+        <!-- 设定值输入 -->
+        <TextBox Grid.Column="1" 
+                 Text="{Binding Value, RelativeSource={RelativeSource AncestorType={x:Type local:SettingItem}}, UpdateSourceTrigger=LostFocus}"
+                 Style="{StaticResource SettingTextBoxStyle}"/>
+
+        <!-- 实际值反馈 -->
+        <TextBox Grid.Column="3" 
+                 Text="{Binding ReadbackValue, RelativeSource={RelativeSource AncestorType={x:Type local:SettingItem}}, Mode=OneWay}"
+                 Style="{StaticResource ReadbackTextBoxStyle}"/>
+
+        <!-- 单位与量程 -->
+        <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+            <TextBlock Text="{Binding Unit, RelativeSource={RelativeSource AncestorType={x:Type local:SettingItem}}}" 
+                       Style="{StaticResource BaseTextStyle}" Foreground="#A0B0C0" Margin="0,0,8,0"/>
+            <TextBlock Text="{Binding Hint, RelativeSource={RelativeSource AncestorType={x:Type local:SettingItem}}}" 
+                       Style="{StaticResource BaseTextStyle}" Foreground="#666666" FontSize="12"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

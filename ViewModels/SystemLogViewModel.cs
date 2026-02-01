@@ -14,7 +14,7 @@ namespace DoorMonitorSystem.ViewModels
 {
     public class SystemLogViewModel : NotifyPropertyChanged
     {
-        private DateTime _startDate = DateTime.Now.AddDays(-1);
+        private DateTime _startDate = DateTime.Now;
         private DateTime _endDate = DateTime.Now;
         private string _keyword = "";
         private bool _isLoading;
@@ -22,13 +22,13 @@ namespace DoorMonitorSystem.ViewModels
         public DateTime StartDate
         {
             get => _startDate;
-            set { _startDate = value; OnPropertyChanged(); }
+            set { _startDate = value; OnPropertyChanged(); OnPropertyChanged(nameof(StartFullDateTime)); }
         }
 
         public DateTime EndDate
         {
             get => _endDate;
-            set { _endDate = value; OnPropertyChanged(); }
+            set { _endDate = value; OnPropertyChanged(); OnPropertyChanged(nameof(EndFullDateTime)); }
         }
 
         public string Keyword
@@ -120,18 +120,64 @@ namespace DoorMonitorSystem.ViewModels
         
         // 时间筛选扩充
         private string _searchStartTime = "00:00:00";
-        private string _searchEndTime = "23:59:59";
+        private string _searchEndTime = DateTime.Now.ToString("HH:mm:ss");
 
         public string SearchStartTime
         {
             get => _searchStartTime;
-            set { _searchStartTime = value; OnPropertyChanged(); }
+            set { _searchStartTime = value; OnPropertyChanged(); OnPropertyChanged(nameof(StartFullDateTime)); }
         }
 
         public string SearchEndTime
         {
             get => _searchEndTime;
-            set { _searchEndTime = value; OnPropertyChanged(); }
+            set { _searchEndTime = value; OnPropertyChanged(); OnPropertyChanged(nameof(EndFullDateTime)); }
+        }
+
+        public DateTime StartFullDateTime
+        {
+            get 
+            {
+                if (TimeSpan.TryParse(SearchStartTime, out var ts))
+                    return StartDate.Date.Add(ts);
+                return StartDate.Date;
+            }
+            set
+            {
+                StartDate = value.Date;
+                SearchStartTime = value.ToString("HH:mm:ss");
+                
+                // 互锁逻辑：开始时间推着结束时间走
+                if (value > EndFullDateTime)
+                {
+                    EndFullDateTime = value.AddHours(1); // 默认顺延一小时，或根据需要调整
+                }
+                
+                OnPropertyChanged();
+            }
+        }
+
+        public DateTime EndFullDateTime
+        {
+            get
+            {
+                if (TimeSpan.TryParse(SearchEndTime, out var ts))
+                    return EndDate.Date.Add(ts);
+                return EndDate.Date;
+            }
+            set
+            {
+                EndDate = value.Date;
+                SearchEndTime = value.ToString("HH:mm:ss");
+
+                // 互锁逻辑：结束时间拉着开始时间走
+                if (value < StartFullDateTime)
+                {
+                    StartFullDateTime = value.AddHours(-1); // 默认提前一小时，或根据需要调整
+                }
+
+                OnPropertyChanged();
+            }
         }
 
         public ICommand SearchCommand { get; set; }
@@ -184,10 +230,10 @@ namespace DoorMonitorSystem.ViewModels
 
         private void OnReset(object obj)
         {
-            StartDate = DateTime.Now.AddDays(-1);
+            StartDate = DateTime.Now;
             EndDate = DateTime.Now;
             SearchStartTime = "00:00:00";
-            SearchEndTime = "23:59:59";
+            SearchEndTime = DateTime.Now.ToString("HH:mm:ss");
             Keyword = "";
             SelectedCategory = "全部";
             SelectedLogLevel = "全部";

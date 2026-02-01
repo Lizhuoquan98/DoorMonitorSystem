@@ -35,6 +35,16 @@ namespace DoorMonitorSystem.Models.ConfigEntity
         [Required, StringLength(50)]
         public string Address { get => _address; set { _address = value; OnPropertyChanged(); } }
 
+        private string _uiBinding;
+        /// <summary>UI 绑定键 (对应 ParameterDefineEntity.BindingKey)</summary>
+        [StringLength(50)]
+        public string UiBinding { get => _uiBinding; set { _uiBinding = value; OnPropertyChanged(); } }
+
+        private string _bindingRole;
+        /// <summary>绑定角色 (Read=读取/状态, Write=写入/控制, Auth=鉴权, DoorId=门号选择)</summary>
+        [StringLength(20)]
+        public string BindingRole { get => _bindingRole; set { _bindingRole = value; OnPropertyChanged(); } }
+
         private string _dataType = "Word";
         /// <summary>数据类型/长度 (例如 "Word", "Float", "Bool" 或字节长度)</summary>
         [StringLength(20)]
@@ -182,6 +192,11 @@ namespace DoorMonitorSystem.Models.ConfigEntity
         [NotMapped]
         public int RowIndex { get => _rowIndex; set { _rowIndex = value; OnPropertyChanged(); } }
 
+        private object? _lastValue;
+        /// <summary>最后一次读取到的实时值缓存 (用于UI参数回显)</summary>
+        [NotMapped]
+        public object? LastValue { get => _lastValue; set { _lastValue = value; OnPropertyChanged(); } }
+
         #endregion
     }
 
@@ -189,6 +204,7 @@ namespace DoorMonitorSystem.Models.ConfigEntity
     {
         None = 0,
         Door = 1,
-        Panel = 2
+        Panel = 2,
+        Station = 3
     }
 }

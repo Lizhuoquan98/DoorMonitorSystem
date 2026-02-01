@@ -178,6 +178,31 @@ namespace DoorMonitorSystem.Assets.Services
         }
 
         /// <summary>
+        /// 添加自定义业务日志（非点位触发）
+        /// </summary>
+        /// <param name="message">日志内容</param>
+        /// <param name="category">日志分类</param>
+        public void AddCustomLog(string message, string category = "系统")
+        {
+            var entity = new PointLogEntity
+            {
+                PointID = -1,    // 非物理点位标识
+                DeviceID = -1,   // 系统级事件
+                LogType = 1,     // 状态/信息类型
+                Message = message,
+                ValText = "操作",
+                Category = category,
+                UserName = GlobalData.CurrentUser?.Username ?? "System",
+                LogTime = DateTime.Now
+            };
+            //输出到数据库
+            // _logQueue.Add(entity);
+
+            // 同步输出到文本日志作为备用
+            LogHelper.Info($"[USER_OP] {category}: {message}");
+        }
+
+        /// <summary>
         /// 启动日志消费者线程：
         /// 规则：满足 50 条或等待超过 3 秒，执行一次批量写入。
         /// </summary>

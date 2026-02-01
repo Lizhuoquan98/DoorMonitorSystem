@@ -35,6 +35,8 @@
                 </StackPanel>
                 
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">
+                    <Button Content="导出点表" Style="{StaticResource ActionButton}" Command="{Binding ExportPointsCommand}" Background="#2E8B57" BorderBrush="#3CB371" Margin="0,0,10,0"/>
+                    <Button Content="导入点表" Style="{StaticResource ActionButton}" Command="{Binding ImportPointsCommand}" Background="#CD853F" BorderBrush="#D2691E" Margin="0,0,10,0"/>
                     <Button Content="刷新列表" Style="{StaticResource ActionButton}" Command="{Binding LoadDevicesCommand}" Margin="0,0,10,0"/>
                     <Button Content="修改点位" Style="{StaticResource ActionButton}" Command="{Binding StartEditCommand}" Background="#1E90FF" BorderBrush="#1C86EE" Margin="0,0,10,0"/>
                     <Button Content="删除点位" Style="{StaticResource ActionButton}" Command="{Binding DeletePointCommand}" Background="#AA3333" BorderBrush="#FF4444"/>
@@ -142,21 +144,36 @@
                     <!-- Col 2: 关联目标 -->
                     <GroupBox Header="关联目标 (Binding)" Grid.Column="2" Margin="0,0,5,0" Foreground="#AAA" BorderBrush="#44FFFFFF" VerticalAlignment="Stretch">
                         <StackPanel Orientation="Horizontal" Margin="5" VerticalAlignment="Center">
-                            <ToggleButton x:Name="BtnSelectPoint" Content="选择" Width="100" Height="34" Margin="0,0,5,0" VerticalAlignment="Bottom"
+                            <!-- 自动关联信息展示 (只读) -->
+                            <StackPanel Margin="0,0,5,0" VerticalAlignment="Center">
+                                <TextBlock Text="已关联逻辑键 (Auto-Bound)" Foreground="#666" FontSize="10"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding NewPoint.UiBinding, TargetNullValue='-'}" Foreground="#4CAF50" FontWeight="Bold" Margin="0,0,5,0"/>
+                                    <TextBlock Text="[" Foreground="#888"/>
+                                    <TextBlock Text="{Binding NewPoint.BindingRole}" Foreground="#2196F3"/>
+                                    <TextBlock Text="]" Foreground="#888"/>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <ToggleButton x:Name="BtnSelectPoint" Content="选择对象" Width="60" Height="34" Margin="0,0,5,0" VerticalAlignment="Bottom"
                                           Background="#22FFFFFF" Foreground="White" BorderBrush="#44FFFFFF" Command="{Binding LoadTreeCommand}"/>
                             
                             <Popup IsOpen="{Binding IsPopupOpen}" StaysOpen="False" PlacementTarget="{Binding ElementName=BtnSelectPoint}">
-                                <Border Background="#1e1e1e" BorderBrush="#555" BorderThickness="1" MaxHeight="300" Width="300" Padding="5">
-                                    <TreeView ItemsSource="{Binding SelectorTree}" Background="Transparent" BorderThickness="0">
-                                        <TreeView.ItemTemplate>
-                                            <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                                                <TextBlock Text="{Binding Name}" Foreground="White" Margin="2">
-                                                    <TextBlock.InputBindings>
-                                                        <MouseBinding Gesture="LeftDoubleClick" Command="{Binding DataContext.SelectNodeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"/>
-                                                    </TextBlock.InputBindings>
-                                                </TextBlock>
-                                            </HierarchicalDataTemplate> 
-                                        </TreeView.ItemTemplate>
+                                <Border Background="#1e1e1e" BorderBrush="#555" BorderThickness="1" MaxHeight="400" Width="350" Padding="5">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <TreeView ItemsSource="{Binding SelectorTree}" Background="Transparent" BorderThickness="0">
+                                            <TreeView.ItemTemplate>
+                                                <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <!-- Icon/Type Indicator could be added here -->
+                                                        <TextBlock Text="{Binding Name}" Foreground="White" Margin="2" ToolTip="{Binding FullDescription}">
+                                                            <TextBlock.InputBindings>
+                                                                <MouseBinding Gesture="LeftDoubleClick" Command="{Binding DataContext.SelectNodeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"/>
+                                                            </TextBlock.InputBindings>
+                                                        </TextBlock>
+                                                    </StackPanel>
+                                                </HierarchicalDataTemplate> 
+                                            </TreeView.ItemTemplate>
                                         <TreeView.ItemContainerStyle>
                                             <Style TargetType="TreeViewItem">
                                                 <Setter Property="IsExpanded" Value="False"/>
@@ -164,6 +181,7 @@
                                             </Style>
                                         </TreeView.ItemContainerStyle>
                                     </TreeView>
+                                    </ScrollViewer>
                                 </Border>
                             </Popup>
 
@@ -305,9 +323,13 @@
             </DataGrid.InputBindings>
             <DataGrid.Columns>
                 <DataGridTextColumn Header="序号" Binding="{Binding RowIndex}" IsReadOnly="True" Width="Auto" MinWidth="40"/>
-                <DataGridTextColumn Header="地址" Binding="{Binding Address}" Width="Auto" MinWidth="80"/>
+                <DataGridTextColumn Header="地址" Binding="{Binding Address}" Width="Auto" MinWidth="60"/>
                 <DataGridTextColumn Header="位" Binding="{Binding BitIndex}" Width="Auto" MinWidth="30"/>
-                <DataGridTextColumn Header="类型" Binding="{Binding DataType}" Width="Auto" MinWidth="60"/>
+                <DataGridTextColumn Header="类型" Binding="{Binding DataType}" Width="Auto" MinWidth="50"/>
+
+                <!-- 逻辑关联信息 -->
+                <DataGridTextColumn Header="逻辑键 (Key)" Binding="{Binding UiBinding}" Width="Auto" MinWidth="100"/>
+                <DataGridTextColumn Header="角色 (Role)" Binding="{Binding BindingRole}" Width="Auto" MinWidth="60"/>
                 
                 <!-- 动态/高级列 -->
                 <DataGridTextColumn Header="高限" Binding="{Binding HighLimit}" Width="Auto" MinWidth="50"/>

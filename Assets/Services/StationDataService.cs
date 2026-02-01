@@ -409,46 +409,5 @@ namespace DoorMonitorSystem.Assets.Services
         }
     }
 
-    #region 临时实体类（匹配实际数据库结构）
 
-    /// <summary>门类型实体</summary>
-    public class DoorTypeEntity
-    {
-        public int Id { get; set; }
-        public string Code { get; set; } = "";
-        public string Name { get; set; } = "";
-        public int PopupLayoutRows { get; set; }
-        public int PopupLayoutColumns { get; set; }
-    }
-
-    /// <summary>门点位配置实体</summary>
-    public class DoorBitConfigEntity
-    {
-        public int Id { get; set; }
-        public int DoorTypeId { get; set; }
-        public string Description { get; set; } = "";
-        public int? CategoryId { get; set; }  // 分类ID（关联 BitCategory 表）
-        public int SortOrder { get; set; }
-        public int HeaderPriority { get; set; }
-        public int ImagePriority { get; set; }
-        public int BottomPriority { get; set; }
-        public string GraphicName { get; set; } = "";
-        public int HighColorId { get; set; }
-        public int LowColorId { get; set; }
-        public int? HeaderColorId { get; set; }
-        public int? BottomColorId { get; set; }
-    }
-
-    /// <summary>面板点位配置实体</summary>
-    public class PanelBitConfigEntity
-    {
-        public int Id { get; set; }
-        public int PanelTypeId { get; set; }
-        public string Description { get; set; } = "";
-        public int SortOrder { get; set; }
-        public int HighColorId { get; set; }
-        public int LowColorId { get; set; }
-    }
-
-    #endregion
 }

@@ -407,6 +407,10 @@ namespace DoorMonitorSystem.Assets.Services
             db.CreateTableFromModel<SysGraphicGroupEntity>();
             db.CreateTableFromModel<SysGraphicItemEntity>();
             db.CreateTableFromModel<SysSettingsEntity>();
+            
+            // 5. ASD 参数系统表
+            db.CreateTableFromModel<AsdModelMappingEntity>();
+            db.CreateTableFromModel<ParameterDefineEntity>();
 
             // 2. 迁移设备数据
             var deviceCount = db.Query<SysDeviceEntity>("SysDeviceEntity", "1=1", null)?.Count ?? 0;
@@ -430,6 +434,22 @@ namespace DoorMonitorSystem.Assets.Services
             {
                 LogHelper.Info("[DataManager] 检测到设置表为空，开始从 JSON 迁移通用配置...");
                 MigrateSettingsFromJson(db);
+            }
+
+            // 5. 迁移 ASD 模型映射
+            var asdModelCount = db.Query<AsdModelMappingEntity>("Sys_AsdModels", "1=1", null)?.Count ?? 0;
+            if (asdModelCount == 0)
+            {
+                LogHelper.Info("[DataManager] 检测到 ASD 模型映射表为空，开始初始化...");
+                MigrateAsdModelsToDb(db);
+            }
+
+            // 6. 迁移 ASD 参数定义
+            var paramDefineCount = db.Query<ParameterDefineEntity>("Sys_ParameterDefines", "1=1", null)?.Count ?? 0;
+            if (paramDefineCount == 0)
+            {
+                LogHelper.Info("[DataManager] 检测到 ASD 参数定义表为空，开始初始化...");
+                MigrateParameterDefinesToDb(db);
             }
         }
 
@@ -482,6 +502,55 @@ namespace DoorMonitorSystem.Assets.Services
                 }
                 catch { /* Ignore */ }
             }
+        }
+
+        private void MigrateAsdModelsToDb(SQLHelper db)
+        {
+            var list = new List<AsdModelMappingEntity>
+            {
+                new AsdModelMappingEntity { DisplayName = "ASD1", PlcId = 1 },
+                new AsdModelMappingEntity { DisplayName = "ASD2", PlcId = 24 },
+                new AsdModelMappingEntity { DisplayName = "ASD3", PlcId = 32 }
+            };
+            foreach (var item in list) db.Insert(item);
+        }
+
+        private void MigrateParameterDefinesToDb(SQLHelper db)
+        {
+            var list = new List<ParameterDefineEntity>
+            {
+                new ParameterDefineEntity { Label = "最大开门速度", Unit = "mm/s", Hint = "0-10000", BindingKey = "MaxSpeedOpen", SortOrder = 1, PlcPermissionValue = 3, DataType = "Int16" },
+                new ParameterDefineEntity { Label = "最大关门速度", Unit = "mm/s", Hint = "0-10000", BindingKey = "MaxSpeedClose", SortOrder = 2, PlcPermissionValue = 3, DataType = "Int16" },
+                new ParameterDefineEntity { Label = "最大开门力", Unit = "N", Hint = "100-500", BindingKey = "MaxForceOpen", SortOrder = 3, PlcPermissionValue = 2, DataType = "Int16" },
+                new ParameterDefineEntity { Label = "最大关门力", Unit = "N", Hint = "100-500", BindingKey = "MaxForceClose", SortOrder = 4, PlcPermissionValue = 2, DataType = "Int16" },
+                new ParameterDefineEntity { Label = "关门违阻重试次数", Unit = "次", Hint = "0-10", BindingKey = "CloseObstructRetry", SortOrder = 5, PlcPermissionValue = 1, DataType = "UInt16" },
+                new ParameterDefineEntity { Label = "关门违阻反向时间", Unit = "ms", Hint = "0-10000", BindingKey = "CloseObstructRevTime", SortOrder = 6, PlcPermissionValue = 1, DataType = "Int16" },
+                new ParameterDefineEntity { Label = "关门违阻反向距离", Unit = "mm", Hint = "0-10000", BindingKey = "CloseObstructRevDist", SortOrder = 7, PlcPermissionValue = 1, DataType = "Int16" },
+                new ParameterDefineEntity { Label = "手动解锁释放时间", Unit = "ms", Hint = "0-30000", BindingKey = "ManualUnlockTime", SortOrder = 8, PlcPermissionValue = 1, DataType = "UInt32" }
+            };
+            foreach (var item in list) db.Insert(item);
+        }
+
+        /// <summary>
+        /// 从数据库加载 ASD 模型映射
+        /// </summary>
+        public List<AsdModelMappingEntity> LoadAsdModelsFromDb()
+        {
+            if (GlobalData.SysCfg == null) return new List<AsdModelMappingEntity>();
+            using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
+            db.Connect();
+            return db.Query<AsdModelMappingEntity>("Sys_AsdModels", "1=1", null) ?? new List<AsdModelMappingEntity>();
+        }
+
+        /// <summary>
+        /// 从数据库加载 ASD 参数定义
+        /// </summary>
+        public List<ParameterDefineEntity> LoadParameterDefinesFromDb()
+        {
+            if (GlobalData.SysCfg == null) return new List<ParameterDefineEntity>();
+            using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
+            db.Connect();
+            return db.Query<ParameterDefineEntity>("Sys_ParameterDefines", "1=1 ORDER BY SortOrder", null) ?? new List<ParameterDefineEntity>();
         }
 
         private void MigrateDevicesFromJson(SQLHelper db)
@@ -865,7 +934,8 @@ namespace DoorMonitorSystem.Assets.Services
                     {
                         if (_uiUpdateQueue.IsEmpty)
                         {
-                            await Task.Delay(200); // 空闲时等待
+                            // 空闲时进入“节电模式”，由于我们只对 UI 响应灵敏度负责，100ms 的唤醒时延足够
+                            await Task.Delay(100); 
                             continue;
                         }
 
@@ -927,10 +997,9 @@ namespace DoorMonitorSystem.Assets.Services
                         Debug.WriteLine($"[DataManager] 批量更新错误: {ex.Message}");
                     }
                     
-                    // 控制刷新频率: 10FPS (100ms/帧)
-                    // 对于工业监控界面，10FPS 的刷新率已经足够流畅，
-                    // 相比 33ms(30FPS)，这能显著降低 UI 线程的 CPU 占用
-                    await Task.Delay(100);
+                    // 控制刷新频率: 20FPS (50ms/帧)
+                    // 在保证流畅度的同时，平衡 CPU 占用（相比 100ms 响应更及时）
+                    await Task.Delay(50);
                 }
             });
         }
