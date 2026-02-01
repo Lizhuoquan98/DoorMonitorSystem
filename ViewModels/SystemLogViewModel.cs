@@ -18,6 +18,8 @@ namespace DoorMonitorSystem.ViewModels
         private DateTime _endDate = DateTime.Now;
         private string _keyword = "";
         private bool _isLoading;
+        private List<PointLogEntity> _allLogsCache = new List<PointLogEntity>();
+        private System.Threading.CancellationTokenSource? _backgroundCts;
 
         public DateTime StartDate
         {
@@ -215,7 +217,7 @@ namespace DoorMonitorSystem.ViewModels
             if (CurrentPage > 1)
             {
                 CurrentPage--;
-                _ = LoadLogsAsync();
+                _ = UpdateDisplayLogsAsync();
             }
         }
 
@@ -224,8 +226,113 @@ namespace DoorMonitorSystem.ViewModels
             if (CurrentPage < TotalPages)
             {
                 CurrentPage++;
-                _ = LoadLogsAsync();
+                _ = UpdateDisplayLogsAsync();
             }
+        }
+
+        /// <summary>
+        /// 智能刷新显示：优先使用缓存，若缓存未到位则实时查询
+        /// </summary>
+        private async Task UpdateDisplayLogsAsync()
+        {
+            int skip = (CurrentPage - 1) * _pageSize;
+            
+            // 检查缓存中是否已有当前页数据
+            lock (_allLogsCache)
+            {
+                if (_allLogsCache.Count >= skip + 1)
+                {
+                    Logs.Clear();
+                    var pageData = _allLogsCache.Skip(skip).Take(_pageSize).ToList();
+                    int index = skip + 1;
+                    foreach (var log in pageData)
+                    {
+                        log.RowIndex = index++;
+                        Logs.Add(log);
+                    }
+                    return;
+                }
+            }
+
+            // 缓存未命中（后台还没加载到这一页），执行单页查询
+            IsLoading = true;
+            try
+            {
+                await Task.Run(() =>
+                {
+                    if (GlobalData.SysCfg == null) return;
+                    string logDb = GlobalData.SysCfg.LogDatabaseName;
+                    using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, logDb);
+                    db.Connect();
+
+                    // 这里的 SQL 逻辑需要跟 LoadLogs 里的 meta 逻辑保持一致
+                    // 为了简化，这里我们调用一个内部的构建 SQL 的方法（如果逻辑复杂的话）
+                    // 暂且直接复制关键查询逻辑
+                    var (fromSource, baseWhere) = GetSearchCriteria();
+                    if (string.IsNullOrEmpty(fromSource)) return;
+
+                    string sql = $"SELECT * FROM {fromSource} WHERE {baseWhere} ORDER BY LogTime DESC LIMIT {skip}, {_pageSize}";
+                    var result = db.Query<PointLogEntity>(sql);
+
+                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        Logs.Clear();
+                        int index = skip + 1;
+                        foreach (var log in result)
+                        {
+                            log.RowIndex = index++;
+                            Logs.Add(log);
+                        }
+                    });
+                });
+            }
+            finally { IsLoading = false; }
+        }
+
+        /// <summary>
+        /// 辅助方法：构建查询条件
+        /// </summary>
+        private (string fromSource, string baseWhere) GetSearchCriteria()
+        {
+            if (GlobalData.SysCfg == null) return ("", "");
+            
+            string startDt = $"{StartDate:yyyy-MM-dd} {SearchStartTime}";
+            string endDt = $"{EndDate:yyyy-MM-dd} {SearchEndTime}";
+
+            List<string> tableList = new();
+            DateTime d = new DateTime(StartDate.Year, StartDate.Month, 1);
+            string tablePrefix = SelectedTableType == "模拟量数据" ? "AnalogLogs" : "PointLogs";
+            
+            // 这里需要一个新的数据库连接来检查 TableExists
+            using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.LogDatabaseName);
+            db.Connect();
+
+            while (d <= EndDate)
+            {
+                string tableName = $"{tablePrefix}_{d:yyyyMM}";
+                if (db.TableExists(tableName)) tableList.Add(tableName);
+                d = d.AddMonths(1);
+            }
+
+            if (tableList.Count == 0) return ("", "");
+
+            string fromSource = tableList.Count == 1 
+                ? $"`{tableList[0]}`" 
+                : $"(" + string.Join(" UNION ALL ", tableList.Select(t => $"SELECT * FROM `{t}`")) + ") AS CombinedLogs";
+
+            string baseWhere = $"LogTime BETWEEN '{startDt}' AND '{endDt}'";
+            if (!string.IsNullOrWhiteSpace(Keyword))
+            {
+                baseWhere += $" AND (Message LIKE '%{Keyword}%' OR Address LIKE '%{Keyword}%' OR ValText LIKE '%{Keyword}%')";
+            }
+            if (!string.IsNullOrEmpty(SelectedCategory) && SelectedCategory != "全部")
+            {
+                baseWhere += $" AND Category = '{SelectedCategory}'";
+            }
+            if (SelectedLogLevel == "状态") baseWhere += " AND LogType <> 2";
+            else if (SelectedLogLevel == "报警") baseWhere += " AND LogType = 2";
+
+            return (fromSource, baseWhere);
         }
 
         private void OnReset(object obj)
@@ -377,7 +484,11 @@ namespace DoorMonitorSystem.ViewModels
         {
             if (IsLoading) return;
 
-            // 检查查询范围（禁止超过7天）
+            // 取消之前的后台加载任务
+            _backgroundCts?.Cancel();
+            _backgroundCts = new System.Threading.CancellationTokenSource();
+            var token = _backgroundCts.Token;
+
             if ((EndDate.Date - StartDate.Date).TotalDays > 7)
             {
                 System.Windows.MessageBox.Show("单次查询跨度不能超过 7 天，请缩小时间范围。", "查询限制", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
@@ -385,6 +496,7 @@ namespace DoorMonitorSystem.ViewModels
             }
 
             IsLoading = true;
+            lock (_allLogsCache) _allLogsCache.Clear();
             Logs.Clear();
 
             try
@@ -393,89 +505,49 @@ namespace DoorMonitorSystem.ViewModels
                 {
                     await Task.Run(() =>
                     {
+                        var (fromSource, baseWhere) = GetSearchCriteria();
+                        if (string.IsNullOrEmpty(fromSource)) return;
+
                         string logDb = GlobalData.SysCfg.LogDatabaseName;
                         using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, logDb);
                         db.Connect();
 
-                        // 组合完整时间串 (用于 SQL Comparison)
-                        string startDt = $"{StartDate:yyyy-MM-dd} {SearchStartTime}";
-                        string endDt = $"{EndDate:yyyy-MM-dd} {SearchEndTime}";
-
-                        // 2. 根据起止时间判定涉及的分表 (1周最多跨2个月)
-                        List<string> tableList = new();
-                        DateTime d = new DateTime(StartDate.Year, StartDate.Month, 1);
-                        string tablePrefix = SelectedTableType == "模拟量数据" ? "AnalogLogs" : "PointLogs";
-                        while (d <= EndDate)
-                        {
-                            string tableName = $"{tablePrefix}_{d:yyyyMM}";
-                            if (db.TableExists(tableName)) tableList.Add(tableName);
-                            d = d.AddMonths(1);
-                        }
-
-                        if (tableList.Count == 0)
-                        {
-                            System.Windows.Application.Current.Dispatcher.Invoke(() => { TotalCount = 0; TotalPages = 1; });
-                            return;
-                        }
-
-                        // 3. 构造数据源 (单一表或 UNION ALL)
-                        string fromSource = tableList.Count == 1 
-                            ? $"`{tableList[0]}`" 
-                            : $"(" + string.Join(" UNION ALL ", tableList.Select(t => $"SELECT * FROM `{t}`")) + ") AS CombinedLogs";
-
-                        // 4. 构建基础 Where 子句
-                        string baseWhere = $"LogTime BETWEEN '{startDt}' AND '{endDt}'";
-                        if (!string.IsNullOrWhiteSpace(Keyword))
-                        {
-                            baseWhere += $" AND (Message LIKE '%{Keyword}%' OR Address LIKE '%{Keyword}%' OR ValText LIKE '%{Keyword}%')";
-                        }
-
-                        if (!string.IsNullOrEmpty(SelectedCategory) && SelectedCategory != "全部")
-                        {
-                            baseWhere += $" AND Category = '{SelectedCategory}'";
-                        }
-
-                        if (SelectedLogLevel == "状态")
-                        {
-                            baseWhere += " AND LogType <> 2";
-                        }
-                        else if (SelectedLogLevel == "报警")
-                        {
-                            baseWhere += " AND LogType = 2";
-                        }
-
-                        // 5. 查询总条数
+                        // 1. 先查总数
                         string countSql = $"SELECT COUNT(*) FROM {fromSource} WHERE {baseWhere}";
                         object countResult = db.ExecuteScalar(countSql);
                         int total = 0;
                         if (countResult != null) int.TryParse(countResult.ToString(), out total);
 
-                        // 6. 计算分页
+                        // 2. 计算分页总数
                         int pages = (int)Math.Ceiling((double)total / _pageSize);
-                        if (pages < 1) pages = 1;
-                        int offset = (CurrentPage - 1) * _pageSize;
-
-                        // 更新UI属性
                         System.Windows.Application.Current.Dispatcher.Invoke(() =>
                         {
                             TotalCount = total;
-                            TotalPages = pages;
-                            if (CurrentPage > TotalPages) CurrentPage = 1; 
+                            TotalPages = pages < 1 ? 1 : pages;
+                            CurrentPage = 1;
                         });
 
-                        // 7. 查询当前页数据
-                        string finalSql = $"SELECT * FROM {fromSource} WHERE {baseWhere} ORDER BY LogTime DESC LIMIT {offset}, {_pageSize}";
-                        var result = db.Query<PointLogEntity>(finalSql); 
+                        // 3. 立即抓取第一页 (Priority Load)
+                        string firstPageSql = $"SELECT * FROM {fromSource} WHERE {baseWhere} ORDER BY LogTime DESC LIMIT 0, {_pageSize}";
+                        var firstPageData = db.Query<PointLogEntity>(firstPageSql);
                         
+                        lock (_allLogsCache) _allLogsCache.AddRange(firstPageData);
+
                         System.Windows.Application.Current.Dispatcher.Invoke(() =>
                         {
-                            int index = 1; /* Reset index for each page */
-                            foreach (var log in result) 
+                            int index = 1;
+                            foreach (var log in firstPageData)
                             {
                                 log.RowIndex = index++;
                                 Logs.Add(log);
                             }
                         });
+
+                        // 4. 开启后台静默加载任务 (批量抓取剩余数据)
+                        if (total > _pageSize)
+                        {
+                            _ = Task.Run(() => BackgroundBatchLoad(fromSource, baseWhere, total, token));
+                        }
                     });
                 }
             }
@@ -486,6 +558,46 @@ namespace DoorMonitorSystem.ViewModels
             finally
             {
                 IsLoading = false;
+            }
+        }
+
+        /// <summary>
+        /// 后台批量加载逻辑：每 5000 条一组拉取
+        /// </summary>
+        private async Task BackgroundBatchLoad(string fromSource, string baseWhere, int totalCount, System.Threading.CancellationToken token)
+        {
+            try
+            {
+                int loaded = _pageSize; 
+                int batchSize = 5000;
+                string logDb = GlobalData.SysCfg?.LogDatabaseName ?? "";
+                
+                while (loaded < totalCount)
+                {
+                    if (token.IsCancellationRequested) return;
+
+                    await Task.Delay(100); // 给数据库一点喘息时间
+                    
+                    using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, logDb);
+                    db.Connect();
+
+                    string sql = $"SELECT * FROM {fromSource} WHERE {baseWhere} ORDER BY LogTime DESC LIMIT {loaded}, {batchSize}";
+                    var batch = db.Query<PointLogEntity>(sql);
+                    
+                    if (batch == null || batch.Count == 0) break;
+
+                    lock (_allLogsCache)
+                    {
+                        _allLogsCache.AddRange(batch);
+                    }
+                    loaded += batch.Count;
+                    
+                    // debug: System.Diagnostics.Debug.WriteLine($"[LogService] Background loaded {loaded}/{totalCount}");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error("Background Log Loading Failed", ex);
             }
         }
 

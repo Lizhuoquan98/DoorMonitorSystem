@@ -12,9 +12,9 @@ using Communicationlib.config;
 using MySql.Data.MySqlClient;
 using Base;
 using DoorMonitorSystem.Assets.Services;
-
 using DoorMonitorSystem.Models.ConfigEntity.Door;
 using DoorMonitorSystem.Models.ConfigEntity.Group;
+using DoorMonitorSystem.Models.Ui;
 namespace DoorMonitorSystem.ViewModels
 {
     public class DevvarlistViewModel : NotifyPropertyChanged
@@ -124,10 +124,19 @@ namespace DoorMonitorSystem.ViewModels
                 if (!columnNames.Contains("State1Desc")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `State1Desc` VARCHAR(50) DEFAULT NULL;");
                 if (!columnNames.Contains("AlarmTargetValue")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `AlarmTargetValue` INT DEFAULT NULL;");
                 
-                // Missing Sync/Log fields from previous manual checks
+                // LogTypeId
+                if (!columnNames.Contains("LogTypeId")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `LogTypeId` INT DEFAULT 1;");
+                if (!columnNames.Contains("IsLogEnabled")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `IsLogEnabled` TINYINT(1) DEFAULT 1;");
+                if (!columnNames.Contains("LogTriggerState")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `LogTriggerState` INT DEFAULT 2;");
+                if (!columnNames.Contains("LogMessage")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `LogMessage` VARCHAR(200) DEFAULT NULL;");
+
                 // Missing Sync/Log fields from previous manual checks
                 if (!columnNames.Contains("SyncMode")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `SyncMode` INT DEFAULT 0;");
                 if (!columnNames.Contains("SyncTargetBitIndex")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `SyncTargetBitIndex` INT DEFAULT NULL;");
+                if (!columnNames.Contains("IsSyncEnabled")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `IsSyncEnabled` TINYINT(1) DEFAULT 0;");
+                if (!columnNames.Contains("SyncTargetDeviceId")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `SyncTargetDeviceId` INT DEFAULT NULL;");
+                if (!columnNames.Contains("SyncTargetAddress")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `SyncTargetAddress` INT DEFAULT NULL;");
+
                 
                 // Logical Binding Key
                 if (!columnNames.Contains("UiBinding")) db.ExecuteNonQuery("ALTER TABLE `DevicePointConfig` ADD COLUMN `UiBinding` VARCHAR(50) DEFAULT NULL;");
@@ -140,6 +149,43 @@ namespace DoorMonitorSystem.ViewModels
                     var pColNames = new HashSet<string>();
                     foreach (System.Data.DataRow row in pCols.Rows) pColNames.Add(row["列名"].ToString());
                     if (!pColNames.Contains("PanelTypeId")) db.ExecuteNonQuery("ALTER TABLE `Panel` ADD COLUMN `PanelTypeId` INT DEFAULT 0;");
+                    if (!pColNames.Contains("ByteStartAddr")) db.ExecuteNonQuery("ALTER TABLE `Panel` ADD COLUMN `ByteStartAddr` INT DEFAULT 0;");
+                    if (!pColNames.Contains("ByteLength")) db.ExecuteNonQuery("ALTER TABLE `Panel` ADD COLUMN `ByteLength` INT DEFAULT 0;");
+                }
+
+                // Door Table Upgrade
+                if (db.TableExists("Door"))
+                {
+                    var dooCols = db.GetTableColumns("Door");
+                    var dooColNames = new HashSet<string>();
+                    foreach (System.Data.DataRow row in dooCols.Rows) dooColNames.Add(row["列名"].ToString());
+                    
+                    if (!dooColNames.Contains("ByteStartAddr")) db.ExecuteNonQuery("ALTER TABLE `Door` ADD COLUMN `ByteStartAddr` INT DEFAULT 0;");
+                    if (!dooColNames.Contains("ByteLength")) db.ExecuteNonQuery("ALTER TABLE `Door` ADD COLUMN `ByteLength` INT DEFAULT 0;");
+                }
+
+                // Check DoorBitConfig for new offset fields
+                if (db.TableExists("DoorBitConfig"))
+                {
+                    var dCols = db.GetTableColumns("DoorBitConfig");
+                    var dColNames = new HashSet<string>();
+                    foreach (System.Data.DataRow row in dCols.Rows) dColNames.Add(row["列名"].ToString());
+                    
+                    if (!dColNames.Contains("ByteOffset")) db.ExecuteNonQuery("ALTER TABLE `DoorBitConfig` ADD COLUMN `ByteOffset` INT DEFAULT 0;");
+                    if (!dColNames.Contains("BitIndex")) db.ExecuteNonQuery("ALTER TABLE `DoorBitConfig` ADD COLUMN `BitIndex` INT DEFAULT 0;");
+                    if (!dColNames.Contains("LogTypeId")) db.ExecuteNonQuery("ALTER TABLE `DoorBitConfig` ADD COLUMN `LogTypeId` INT DEFAULT 1;");
+                }
+
+                // Check PanelBitConfig for new offset fields
+                if (db.TableExists("PanelBitConfig"))
+                {
+                    var pbCols = db.GetTableColumns("PanelBitConfig");
+                    var pbColNames = new HashSet<string>();
+                    foreach (System.Data.DataRow row in pbCols.Rows) pbColNames.Add(row["列名"].ToString());
+
+                    if (!pbColNames.Contains("ByteOffset")) db.ExecuteNonQuery("ALTER TABLE `PanelBitConfig` ADD COLUMN `ByteOffset` INT DEFAULT 0;");
+                    if (!pbColNames.Contains("BitIndex")) db.ExecuteNonQuery("ALTER TABLE `PanelBitConfig` ADD COLUMN `BitIndex` INT DEFAULT 0;");
+                    if (!pbColNames.Contains("LogTypeId")) db.ExecuteNonQuery("ALTER TABLE `PanelBitConfig` ADD COLUMN `LogTypeId` INT DEFAULT 1;");
                 }
             }
             catch (Exception ex)
@@ -694,6 +740,355 @@ namespace DoorMonitorSystem.ViewModels
 
         public List<string> BindingRoles { get; } = new List<string> { "Read", "Write", "Auth", "DoorId" };
 
+        public ObservableCollection<StationEntity> Stations { get; } = new ObservableCollection<StationEntity>();
+
+        private StationEntity _batchSelectedStation;
+        public StationEntity BatchSelectedStation
+        {
+            get => _batchSelectedStation;
+            set { _batchSelectedStation = value; OnPropertyChanged(); }
+        }
+
+        #region 批量生成 (Batch Generation)
+
+        private string _batchStartAddress = "100";
+        public string BatchStartAddress
+        {
+            get => _batchStartAddress;
+            set { _batchStartAddress = value; OnPropertyChanged(); }
+        }
+
+        private int _batchDoorStride = 64;
+        public int BatchDoorStride
+        {
+            get => _batchDoorStride;
+            set { _batchDoorStride = value; OnPropertyChanged(); }
+        }
+
+        private bool _isBatchPopupOpen;
+        public bool IsBatchPopupOpen
+        {
+            get => _isBatchPopupOpen;
+            set { _isBatchPopupOpen = value; OnPropertyChanged(); }
+        }
+
+        public ICommand OpenBatchPopupCommand => new RelayCommand(OpenBatchPopup);
+        public ICommand BatchGenerateCommand => new RelayCommand(BatchGenerate);
+
+        private void OpenBatchPopup(object obj)
+        {
+            IsBatchPopupOpen = true;
+            LoadStations();
+        }
+
+        private void LoadStations()
+        {
+            Stations.Clear();
+            try
+            {
+                if (GlobalData.SysCfg == null)
+                {
+                    MessageBox.Show("系统配置尚未加载，无法连接数据库。", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
+                if (!db.IsConnected) db.Connect();
+                
+                var list = db.FindAll<StationEntity>();
+                if (list != null)
+                {
+                    var sortedList = list.OrderBy(s => s.SortOrder).ToList();
+                    foreach(var s in sortedList) Stations.Add(s);
+                    
+                    // debug info
+                    // MessageBox.Show($"Debug: Loaded {Stations.Count} stations from DB '{GlobalData.SysCfg.DatabaseName}'. Table: Station", "Debug");
+                }
+                
+                if (Stations.Count > 0) 
+                {
+                    BatchSelectedStation = Stations[0];
+                }
+                else 
+                {
+                    // 尝试使用小写表名再次查询，以防 Linux/Case-sensitive 导致的问题
+                    try {
+                        var list2 = db.Query<StationEntity>("SELECT * FROM station");
+                        if (list2 != null && list2.Count > 0)
+                        {
+                            foreach(var s in list2) Stations.Add(s);
+                            BatchSelectedStation = Stations[0];
+                        }
+                        else
+                        {
+                            MessageBox.Show($"数据库 [{GlobalData.SysCfg.DatabaseName}] 中未找到任何站台信息 (Table: Station/station)。\n请确认数据库中是否存在 'Station' 表且包含数据。", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        }
+                    }
+                    catch {
+                         MessageBox.Show($"数据库 [{GlobalData.SysCfg.DatabaseName}] 中未找到任何站台信息。", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                }
+            }
+            catch(Exception ex) 
+            { 
+                LogHelper.Error("LoadStations", ex);
+                MessageBox.Show($"加载站台列表失败: {ex.Message}\nDB: {GlobalData.SysCfg?.DatabaseName}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private int _batchTargetType = 0; // 0=Door, 1=Panel
+        public int BatchTargetType
+        {
+            get => _batchTargetType;
+            set { _batchTargetType = value; OnPropertyChanged(); }
+        }
+
+        private void BatchGenerate(object obj)
+        {
+            if (SelectedDevice == null)
+            {
+                MessageBox.Show("请先选择目标设备！");
+                return;
+            }
+
+            string targetName = BatchTargetType == 0 ? "站台门" : "监控面板";
+            
+            if (MessageBox.Show($"即将为设备 [{SelectedDevice.Name}] 批量生成【{targetName}】点表。\n\n" +
+                                $"⚠️ 注意：将直接使用【地址映射】中配置的物理地址。\n" +
+                                $"请确保已在【地址映射】中为每个门/面板配置了正确的起始偏移。\n\n是否继续？", 
+                                "确认批量生成", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            try
+            {
+                using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
+                db.Connect();
+
+                List<DevicePointConfigEntity> newPoints = new List<DevicePointConfigEntity>();
+                string protocol = SelectedDevice.Protocol.Contains("S7") ? "S7" : "Modbus";
+
+                if (BatchTargetType == 0) // Door
+                {
+                    // 先关联查询出该站台下属的所有门 (Door->DoorGroup->Station)
+                    string sql = @"
+                        SELECT d.* 
+                        FROM `Door` d
+                        JOIN `DoorGroup` dg ON d.DoorGroupId = dg.Id
+                        WHERE dg.StationId = @sid
+                        ORDER BY d.SortOrder";
+                    
+                    var doors = db.Query<DoorEntity>(sql, new MySqlParameter("@sid", BatchSelectedStation?.Id ?? -1));
+
+                    var templates = db.FindAll<DoorBitConfigEntity>();
+                    if (doors == null || doors.Count == 0) { MessageBox.Show("该站台未找到门定义"); return; }
+                    // startAddress=0, stride=0 -> Force use of Entity.ByteStartAddr
+                    newPoints = DbPointGenerator.GenerateDoorPoints(doors, templates, SelectedDevice.ID, 0, 0, protocol);
+                }
+                else // Panel
+                {
+                    // 先关联查询出该站台下属的所有面板 (Panel->PanelGroup->Station)
+                    string sql = @"
+                        SELECT p.* 
+                        FROM `Panel` p
+                        JOIN `PanelGroup` pg ON p.PanelGroupId = pg.Id
+                        WHERE pg.StationId = @sid
+                        ORDER BY p.SortOrder";
+
+                    var panels = db.Query<PanelEntity>(sql, new MySqlParameter("@sid", BatchSelectedStation?.Id ?? -1));
+
+                    var templates = db.FindAll<PanelBitConfigEntity>();
+                    if (panels == null || panels.Count == 0) { MessageBox.Show("该站台未找到面板定义"); return; }
+                    // startAddress=0, stride=0 -> Force use of Entity.ByteStartAddr
+                    newPoints = DbPointGenerator.GeneratePanelPoints(panels, templates, SelectedDevice.ID, 0, 0, protocol);
+                }
+
+                // 3. 查重 & 批量插入
+
+                var existingBindings = new HashSet<string>();
+                var bindingRows = db.ExecuteQuery("SELECT UiBinding FROM DevicePointConfig WHERE SourceDeviceId = @sid", new MySqlParameter("@sid", SelectedDevice.ID));
+                if (bindingRows != null)
+                {
+                    foreach (System.Data.DataRow row in bindingRows.Rows)
+                    {
+                        existingBindings.Add(row["UiBinding"].ToString());
+                    }
+                }
+
+                db.BeginTransaction();
+                try
+                {
+                    int count = 0;
+                    int skipCount = 0;
+                    foreach (var p in newPoints)
+                    {
+                        // 如果已经存在相同的 UiBinding (例如 'Door1_OpenState')，则跳过
+                        if (!string.IsNullOrEmpty(p.UiBinding) && existingBindings.Contains(p.UiBinding))
+                        {
+                            skipCount++;
+                            continue;
+                        }
+                        
+                        db.Insert(p);
+                        count++;
+                    }
+                    db.CommitTransaction();
+                    
+                    MessageBox.Show($"生成完毕！\n新增: {count} 个\n跳过: {skipCount} 个 (已存在)");
+                    IsBatchPopupOpen = false;
+                    
+                    // 刷新列表
+                    LoadPoints();
+                    DeviceCommunicationService.Instance?.ReloadConfigs();
+                }
+                catch (Exception ex)
+                {
+                    db.RollbackTransaction();
+                    throw ex;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"生成失败: {ex.Message}");
+            }
+        }
+
+        // ===========================================
+        // 地址管理 (Address Management)
+        // ===========================================
+
+        private bool _isAddressMgrOpen;
+        public bool IsAddressMgrOpen
+        {
+            get => _isAddressMgrOpen;
+            set { _isAddressMgrOpen = value; OnPropertyChanged(); }
+        }
+
+        public ObservableCollection<AddressConfigItem> AddressItems { get; set; } = new ObservableCollection<AddressConfigItem>();
+        public ICommand OpenAddressMgrCommand => new RelayCommand(OpenAddressMgr);
+        public ICommand SaveAddressConfigCommand => new RelayCommand(SaveAddressConfig);
+        public ICommand CloseAddressMgrCommand => new RelayCommand(obj => IsAddressMgrOpen = false);
+
+        private void OpenAddressMgr(object obj)
+        {
+            if (BatchSelectedStation == null)
+            {
+                if (Stations.Count > 0) BatchSelectedStation = Stations[0];
+                else 
+                {
+                    MessageBox.Show("请先选择或配置站台！");
+                    return;
+                }
+            }
+            
+            IsAddressMgrOpen = true;
+            IsBatchPopupOpen = false; 
+            LoadAddressItems();
+        }
+
+        public void LoadAddressItems()
+        {
+            AddressItems.Clear();
+            if (BatchSelectedStation == null) return;
+
+            try
+            {
+                using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
+                db.Connect();
+
+                if (BatchTargetType == 0) // Door
+                {
+                    string sql = @"
+                        SELECT d.Id, d.DoorName, d.ByteStartAddr, d.ByteLength, d.SortOrder 
+                        FROM `Door` d
+                        JOIN `DoorGroup` dg ON d.DoorGroupId = dg.Id
+                        WHERE dg.StationId = @sid
+                        ORDER BY d.SortOrder";
+                
+                    var doors = db.ExecuteQuery(sql, new MySqlParameter("@sid", BatchSelectedStation.Id));
+                    foreach (System.Data.DataRow row in doors.Rows)
+                    {
+                         AddressItems.Add(new AddressConfigItem
+                         {
+                             Id = Convert.ToInt32(row["Id"]),
+                             Name = row["DoorName"].ToString(),
+                             ByteStartAddr = row["ByteStartAddr"] == DBNull.Value ? 0 : Convert.ToInt32(row["ByteStartAddr"]),
+                             ByteLength = row["ByteLength"] == DBNull.Value ? 0 : Convert.ToInt32(row["ByteLength"]),
+                             Type = "Door",
+                             SortOrder = Convert.ToInt32(row["SortOrder"])
+                         });
+                    }
+                }
+                else // Panel
+                {
+                    string sql = @"
+                        SELECT p.Id, p.PanelName, p.ByteStartAddr, p.ByteLength, p.SortOrder 
+                        FROM `Panel` p
+                        JOIN `PanelGroup` pg ON p.PanelGroupId = pg.Id
+                        WHERE pg.StationId = @sid
+                        ORDER BY p.SortOrder";
+
+                    var panels = db.ExecuteQuery(sql, new MySqlParameter("@sid", BatchSelectedStation.Id));
+                    foreach (System.Data.DataRow row in panels.Rows)
+                    {
+                        AddressItems.Add(new AddressConfigItem
+                        {
+                            Id = Convert.ToInt32(row["Id"]),
+                            Name = row["PanelName"].ToString(),
+                            ByteStartAddr = row["ByteStartAddr"] == DBNull.Value ? 0 : Convert.ToInt32(row["ByteStartAddr"]),
+                            ByteLength = row["ByteLength"] == DBNull.Value ? 0 : Convert.ToInt32(row["ByteLength"]),
+                            Type = "Panel",
+                            SortOrder = Convert.ToInt32(row["SortOrder"])
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"加载地址配置失败: {ex.Message}");
+            }
+        }
+
+        private void SaveAddressConfig(object obj)
+        {
+            try
+            {
+                using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
+                db.Connect();
+                db.BeginTransaction();
+
+                try
+                {
+                    foreach (var item in AddressItems)
+                    {
+                        string tableName = item.Type == "Door" ? "Door" : "Panel";
+                        string sql = $"UPDATE `{tableName}` SET ByteStartAddr = @addr, ByteLength = @len WHERE Id = @id";
+                        db.ExecuteNonQuery(sql, 
+                            new MySqlParameter("@addr", item.ByteStartAddr),
+                            new MySqlParameter("@len", item.ByteLength),
+                            new MySqlParameter("@id", item.Id));
+                    }
+                    
+                    db.CommitTransaction();
+                    // MessageBox.Show("地址配置保存成功！", "成功");
+                    IsAddressMgrOpen = false;
+                    // IsBatchPopupOpen = true; // 用户要求保存后直接关闭，不再自动返回上一级 
+                }
+                catch
+                {
+                    db.RollbackTransaction();
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"保存失败: {ex.Message}");
+            }
+        }
+
+        #endregion
+
         #region 导入导出逻辑
 
         /// <summary>
@@ -891,18 +1286,6 @@ namespace DoorMonitorSystem.ViewModels
 
         #endregion
     }
-
-    public class SelectorNode
-    {
-        public string Name { get; set; }
-        public string FullDescription { get; set; } // Station_Door_Config
-        public string ObjectName { get; set; } // New Property for Name Lookup
-        public string NodeType { get; set; } // Station, Group, Door, Config, ParamRoot, Param
-        public string Role { get; set; } // Read, Write, Auth
-        public int Id { get; set; }
-        public int ExtendedId { get; set; } // For storing Parent Obj Id
-        public int ParentId { get; set; }
-        public object Tag { get; set; }
-        public ObservableCollection<SelectorNode> Children { get; set; } = new ObservableCollection<SelectorNode>();
-    }
 }
+
+

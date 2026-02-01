@@ -29,7 +29,10 @@
                 CommandParameter="{Binding}"
                 Width="50" Height="80"
                 Margin="1,0"
-                FontSize="14"/>
+                FontSize="14"
+                SnapsToDevicePixels="True"
+                UseLayoutRounding="True">
+            </usc:DoorControl>
         </DataTemplate>
 
         <!-- 门组模板 -->
@@ -169,10 +172,13 @@
         <!-- 主内容区 - 站台列表（全屏显示） -->
         <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="5,1"
                      Background="Transparent">
-            <ItemsControl ItemsSource="{Binding Stations}">
+            <ItemsControl ItemsSource="{Binding Stations}"
+                          VirtualizingPanel.IsVirtualizing="True"
+                          VirtualizingPanel.VirtualizationMode="Recycling"
+                          ScrollViewer.CanContentScroll="True">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <StackPanel Orientation="Vertical"/>
+                        <VirtualizingStackPanel Orientation="Vertical"/>
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
 
@@ -183,37 +189,17 @@
                         <Border BorderThickness="0" CornerRadius="10"
                                 Margin="0,8" Padding="20"
                                 Background="#1a1f2e">
-                            <!-- <Border.Effect>
-                                <DropShadowEffect Color="#000000" BlurRadius="15"
-                                                ShadowDepth="3" Opacity="0.4"/>
-                            </Border.Effect> -->
-
-                            <!-- 悬停效果 -->
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Style.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter Property="Background" Value="#252b3b"/>
-                                            <!-- <Setter Property="Effect">
-                                                <Setter.Value>
-                                                    <DropShadowEffect Color="#1976d2" BlurRadius="20"
-                                                                    ShadowDepth="3" Opacity="0.6"/>
-                                                </Setter.Value>
-                                            </Setter> -->
-                                        </Trigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
-
                             <!-- 站台内容（门组和面板组混合显示） -->
                             <ItemsControl ItemsSource="{Binding DisplayItems}"
                                          ItemTemplateSelector="{StaticResource StationItemTemplateSelector}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
-                                        <StackPanel Orientation="Vertical" HorizontalAlignment="Center"/>
+                                        <VirtualizingStackPanel Orientation="Vertical" HorizontalAlignment="Center"/>
                                     </ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
                             </ItemsControl>
+                            
+                            <!-- 移除了会导致模糊的位图缓存 -->
                         </Border>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
@@ -240,15 +226,16 @@
                 </Style>
             </Grid.Style>
 
-            <!-- 主弹窗边框 -->
-            <Border x:Name="PopupBorder" CornerRadius="15" MaxWidth="1200" MaxHeight="650"
-                   Background="#1a1f2e" BorderBrush="#2a5f8f" BorderThickness="1">
+            <!-- 主弹窗边框 (移除昂贵的阴影，改为加深边框以适配 Win7 老机器) -->
+            <Border x:Name="PopupBorder" CornerRadius="12" MaxWidth="1200" MaxHeight="650"
+                   Background="#1a1f2e" BorderBrush="#3a6f9f" BorderThickness="2">
                 <Border.RenderTransform>
                     <TranslateTransform x:Name="PopupTranslateTransform"/>
                 </Border.RenderTransform>
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="20" ShadowDepth="0" Opacity="0.7"/>
-                </Border.Effect>
+                <Border.CacheMode>
+                    <BitmapCache RenderAtScale="1"/>
+                </Border.CacheMode>
+                <!-- 移除了 DropShadowEffect 以确保老设备流畅 -->
                 
                     <Grid>
                         <Grid.RowDefinitions>

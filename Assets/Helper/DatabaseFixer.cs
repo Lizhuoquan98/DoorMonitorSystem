@@ -23,8 +23,15 @@ namespace DoorMonitorSystem.Assets.Helper
                 VerifyAndFixTable<SysGraphicItemEntity>(db, "SysGraphicItemEntity");
                 VerifyAndFixTable<SysSettingsEntity>(db, "SysSettingsEntity");
 
+                // 确保 DevicePointConfig, DoorBitConfig 和 PanelBitConfig 都有 LogTypeId
+                EnsureColumnExists(db, "DevicePointConfig", "LogTypeId", "INT DEFAULT 1");
+                EnsureColumnExists(db, "DoorBitConfig", "LogTypeId", "INT DEFAULT 1");
+                EnsureColumnExists(db, "PanelBitConfig", "LogTypeId", "INT DEFAULT 1");
+
                 // 修正遗留数据的 LogTypeId=0 问题 (默认为1)
                 db.ExecuteNonQuery("UPDATE DevicePointConfig SET LogTypeId = 1 WHERE LogTypeId = 0");
+                db.ExecuteNonQuery("UPDATE DoorBitConfig SET LogTypeId = 1 WHERE LogTypeId = 0");
+                db.ExecuteNonQuery("UPDATE PanelBitConfig SET LogTypeId = 1 WHERE LogTypeId = 0");
             }
             catch (Exception ex)
             {
@@ -124,6 +131,35 @@ namespace DoorMonitorSystem.Assets.Helper
                 list.Add(row["列名"].ToString());
             }
             return list;
+        }
+        private static void EnsureColumnExists(SQLHelper db, string tableName, string columnName, string definition)
+        {
+            try
+            {
+                if (!db.TableExists(tableName)) return;
+
+                string sql = $@"
+                    SELECT COUNT(*) 
+                    FROM information_schema.columns 
+                    WHERE table_schema = @db 
+                    AND table_name = @tb 
+                    AND column_name = @col";
+
+                var result = db.ExecuteScalar(sql,
+                    new MySqlParameter("@db", db.DatabaseName),
+                    new MySqlParameter("@tb", tableName),
+                    new MySqlParameter("@col", columnName));
+
+                if (Convert.ToInt32(result) == 0)
+                {
+                    LogHelper.Info($"[DatabaseFixer] 表 {tableName} 缺少列 {columnName}，正在添加...");
+                    db.ExecuteNonQuery($"ALTER TABLE `{tableName}` ADD COLUMN `{columnName}` {definition}");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error($"[DatabaseFixer] 检查/添加列 {tableName}.{columnName} 失败", ex);
+            }
         }
     }
 }

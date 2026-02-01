@@ -224,8 +224,7 @@ namespace DoorMonitorSystem.Assets.Services
                     {
                         HeaderText = entity.DoorName,
                         HeaderBackground = Brushes.Gray,
-                        BottomBackground = Brushes.Green,
-                        Icons = new List<IconItem>()
+                        BottomBackground = Brushes.Green
                     }
                 };
 

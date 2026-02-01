@@ -119,7 +119,7 @@ namespace DoorMonitorSystem.Models.ConfigEntity
         /// <summary>日志类型 (1=普通记录, 2=报警记录)</summary>
         public int LogTypeId { get => _logTypeId; set { _logTypeId = value; OnPropertyChanged(); } }
 
-        private int _logTriggerState;
+        private int _logTriggerState = 2;
         /// <summary>日志触发状态 (0=False触发, 1=True触发, 2=双向触发)</summary>
         public int LogTriggerState { get => _logTriggerState; set { _logTriggerState = value; OnPropertyChanged(); } }
 

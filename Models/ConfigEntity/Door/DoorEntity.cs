@@ -25,5 +25,11 @@ namespace DoorMonitorSystem.Models.ConfigEntity.Door
 
         /// <summary>排序序号</summary>
         public int SortOrder { get; set; }
+
+        /// <summary>起始字节偏移 (相对基址)</summary>
+        public int ByteStartAddr { get; set; }
+
+        /// <summary>数据字节长度/宽度</summary>
+        public int ByteLength { get; set; }
     }
 }

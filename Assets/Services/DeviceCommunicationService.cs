@@ -47,6 +47,7 @@ namespace DoorMonitorSystem.Assets.Services
         public event Action ConfigLoaded;
 
         private readonly Dictionary<int, CommRuntime> _runtimes = new();
+        private readonly Dictionary<int, IProtocolClient> _protocolClients = new();
         private readonly Dictionary<int, ICommBase> _slaves = new();
         private Dictionary<int, List<DevicePointConfigEntity>> _devicePointsCache = new();
         private Dictionary<int, List<DevicePointConfigEntity>> _doorPointsIndex = new(); // Index by TargetObjId (Door)
@@ -312,9 +313,29 @@ namespace DoorMonitorSystem.Assets.Services
         public void ReloadConfigs()
         {
             LoadPointConfigs();
-            // 如果 DataProcessor 需要更新引用，可以在这里处理，
-            // 但目前的架构中 ExecuteSave 直接使用 Service 的 Lookups，
-            // 所以仅仅更新 Service 的字段即可解决写入地址查找失败的问题。
+            // 同步最新的日志开关到运行中的驱动
+            UpdateTraceConfigs();
+        }
+
+        /// <summary>
+        /// 动态更新运行中设备的日志追踪开关 (实时生效)
+        /// </summary>
+        public void UpdateTraceConfigs()
+        {
+            var cfg = GlobalData.DebugConfig;
+            if (cfg == null) return;
+
+            foreach (var client in _protocolClients.Values)
+            {
+                // 同步驱动内部的详细追踪开关 (控制原始 TX/RX)
+                client.TraceDetail = cfg.Trace_Communication_Raw;
+            }
+
+            foreach (var slave in _slaves.Values)
+            {
+                // 同步从站/服务端内部的详细追踪开关
+                slave.TraceDetail = cfg.Trace_Communication_Raw;
+            }
         }
 
         /// <summary>
@@ -368,16 +389,24 @@ namespace DoorMonitorSystem.Assets.Services
                         string ip = paramDict.GetValueOrDefault("IP地址", paramDict.GetValueOrDefault("IP", "127.0.0.1"));
                         s7.SetConnectionConfig(ip, int.Parse(paramDict.GetValueOrDefault("机架号", "0")), int.Parse(paramDict.GetValueOrDefault("插槽号", "2")));
                         
-                        // 注入日志与配置
-                        s7.Logger = msg => LogHelper.Debug(msg);
-                        s7.TraceDetail = GlobalData.DebugConfig?.Trace_S7_Detail ?? false;
+                        // 注入日志与配置 (动态检查，确保开关实时生效)
+                        s7.Logger = msg => {
+                            var current = GlobalData.DebugConfig;
+                            if (current != null && (current.Trace_Communication_Raw || current.Trace_S7_Detail))
+                                LogHelper.Debug(msg);
+                        };
+                        s7.TraceDetail = GlobalData.DebugConfig?.Trace_Communication_Raw ?? false;
                         
                         protocolClient = s7;
                     }
                     else if (dev.Protocol == "MODBUS_RTU_CLIENT") 
                     {
                         var rtu = new Communicationlib.Protocol.Modbus.ModbusRtuClient(); 
-                        rtu.Logger = msg => LogHelper.Debug(msg);
+                        rtu.Logger = msg => {
+                            var current = GlobalData.DebugConfig;
+                            if (current != null && (current.Trace_Communication_Raw || current.Trace_Modbus_Detail))
+                                LogHelper.Debug(msg);
+                        };
                         rtu.TraceDetail = GlobalData.DebugConfig?.Trace_Communication_Raw ?? false;
                         protocolClient = rtu;
                     }
@@ -385,16 +414,26 @@ namespace DoorMonitorSystem.Assets.Services
                     {
                         var tcp = new Communicationlib.Protocol.Modbus.ModbusTcpClient(); 
                         // Inject Logger & Trace Config
-                        tcp.Logger = msg => LogHelper.Debug(msg);
+                        tcp.Logger = msg => {
+                            var current = GlobalData.DebugConfig;
+                            if (current != null && (current.Trace_Communication_Raw || current.Trace_Modbus_Detail))
+                                LogHelper.Debug(msg);
+                        };
                         tcp.TraceDetail = GlobalData.DebugConfig?.Trace_Communication_Raw ?? false;
                         protocolClient = tcp;
                     }
 
                     protocolClient.DeviceName = dev.Name;
-                    
+                    _protocolClients[dev.ID] = protocolClient;
+
                     var runtime = new CommRuntime(channel, protocolClient) { RuntimeName = $"Runtime_{dev.Name}" };
                     // 注入 Runtime 日志 (包含异常捕获日志)
-                    runtime.Logger = msg => LogHelper.Debug(msg);
+                    // 注入 Runtime 日志 (主要包含异常捕获日志)
+                    runtime.Logger = msg => {
+                        var current = GlobalData.DebugConfig;
+                        if (current != null && current.Trace_Communication_Raw)
+                            LogHelper.Debug(msg);
+                    };
                     
                     int cycleTime = int.TryParse(paramDict.GetValueOrDefault("循环读取时间", "500"), out var c) ? c : 500;
 
@@ -449,6 +488,7 @@ namespace DoorMonitorSystem.Assets.Services
             _isRunning = false;
             foreach (var r in _runtimes.Values) r.Dispose();
             _runtimes.Clear();
+            _protocolClients.Clear();
             foreach (var s in _slaves.Values) s.Close();
             _slaves.Clear();
 

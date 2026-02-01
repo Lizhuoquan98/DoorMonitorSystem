@@ -112,7 +112,15 @@ namespace DoorMonitorSystem.Assets.Services
                     });
                     
                     BuildBitCache();
-                    LogHelper.Info($"[DataManager] 业务数据加载完成. 站台数量: {stations.Count}");
+
+                    // ★ 强烈建议：加载后立即对所有门执行一次初始视觉裁决
+                    // 确保首屏即使没有点位变化也能显示默认状态（如“关闭”）
+                    foreach (var door in _doorCache.Values)
+                    {
+                        AdjudicateDoorVisual(door);
+                    }
+
+                    LogHelper.Info($"[DataManager] 业务数据加载完成并完成初始裁决. 站台数量: {stations.Count}");
                 }
             }
             catch (Exception ex)
@@ -953,43 +961,44 @@ namespace DoorMonitorSystem.Assets.Services
                         // 能够确保 鼠标输入(Input) 和 渲染(Render) 优先于 数据更新，解决"漂移/不跟手"问题
                         if (batch.Count > 0 && Application.Current != null && Application.Current.Dispatcher != null)
                         {
-                            await Application.Current.Dispatcher.InvokeAsync(() =>
+                            var dirtyDoors = new HashSet<DoorModel>();
+
+                            // 1. 先在后台线程处理数值更新（不涉及 UI 的部分）
+                            foreach (var (targetObjId, bitConfigId, targetType, value) in batch)
                             {
-                                var dirtyDoors = new HashSet<DoorModel>();
+                                string key = $"{targetObjId}_{bitConfigId}";
 
-                                foreach (var (targetObjId, bitConfigId, targetType, value) in batch)
+                                if (targetType == TargetType.Door)
                                 {
-                                    string key = $"{targetObjId}_{bitConfigId}";
-                                    
-                                    if (targetType == TargetType.Door)
+                                    if (_doorBitCache.TryGetValue(key, out var bit))
                                     {
-                                        if (_doorBitCache.TryGetValue(key, out var bit))
+                                        bit.BitValue = value;
+                                        if (_doorCache.TryGetValue(targetObjId, out var door))
                                         {
-                                            bit.BitValue = value;
-                                            
-                                            // 标记该门需要重新裁决视觉状态
-                                            if (_doorCache.TryGetValue(targetObjId, out var door))
-                                            {
-                                                dirtyDoors.Add(door);
-                                            }
-                                        }
-                                    }
-                                    else if (targetType == TargetType.Panel)
-                                    {
-                                        if (_panelBitCache.TryGetValue(key, out var bit))
-                                        {
-                                            bit.BitValue = value;
+                                            dirtyDoors.Add(door);
                                         }
                                     }
                                 }
-
-                                // 批量刷新脏门（裁决优先级，更新图标）
-                                foreach (var door in dirtyDoors)
+                                else if (targetType == TargetType.Panel)
                                 {
-                                    AdjudicateDoorVisual(door);
+                                    if (_panelBitCache.TryGetValue(key, out var bit))
+                                    {
+                                        bit.BitValue = value;
+                                    }
                                 }
+                            }
 
-                            }, System.Windows.Threading.DispatcherPriority.Background);
+                            // 2. 只有产生脏数据时，才切回 UI 线程进行耗时比对和 UI 刷新
+                            if (dirtyDoors.Count > 0)
+                            {
+                                await Application.Current.Dispatcher.InvokeAsync(() =>
+                                {
+                                    foreach (var door in dirtyDoors)
+                                    {
+                                        AdjudicateDoorVisual(door);
+                                    }
+                                }, System.Windows.Threading.DispatcherPriority.Normal);
+                            }
                         }
                     }
                     catch (Exception ex)
@@ -997,9 +1006,9 @@ namespace DoorMonitorSystem.Assets.Services
                         Debug.WriteLine($"[DataManager] 批量更新错误: {ex.Message}");
                     }
                     
-                    // 控制刷新频率: 20FPS (50ms/帧)
-                    // 在保证流畅度的同时，平衡 CPU 占用（相比 100ms 响应更及时）
-                    await Task.Delay(50);
+                    // 控制刷新频率: 10FPS (100ms/帧)
+                    // 站台监控 100ms 的延迟在肉眼看来依然流畅，但能节省 50% 的 UI 线程调度开销
+                    await Task.Delay(100);
                 }
             });
         }
@@ -1060,108 +1069,82 @@ namespace DoorMonitorSystem.Assets.Services
         {
             if (door?.Bits == null) return;
 
-            // 1. 头部颜色条
+            // 1. 提取各部分最高优先级的激活点位
             var headerBit = door.Bits
                 .Where(b => b.BitValue && b.HeaderPriority > 0)
                 .OrderByDescending(b => b.HeaderPriority)
                 .FirstOrDefault();
-            
-            var oldHeader = door.Visual.HeaderBackground;
-            door.Visual.HeaderBackground = headerBit?.HeaderColor ?? Brushes.Gray;
-            door.Visual.HeaderText = door.DoorName;
 
-            // 2. 中间图形
             var imageBit = door.Bits
                 .Where(b => b.BitValue && !string.IsNullOrEmpty(b.GraphicName))
                 .OrderByDescending(b => b.ImagePriority)
                 .ThenByDescending(b => b.BitId)
                 .FirstOrDefault();
 
-            if (imageBit != null)
-            {
-                // Debug.WriteLine($"[Adjudicate] Door: {door.DoorName}, GraphicName: '{imageBit.GraphicName}'");
-
-                if (GlobalData.GraphicDictionary != null &&
-                    GlobalData.GraphicDictionary.TryGetValue(imageBit.GraphicName.Trim(), out var templates))
-                {
-                    // LogHelper.Debug($"[DataManager] Drawing icons for {door.DoorName}: {imageBit.GraphicName}");
-                    var newIcons = new List<IconItem>();
-                    foreach (var t in templates)
-                    {
-                        var cloned = t.Clone();
-                        
-                        // 逻辑修正：不再强制覆盖颜色
-                        // 因为"故障"等图标通常不仅是单色图形，而是包含背景、边框、主体等多色组合的复杂矢量图
-                        // 如果强制染成红色，会导致整个图标变成一个红色方块
-                        // 既然 GraphicDictionary 里已经定义好了颜色（如灰底红三角），直接使用原色即可
-                        
-                        /* 
-                        if (imageBit.GraphicColor != null && imageBit.GraphicColor != Brushes.Black)
-                        {
-                             // ... (Color Override Logic Disabled) ...
-                        }
-                        */
-                        
-                        if (cloned.Data != null && cloned.Data.CanFreeze) cloned.Data.Freeze();
-                        if (cloned.Fill != null && cloned.Fill.CanFreeze) cloned.Fill.Freeze();
-                        if (cloned.Stroke != null && cloned.Stroke.CanFreeze) cloned.Stroke.Freeze();
-                        
-                        newIcons.Add(cloned);
-                    }
-                    door.Visual.Icons = newIcons;
-                }
-                else
-                {
-                    if (!string.IsNullOrEmpty(imageBit.GraphicName))
-                    {
-                        // 详细调试：打印名称长度和不可见字符
-                        var name = imageBit.GraphicName;
-                        LogHelper.Debug($"[Visual-Err] 找不到图形. 名称:'{name}' 长度:{name.Length} 门:{door.DoorName}");
-                        
-                        // 仅在首次失败时打印一次字典键，避免刷屏
-                        if (!_debugKeysPrinted && GlobalData.GraphicDictionary != null)
-                        {
-                            var keys = string.Join(",", GlobalData.GraphicDictionary.Keys);
-                            LogHelper.Debug($"[Visual-Err] 可用键列表: [{keys}]");
-                            _debugKeysPrinted = true;
-                        }
-                    }
-                    if (door.Visual.Icons?.Count > 0) door.Visual.Icons = new List<IconItem>();
-                }
-            }
-            else
-            {
-               // Debug.WriteLine($"[Adjudicate] Door: {door.DoorName}, No active image bit.");
-               if (door.Visual.Icons?.Count > 0) door.Visual.Icons = new List<IconItem>();
-            }
-            
-            // 默认兜底逻辑：如果没有任何状态激活，且没有图标，则显示"关门"状态
-            if ((door.Visual.Icons == null || door.Visual.Icons.Count == 0) && GlobalData.GraphicDictionary != null)
-            {
-                 if (GlobalData.GraphicDictionary.TryGetValue("关门", out var defaultTemplates))
-                 {
-                    var defaultIcons = new List<IconItem>();
-                    foreach (var t in defaultTemplates)
-                    {
-                        var cloned = t.Clone();
-                        if (cloned.Data != null && cloned.Data.CanFreeze) cloned.Data.Freeze();
-                        if (cloned.Fill != null && cloned.Fill.CanFreeze) cloned.Fill.Freeze();
-                        defaultIcons.Add(cloned);
-                    }
-                    door.Visual.Icons = defaultIcons;
-                 }
-                 else 
-                 {
-                     // Debug.WriteLine($"[Visual-Err] Default '关门' graphic not found.");
-                 }
-            }
-
-            // 3. 底部锁闭条
             var bottomBit = door.Bits
                 .Where(b => b.BitValue && b.BottomPriority > 0)
                 .OrderByDescending(b => b.BottomPriority)
                 .FirstOrDefault();
-            door.Visual.BottomBackground = bottomBit?.BottomColor ?? Brushes.Transparent;
+
+            // 4. 视觉指纹生成与比对 (核心性能防抖)
+            // 构造一个能够代表当前“展示组合”的唯一指纹
+            string currentFingerprint = $"{headerBit?.BitId ?? 0}_{imageBit?.BitId ?? 0}_{bottomBit?.BitId ?? 0}";
+            
+            // 如果指纹没变，说明最高优先级的点位组合没变，直接退出
+            if (door.LastVisualStateFingerprint == currentFingerprint) return;
+            
+            // 只有指纹变了，才执行耗性能的克隆操作
+            door.LastVisualStateFingerprint = currentFingerprint;
+
+            // 1. 头部颜色条
+            door.Visual.HeaderBackground = headerBit?.HeaderColor ?? System.Windows.Media.Brushes.Gray;
+            door.Visual.HeaderText = door.DoorName;
+
+            // 2. 中间图形
+            if (imageBit != null)
+            {
+                if (GlobalData.GraphicDictionary != null &&
+                    GlobalData.GraphicDictionary.TryGetValue(imageBit.GraphicName.Trim(), out var templates))
+                {
+                    var newIcons = new List<ControlLibrary.Models.IconItem>();
+                    foreach (var t in templates)
+                    {
+                        var cloned = t.Clone();
+                        if (cloned.Data != null && cloned.Data.CanFreeze) cloned.Data.Freeze();
+                        if (cloned.Fill != null && cloned.Fill.CanFreeze) cloned.Fill.Freeze();
+                        if (cloned.Stroke != null && cloned.Stroke.CanFreeze) cloned.Stroke.Freeze();
+                        newIcons.Add(cloned);
+                    }
+                    door.Visual.UpdateIcons(newIcons);
+                }
+                else
+                {
+                    door.Visual.UpdateIcons(null);
+                }
+            }
+            else
+            {
+                // 默认兜底逻辑：显示"关门"
+                if (GlobalData.GraphicDictionary != null && GlobalData.GraphicDictionary.TryGetValue("关门", out var defaultTemplates))
+                {
+                   var defaultIcons = new List<ControlLibrary.Models.IconItem>();
+                   foreach (var t in defaultTemplates)
+                   {
+                       var cloned = t.Clone();
+                       if (cloned.Data != null && cloned.Data.CanFreeze) cloned.Data.Freeze();
+                       if (cloned.Fill != null && cloned.Fill.CanFreeze) cloned.Fill.Freeze();
+                       defaultIcons.Add(cloned);
+                   }
+                   door.Visual.UpdateIcons(defaultIcons);
+                }
+                else
+                {
+                   door.Visual.UpdateIcons(null);
+                }
+            }
+
+            // 3. 底部锁闭条
+            door.Visual.BottomBackground = bottomBit?.BottomColor ?? System.Windows.Media.Brushes.Transparent;
             
             // 调试日志（仅在有变化或有激活点位时输出，避免刷屏）
             if (headerBit != null || imageBit != null || bottomBit != null)

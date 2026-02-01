@@ -71,6 +71,12 @@ namespace DoorMonitorSystem.Models.RunModels
         /// </summary>
         public DoorVisualResult Visual { get; set; } = new();
 
+        /// <summary>
+        /// 视觉状态指纹：用于记录上一次裁决结果的关键特征汇聚（HeaderID + ImageID + BottomID）
+        /// 如果指纹未变，则无需重新克隆图形和触发 UI 刷新，极大降低 CPU 占用。
+        /// </summary>
+        public string LastVisualStateFingerprint { get; set; } = "";
+
         #endregion
 
         #region 交互属性

@@ -19,6 +19,12 @@ namespace DoorMonitorSystem.Models.ConfigEntity.Door
         [Required, StringLength(100)]
         public string Description { get; set; } = "";
 
+        /// <summary>字节偏移量 (相对于门的起始地址)</summary>
+        public int ByteOffset { get; set; }
+
+        /// <summary>位索引 (0-7)</summary>
+        public int BitIndex { get; set; }
+
         /// <summary>点位分类ID（关联 BitCategory 表，用于弹窗分栏显示）</summary>
         public int? CategoryId { get; set; }
 
@@ -48,6 +54,9 @@ namespace DoorMonitorSystem.Models.ConfigEntity.Door
         /// <summary>图形名称（从全局图形字典获取，图形包含完整颜色信息）</summary>
         [StringLength(50)]
         public string GraphicName { get; set; } = "";
+
+        /// <summary>日志类型 (1=普通记录, 2=报警记录)</summary>
+        public int LogTypeId { get; set; } = 1;
 
         /// <summary>排序序号</summary>
         public int SortOrder { get; set; }

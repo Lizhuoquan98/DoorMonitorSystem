@@ -15,11 +15,35 @@ namespace DoorMonitorSystem.Models.RunModels
     /// </summary>
     public class DoorVisualResult : NotifyPropertyChanged
     {
-        private List<IconItem> _icons = new();
-        public List<IconItem> Icons
+        private ObservableCollection<IconItem> _icons = new();
+        /// <summary>
+        /// 中间图形集合。
+        /// 注意：UI 绑定此集合，应尽量避免直接重新赋值，而是使用 UpdateIcons 进行增量更新。
+        /// </summary>
+        public ObservableCollection<IconItem> Icons
         {
             get => _icons;
             set { _icons = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>
+        /// 增量更新图标集合，避免 UI 全量重建
+        /// </summary>
+        public void UpdateIcons(List<IconItem> newItems)
+        {
+            if (newItems == null)
+            {
+                if (Icons.Count > 0) Icons.Clear();
+                return;
+            }
+
+            // 如果数量或内容不一致，清空并重新填充
+            // (也可以做更复杂的 Diff 算法，但 Clear+Add 对 1-3 个图标的小集合已经足够快且稳定)
+            Icons.Clear();
+            foreach (var item in newItems)
+            {
+                Icons.Add(item);
+            }
         }
 
         private Brush _header = Brushes.LightGray;

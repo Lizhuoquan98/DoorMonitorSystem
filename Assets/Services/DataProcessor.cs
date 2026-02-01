@@ -91,8 +91,8 @@ namespace DoorMonitorSystem.Assets.Services
                 // --- 情况 D: 布尔位 ---
                 else if (dType.Contains("bit") || dType.Contains("bool")) rawObjValue = bitValue;
 
-                // 3. 执行业务流水线
-                ExecutePipeline(p, rawObjValue, bitValue);
+                // 3. 执行业务流水线 (传入协议类型用于日志分类)
+                ExecutePipeline(p, rawObjValue, bitValue, "Modbus");
             }
         }
 
@@ -139,7 +139,7 @@ namespace DoorMonitorSystem.Assets.Services
                 }
                 else if (dType.Contains("bit") || dType.Contains("bool")) rawObjValue = bitValue;
 
-                ExecutePipeline(p, rawObjValue, bitValue);
+                ExecutePipeline(p, rawObjValue, bitValue, "S7");
             }
         }
 
@@ -147,27 +147,67 @@ namespace DoorMonitorSystem.Assets.Services
         /// 统一业务决策流水线：
         /// 数据解析出来后，必须按顺序下达三个指令
         /// </summary>
-        private void ExecutePipeline(DevicePointConfigEntity p, object rawObjValue, bool bitValue)
+        private void ExecutePipeline(DevicePointConfigEntity p, object rawObjValue, bool bitValue, string protocol)
         {
-            // 0. 更新实时值缓存 (用于参数界面回显)
-            p.LastValue = rawObjValue;
-            
-            // 降噪：仅在开启详细调试时才打印每帧更新日志
-            if (p.UiBinding != null && GlobalData.DebugConfig != null && GlobalData.DebugConfig.Trace_Communication_Raw)
+            // 0. 变更检测 (Change Detection) - 核心性能优化
+            // 防止重复的数值反复触发 UI 更新、日志检查和同步逻辑
+            bool isChanged = false;
+
+            if (p.LastValue == null)
             {
-                 LogHelper.Debug($"[DataProc] Set LastValue for {p.UiBinding} = {rawObjValue} (ObjHash: {p.GetHashCode()})");
+                isChanged = true;
+            }
+            else
+            {
+                // 根据类型进行比对
+                if (rawObjValue is bool bVal && p.LastValue is bool bLast)
+                {
+                    isChanged = (bVal != bLast);
+                }
+                else if (rawObjValue is double dVal && p.LastValue is double dLast)
+                {
+                     // 简单浮点比对，如果需要死区应在 LogService 处理，这里仅关注是否完全一致以决定是否重绘 UI
+                     isChanged = Math.Abs(dVal - dLast) > 0.000001; 
+                }
+                else
+                {
+                    // 通用比对 (Int, String, etc)
+                    isChanged = !rawObjValue.Equals(p.LastValue);
+                }
             }
 
-            // 1. 发射到 UI DataManager：让全局画面动起来，这一步进入 UI 缓冲队列
+            // 如果数值不仅没变，而且不是第一次读取，则直接忽略，极大降低 CPU 占用
+            if (!isChanged) return;
+
+            // 1. 更新实时值缓存 (用于参数界面回显)
+            // 注意：这会触发 PropertyChanged，如果绑定了界面也会刷新
+            p.LastValue = rawObjValue;
+            
+            // 降噪与分类日志：根据协议开启对应的详细跟踪
+            bool shouldLog = false;
+            if (GlobalData.DebugConfig != null)
+            {
+                if (protocol == "S7") shouldLog = GlobalData.DebugConfig.Trace_S7_Detail;
+                else if (protocol == "Modbus") shouldLog = GlobalData.DebugConfig.Trace_Modbus_Detail;
+                else shouldLog = GlobalData.DebugConfig.Trace_Communication_Raw; // 降级到 Raw 开关
+            }
+
+            if (p.UiBinding != null && shouldLog)
+            {
+                 LogHelper.Debug($"[{protocol}] Set LastValue for {p.UiBinding} = {rawObjValue} (ObjHash: {p.GetHashCode()})");
+            }
+
+            // 2. 发射到 UI DataManager：让全局画面动起来
             DataManager.Instance.UpdatePointValue(p.TargetObjId, p.TargetBitConfigId, p.TargetType, bitValue);
 
-            // 2. 发射到转发引擎：如果点位开启了转发，则尝试操作目标设备
+            // 3. 发射到转发引擎：如果点位开启了转发，则尝试操作目标设备
             if (p.IsSyncEnabled)
             {
                 DataSyncService.SyncData(p, rawObjValue, bitValue, _runtimes, _slaves);
             }
 
-            // 3. 发射到日志引擎：评估是否变位，若满足规则则执行落盘
+            // 4. 发射到日志引擎
+            // LogService 内部也有去重逻辑，但在这里拦截可以减少方法调用开销
             LogService.Instance.ProcessLogging(p, bitValue, rawObjValue);
         }
     }

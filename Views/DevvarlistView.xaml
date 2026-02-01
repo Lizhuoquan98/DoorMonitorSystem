@@ -13,6 +13,38 @@
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
         <cvt:DataTypeToVisibilityConverter x:Key="DataTypeToVis"/>
+        <cvt:IntToBoolConverter x:Key="IntToBool"/>
+
+        <Style x:Key="BatchToggleButtonStyle" TargetType="ToggleButton">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="15,0"/>
+            <Setter Property="Background" Value="#8A2BE2"/>
+            <Setter Property="BorderBrush" Value="#9370DB"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#AA8A2BE2"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#668A2BE2"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
 
     <UserControl.DataContext>
@@ -35,7 +67,118 @@
                 </StackPanel>
                 
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">
-                    <Button Content="导出点表" Style="{StaticResource ActionButton}" Command="{Binding ExportPointsCommand}" Background="#2E8B57" BorderBrush="#3CB371" Margin="0,0,10,0"/>
+                    
+                    <!-- 批量生成工具 -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,10,0">
+                        <ToggleButton x:Name="BtnBatchGen" Content="批量生成" Style="{StaticResource BatchToggleButtonStyle}" 
+                                      IsChecked="{Binding IsBatchPopupOpen, Mode=TwoWay}"
+                                      Command="{Binding OpenBatchPopupCommand}"
+                                      Background="#8A2BE2" BorderBrush="#9370DB"/>
+                        <Popup IsOpen="{Binding IsBatchPopupOpen, Mode=TwoWay}" StaysOpen="False" PlacementTarget="{Binding ElementName=BtnBatchGen}" AllowsTransparency="True" PopupAnimation="Fade">
+                            <Border Background="#252526" BorderBrush="#3f3f46" BorderThickness="1" CornerRadius="6" Padding="15">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.5"/>
+                                </Border.Effect>
+                                <StackPanel Width="220">
+                                    <TextBlock Text="⚡ 批量生成向导" Foreground="White" FontWeight="Bold" FontSize="14" Margin="0,0,0,15"/>
+
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="10"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="10"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="10"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="生成对象:" Foreground="#BBB" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+                                            <RadioButton Content="站台门" IsChecked="{Binding BatchTargetType, Converter={StaticResource IntToBool}, ConverterParameter=0}" GroupName="G1" Foreground="White" Margin="0,0,10,0"/>
+                                            <RadioButton Content="监控面板" IsChecked="{Binding BatchTargetType, Converter={StaticResource IntToBool}, ConverterParameter=1}" GroupName="G1" Foreground="White"/>
+                                        </StackPanel>
+
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="选择站台:" Foreground="#BBB" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                        <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Stations}" SelectedItem="{Binding BatchSelectedStation}" DisplayMemberPath="StationName" Height="26"/>
+
+
+                                    </Grid>
+
+                                    <TextBlock Text="提示：基于[DoorBitConfig]模板裂变生成" Foreground="#666" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                                    
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="10"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Button Grid.Column="0" Content="⚙️ 地址映射" Command="{Binding OpenAddressMgrCommand}" Height="32" 
+                                                Background="#444" BorderThickness="0" Foreground="White" FontSize="11" Cursor="Hand"/>
+                                        <Button Grid.Column="2" Content="🚀 立即执行" Command="{Binding BatchGenerateCommand}" Height="32" 
+                                                Background="#8A2BE2" BorderThickness="0" Foreground="White" FontWeight="SemiBold" Cursor="Hand"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </Popup>
+                        
+                        <!-- 地址配置管理弹窗 (Popup Mode) -->
+                        <Popup IsOpen="{Binding IsAddressMgrOpen, Mode=TwoWay}" StaysOpen="True" Placement="Center" PlacementTarget="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type Window}}}" VerticalOffset="0" HorizontalOffset="0" AllowsTransparency="True" PopupAnimation="Fade">
+                            <Border Background="#252526" BorderBrush="#00E5FF" BorderThickness="1" CornerRadius="8" Padding="15" Width="500" Height="400">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="20" ShadowDepth="5" Opacity="0.7"/>
+                                </Border.Effect>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    
+                                    <!-- Header -->
+                                    <DockPanel Grid.Row="0" Margin="0,0,0,10" Background="Transparent">
+                                        <TextBlock Text="⚙️ 站台物理地址配置" Foreground="#00E5FF" FontWeight="Bold" FontSize="16" DockPanel.Dock="Left"/>
+                                        <Button Content="❌" Command="{Binding CloseAddressMgrCommand}" Width="20" Height="20" DockPanel.Dock="Right" HorizontalAlignment="Right"
+                                                Background="Transparent" BorderThickness="0" Foreground="Gray" ClickMode="Press"/>
+                                    </DockPanel>
+                                    
+                                    <!-- Data Grid -->
+                                    <DataGrid Grid.Row="1" ItemsSource="{Binding AddressItems}" AutoGenerateColumns="False" CanUserAddRows="False"
+                                              Background="#1E1E1E" BorderBrush="#333" RowBackground="#1E1E1E" Foreground="#DDD"
+                                              HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#333" RowHeaderWidth="0">
+                                        <DataGrid.ColumnHeaderStyle>
+                                            <Style TargetType="DataGridColumnHeader">
+                                                <Setter Property="Background" Value="#333"/>
+                                                <Setter Property="Foreground" Value="White"/>
+                                                <Setter Property="Padding" Value="5"/>
+                                                <Setter Property="BorderThickness" Value="0,0,1,0"/>
+                                                <Setter Property="BorderBrush" Value="#555"/>
+                                            </Style>
+                                        </DataGrid.ColumnHeaderStyle>
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="ID" Binding="{Binding SortOrder}" Width="40" IsReadOnly="True" Foreground="#888"/>
+                                            <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="*" IsReadOnly="True" FontWeight="Bold"/>
+                                            <DataGridTextColumn Header="起始偏移(Byte)" Binding="{Binding ByteStartAddr, UpdateSourceTrigger=PropertyChanged}" Width="100"/>
+                                            <DataGridTextColumn Header="长度(Byte)" Binding="{Binding ByteLength, UpdateSourceTrigger=PropertyChanged}" Width="80"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                    
+                                    <!-- Footer -->
+                                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+                                        <TextBlock Text="设置特定对象的起始偏移，为0则使用批量计算" Foreground="#666" FontSize="10" VerticalAlignment="Center" Margin="0,0,20,0"/>
+                                        <Button Content="保存配置" Command="{Binding SaveAddressConfigCommand}" Width="100" Height="30"
+                                                Background="#007ACC" Foreground="White" BorderThickness="0"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Popup>
+                    </StackPanel>
+                        
+
                     <Button Content="导入点表" Style="{StaticResource ActionButton}" Command="{Binding ImportPointsCommand}" Background="#CD853F" BorderBrush="#D2691E" Margin="0,0,10,0"/>
                     <Button Content="刷新列表" Style="{StaticResource ActionButton}" Command="{Binding LoadDevicesCommand}" Margin="0,0,10,0"/>
                     <Button Content="修改点位" Style="{StaticResource ActionButton}" Command="{Binding StartEditCommand}" Background="#1E90FF" BorderBrush="#1C86EE" Margin="0,0,10,0"/>
@@ -357,5 +500,6 @@
                 <DataGridTextColumn Header="备注" Binding="{Binding Description}" Width="*"/>
             </DataGrid.Columns>
         </DataGrid>
+
     </Grid>
 </UserControl>
