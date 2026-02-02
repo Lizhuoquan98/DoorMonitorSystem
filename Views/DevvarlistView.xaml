@@ -5,501 +5,853 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:DoorMonitorSystem.Views"
              xmlns:vm="clr-namespace:DoorMonitorSystem.ViewModels"
+             xmlns:ui="clr-namespace:DoorMonitorSystem.Models.Ui"
              xmlns:cvt="clr-namespace:DoorMonitorSystem.Assets.Converters"
              xmlns:sys="clr-namespace:System;assembly=mscorlib"
              mc:Ignorable="d" 
-             d:DesignHeight="700" d:DesignWidth="1100">
-    
+             d:DesignHeight="800" d:DesignWidth="1200"
+             d:DataContext="{d:DesignInstance vm:DevvarlistViewModel, IsDesignTimeCreatable=False}"
+             Background="#0F0F12">
+
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
         <cvt:DataTypeToVisibilityConverter x:Key="DataTypeToVis"/>
         <cvt:IntToBoolConverter x:Key="IntToBool"/>
 
-        <Style x:Key="BatchToggleButtonStyle" TargetType="ToggleButton">
-            <Setter Property="Height" Value="30"/>
-            <Setter Property="Padding" Value="15,0"/>
-            <Setter Property="Background" Value="#8A2BE2"/>
-            <Setter Property="BorderBrush" Value="#9370DB"/>
-            <Setter Property="Foreground" Value="White"/>
+        <!-- 🎨 Premium Color System -->
+        <Color x:Key="WindowBackgroundColor">#0F0F12</Color>
+        <Color x:Key="CardBackgroundColor">#1C1C21</Color>
+        <Color x:Key="ControlBackgroundColor">#2C2C34</Color>
+        <Color x:Key="PrimaryColor">#58A6FF</Color> 
+        <Color x:Key="PrimaryHoverColor">#79BBFF</Color>
+        <Color x:Key="AccentPurple">#A371F7</Color> 
+        <Color x:Key="DangerColor">#FF6B6B</Color>
+        <Color x:Key="SuccessColor">#4ADE80</Color>
+        <Color x:Key="TextPrimaryColor">#F0F6FC</Color>
+        <Color x:Key="TextSecondaryColor">#8B949E</Color>
+        <Color x:Key="BorderBrushColor">#30363D</Color>
+
+        <SolidColorBrush x:Key="WindowBackgroundBrush" Color="{StaticResource WindowBackgroundColor}"/>
+        <SolidColorBrush x:Key="CardBackgroundBrush" Color="{StaticResource CardBackgroundColor}"/>
+        <SolidColorBrush x:Key="ControlBackgroundBrush" Color="{StaticResource ControlBackgroundColor}"/>
+        <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource PrimaryColor}"/>
+        <SolidColorBrush x:Key="AccentPurpleBrush" Color="{StaticResource AccentPurple}"/>
+        <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}"/>
+        <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}"/>
+        <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}"/>
+        <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderBrushColor}"/>
+        <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}"/>
+
+        <DropShadowEffect x:Key="CardShadow" BlurRadius="20" ShadowDepth="2" Opacity="0.3" Color="Black"/>
+        
+        <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+        </Style>
+
+        <Style x:Key="LabelText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Margin" Value="2,0,0,4"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style x:Key="CardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="15"/>
+            <Setter Property="Effect" Value="{StaticResource CardShadow}"/>
+        </Style>
+
+        <Style x:Key="ModernButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource ControlBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="ToggleButton">
-                        <Border x:Name="Border"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" CornerRadius="6" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Border" Property="Background" Value="#AA8A2BE2"/>
-                            </Trigger>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Border" Property="Background" Value="#668A2BE2"/>
-                                <Setter TargetName="Border" Property="BorderBrush" Value="White"/>
-                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="border" Property="Background" Value="#3F3F46"/></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
-    </UserControl.Resources>
 
-    <UserControl.DataContext>
-        <vm:DevvarlistViewModel/>
-    </UserControl.DataContext>
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ModernButtonStyle}">
+            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
 
-    <Grid Margin="10">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+        <Style x:Key="PrimaryToggleButtonStyle" TargetType="ToggleButton">
+            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="border" CornerRadius="6" Background="{TemplateBinding Background}">
+                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
-        <!-- 1. 顶部：设备选择 -->
-        <Border Grid.Row="0" Margin="0,0,0,10" Padding="10" Background="#11FFFFFF" CornerRadius="5" BorderBrush="#33FFFFFF" BorderThickness="1">
-            <DockPanel>
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                    <TextBlock Text="当前设备：" VerticalAlignment="Center" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,10,0"/>
-                    <ComboBox Width="200" ItemsSource="{Binding Devices}" SelectedItem="{Binding SelectedDevice}" DisplayMemberPath="Name" Height="28"/>
-                </StackPanel>
-                
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">
-                    
-                    <!-- 批量生成工具 -->
-                    <StackPanel Orientation="Horizontal" Margin="0,0,10,0">
-                        <ToggleButton x:Name="BtnBatchGen" Content="批量生成" Style="{StaticResource BatchToggleButtonStyle}" 
-                                      IsChecked="{Binding IsBatchPopupOpen, Mode=TwoWay}"
-                                      Command="{Binding OpenBatchPopupCommand}"
-                                      Background="#8A2BE2" BorderBrush="#9370DB"/>
-                        <Popup IsOpen="{Binding IsBatchPopupOpen, Mode=TwoWay}" StaysOpen="False" PlacementTarget="{Binding ElementName=BtnBatchGen}" AllowsTransparency="True" PopupAnimation="Fade">
-                            <Border Background="#252526" BorderBrush="#3f3f46" BorderThickness="1" CornerRadius="6" Padding="15">
-                                <Border.Effect>
-                                    <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.5"/>
-                                </Border.Effect>
-                                <StackPanel Width="220">
-                                    <TextBlock Text="⚡ 批量生成向导" Foreground="White" FontWeight="Bold" FontSize="14" Margin="0,0,0,15"/>
+        <Style x:Key="EditorSectionBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="#10FFFFFF"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="12"/>
+        </Style>
 
-                                    <Grid Margin="0,0,0,10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="10"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="10"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="10"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-
-                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="生成对象:" Foreground="#BBB" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
-                                            <RadioButton Content="站台门" IsChecked="{Binding BatchTargetType, Converter={StaticResource IntToBool}, ConverterParameter=0}" GroupName="G1" Foreground="White" Margin="0,0,10,0"/>
-                                            <RadioButton Content="监控面板" IsChecked="{Binding BatchTargetType, Converter={StaticResource IntToBool}, ConverterParameter=1}" GroupName="G1" Foreground="White"/>
-                                        </StackPanel>
-
-                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="选择站台:" Foreground="#BBB" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                        <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Stations}" SelectedItem="{Binding BatchSelectedStation}" DisplayMemberPath="StationName" Height="26"/>
-
-
-                                    </Grid>
-
-                                    <TextBlock Text="提示：基于[DoorBitConfig]模板裂变生成" Foreground="#666" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,10"/>
-                                    
-                                    <Grid Margin="0,10,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="10"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Button Grid.Column="0" Content="⚙️ 地址映射" Command="{Binding OpenAddressMgrCommand}" Height="32" 
-                                                Background="#444" BorderThickness="0" Foreground="White" FontSize="11" Cursor="Hand"/>
-                                        <Button Grid.Column="2" Content="🚀 立即执行" Command="{Binding BatchGenerateCommand}" Height="32" 
-                                                Background="#8A2BE2" BorderThickness="0" Foreground="White" FontWeight="SemiBold" Cursor="Hand"/>
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
-                        </Popup>
-                        
-                        <!-- 地址配置管理弹窗 (Popup Mode) -->
-                        <Popup IsOpen="{Binding IsAddressMgrOpen, Mode=TwoWay}" StaysOpen="True" Placement="Center" PlacementTarget="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type Window}}}" VerticalOffset="0" HorizontalOffset="0" AllowsTransparency="True" PopupAnimation="Fade">
-                            <Border Background="#252526" BorderBrush="#00E5FF" BorderThickness="1" CornerRadius="8" Padding="15" Width="500" Height="400">
-                                <Border.Effect>
-                                    <DropShadowEffect BlurRadius="20" ShadowDepth="5" Opacity="0.7"/>
-                                </Border.Effect>
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-                                    
-                                    <!-- Header -->
-                                    <DockPanel Grid.Row="0" Margin="0,0,0,10" Background="Transparent">
-                                        <TextBlock Text="⚙️ 站台物理地址配置" Foreground="#00E5FF" FontWeight="Bold" FontSize="16" DockPanel.Dock="Left"/>
-                                        <Button Content="❌" Command="{Binding CloseAddressMgrCommand}" Width="20" Height="20" DockPanel.Dock="Right" HorizontalAlignment="Right"
-                                                Background="Transparent" BorderThickness="0" Foreground="Gray" ClickMode="Press"/>
-                                    </DockPanel>
-                                    
-                                    <!-- Data Grid -->
-                                    <DataGrid Grid.Row="1" ItemsSource="{Binding AddressItems}" AutoGenerateColumns="False" CanUserAddRows="False"
-                                              Background="#1E1E1E" BorderBrush="#333" RowBackground="#1E1E1E" Foreground="#DDD"
-                                              HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#333" RowHeaderWidth="0">
-                                        <DataGrid.ColumnHeaderStyle>
-                                            <Style TargetType="DataGridColumnHeader">
-                                                <Setter Property="Background" Value="#333"/>
-                                                <Setter Property="Foreground" Value="White"/>
-                                                <Setter Property="Padding" Value="5"/>
-                                                <Setter Property="BorderThickness" Value="0,0,1,0"/>
-                                                <Setter Property="BorderBrush" Value="#555"/>
-                                            </Style>
-                                        </DataGrid.ColumnHeaderStyle>
-                                        <DataGrid.Columns>
-                                            <DataGridTextColumn Header="ID" Binding="{Binding SortOrder}" Width="40" IsReadOnly="True" Foreground="#888"/>
-                                            <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="*" IsReadOnly="True" FontWeight="Bold"/>
-                                            <DataGridTextColumn Header="起始偏移(Byte)" Binding="{Binding ByteStartAddr, UpdateSourceTrigger=PropertyChanged}" Width="100"/>
-                                            <DataGridTextColumn Header="长度(Byte)" Binding="{Binding ByteLength, UpdateSourceTrigger=PropertyChanged}" Width="80"/>
-                                        </DataGrid.Columns>
-                                    </DataGrid>
-                                    
-                                    <!-- Footer -->
-                                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
-                                        <TextBlock Text="设置特定对象的起始偏移，为0则使用批量计算" Foreground="#666" FontSize="10" VerticalAlignment="Center" Margin="0,0,20,0"/>
-                                        <Button Content="保存配置" Command="{Binding SaveAddressConfigCommand}" Width="100" Height="30"
-                                                Background="#007ACC" Foreground="White" BorderThickness="0"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-                        </Popup>
-                    </StackPanel>
-                        
-
-                    <Button Content="导入点表" Style="{StaticResource ActionButton}" Command="{Binding ImportPointsCommand}" Background="#CD853F" BorderBrush="#D2691E" Margin="0,0,10,0"/>
-                    <Button Content="刷新列表" Style="{StaticResource ActionButton}" Command="{Binding LoadDevicesCommand}" Margin="0,0,10,0"/>
-                    <Button Content="修改点位" Style="{StaticResource ActionButton}" Command="{Binding StartEditCommand}" Background="#1E90FF" BorderBrush="#1C86EE" Margin="0,0,10,0"/>
-                    <Button Content="删除点位" Style="{StaticResource ActionButton}" Command="{Binding DeletePointCommand}" Background="#AA3333" BorderBrush="#FF4444"/>
-                </StackPanel>
-            </DockPanel>
-        </Border>
-
-        <!-- 2. 中部：添加/编辑表单 (分组布局) -->
-        <Border Grid.Row="1" Margin="0,0,0,10" Padding="10" Background="#11FFFFFF" CornerRadius="5" BorderBrush="#33FFFFFF" BorderThickness="1">
-            <Grid>
-           
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/> <!-- Title -->
-                    <RowDefinition Height="Auto"/> <!-- Groups -->
-                </Grid.RowDefinitions>
-
-                <TextBlock Text="新增点位配置 (New Point Config)"  FontSize="14" FontWeight="Bold" Foreground="#DDD" Margin="0,0,0,10"/>
-
-                <!-- 1行6列横向布局 - 内部也横向压扁 -->
-                <Grid Grid.Row="1"  Margin="0,0,0,5" HorizontalAlignment="Left" VerticalAlignment="Center">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/> <!-- Source -->
-                        <ColumnDefinition Width="Auto"/> <!-- Processing -->
-                        <ColumnDefinition Width="Auto"/> <!-- Binding -->
-                        <ColumnDefinition Width="Auto"/> <!-- Sync -->
-                        <ColumnDefinition Width="Auto"/> <!-- Log -->
-                        <ColumnDefinition Width="Auto"/> <!-- Button -->
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Col 0: 基础信息 -->
-                    <GroupBox Header="基础信息 (Source)" Grid.Column="0" Margin="0,0,5,0" Foreground="#AAA" BorderBrush="#44FFFFFF" VerticalAlignment="Stretch">
-                        <StackPanel Orientation="Horizontal" Margin="5" VerticalAlignment="Center">
-                            <StackPanel Margin="0,0,5,0" Width="80">
-                                <TextBlock Text="地址" Foreground="#888" FontSize="10"/>
-                                <TextBox Text="{Binding NewPoint.Address}" ToolTip="例如: 40001"/>
-                            </StackPanel>
-                            <StackPanel Margin="0,0,5,0" Width="30">
-                                <TextBlock Text="位" Foreground="#888" FontSize="10"/>
-                                <TextBox Text="{Binding NewPoint.BitIndex}"/>
-                            </StackPanel>
-                            <StackPanel Margin="0,0,5,0" Width="65">
-                                <TextBlock Text="类型" Foreground="#888" FontSize="10"/>
-                                <ComboBox Text="{Binding NewPoint.DataType}" IsEditable="True">
-                                    <ComboBoxItem Content="Bool"/>
-                                    <ComboBoxItem Content="Word"/>
-                                    <ComboBoxItem Content="Int16"/>
-                                    <ComboBoxItem Content="UInt16"/>
-                                    <ComboBoxItem Content="Real"/>
-                                    <ComboBoxItem Content="Float"/>
-                                    <ComboBoxItem Content="DWord"/>
-                                </ComboBox>
-                            </StackPanel>
-                            <StackPanel >
-                                <TextBlock Text="备注" Width="200" Foreground="#888" FontSize="10"/>
-                                <TextBox Text="{Binding NewPoint.Description}"/>
-                            </StackPanel>
-                        </StackPanel>
-                    </GroupBox>
-
-                    <!-- Col 1: 业务处理 -->
-                    <GroupBox Header="业务处理 (Processing)" Grid.Column="1" Margin="0,0,5,0" Foreground="#AAA" BorderBrush="#44FFFFFF" VerticalAlignment="Stretch">
-                        <StackPanel Orientation="Horizontal" Margin="5" VerticalAlignment="Center">
-                            <!-- 模拟量配置 (Analog) -->
-                            <StackPanel Orientation="Horizontal" Visibility="{Binding NewPoint.DataType, Converter={StaticResource DataTypeToVis}, ConverterParameter=Analog}">
-                                <StackPanel Margin="0,0,5,0" Width="50">
-                                    <TextBlock Text="高限" Foreground="#888" FontSize="10"/>
-                                    <TextBox Text="{Binding NewPoint.HighLimit}"/>
-                                </StackPanel>
-                                <StackPanel Width="50">
-                                    <TextBlock Text="低限" Foreground="#888" FontSize="10"/>
-                                    <TextBox Text="{Binding NewPoint.LowLimit}"/>
-                                </StackPanel>
-                            </StackPanel>
-
-                            <!-- 开关量配置 (Boolean) -->
-                            <StackPanel Orientation="Horizontal" Visibility="{Binding NewPoint.DataType, Converter={StaticResource DataTypeToVis}, ConverterParameter=Bool}">
-                                <StackPanel Margin="0,0,5,0" Width="50">
-                                    <TextBlock Text="0显示" Foreground="#888" FontSize="10"/>
-                                    <TextBox Text="{Binding NewPoint.State0Desc}"/>
-                                </StackPanel>
-                                <StackPanel Margin="0,0,5,0" Width="50">
-                                    <TextBlock Text="1显示" Foreground="#888" FontSize="10"/>
-                                    <TextBox Text="{Binding NewPoint.State1Desc}"/>
-                                </StackPanel>
-                                <StackPanel Width="50">
-                                    <TextBlock Text="报警值" Foreground="#888" FontSize="10"/>
-                                    <ComboBox SelectedValue="{Binding NewPoint.AlarmTargetValue}" SelectedValuePath="Tag">
-                                        <ComboBoxItem Content="无" Tag="{x:Null}"/>
-                                        <ComboBoxItem Content="0">
-                                            <ComboBoxItem.Tag>
-                                                <sys:Int32>0</sys:Int32>
-                                            </ComboBoxItem.Tag>
-                                        </ComboBoxItem>
-                                        <ComboBoxItem Content="1">
-                                            <ComboBoxItem.Tag>
-                                                <sys:Int32>1</sys:Int32>
-                                            </ComboBoxItem.Tag>
-                                        </ComboBoxItem>
-                                    </ComboBox>
-                                </StackPanel>
-                            </StackPanel>
-                        </StackPanel>
-                    </GroupBox>
-
-                    <!-- Col 2: 关联目标 -->
-                    <GroupBox Header="关联目标 (Binding)" Grid.Column="2" Margin="0,0,5,0" Foreground="#AAA" BorderBrush="#44FFFFFF" VerticalAlignment="Stretch">
-                        <StackPanel Orientation="Horizontal" Margin="5" VerticalAlignment="Center">
-                            <!-- 自动关联信息展示 (只读) -->
-                            <StackPanel Margin="0,0,5,0" VerticalAlignment="Center">
-                                <TextBlock Text="已关联逻辑键 (Auto-Bound)" Foreground="#666" FontSize="10"/>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding NewPoint.UiBinding, TargetNullValue='-'}" Foreground="#4CAF50" FontWeight="Bold" Margin="0,0,5,0"/>
-                                    <TextBlock Text="[" Foreground="#888"/>
-                                    <TextBlock Text="{Binding NewPoint.BindingRole}" Foreground="#2196F3"/>
-                                    <TextBlock Text="]" Foreground="#888"/>
-                                </StackPanel>
-                            </StackPanel>
-
-                            <ToggleButton x:Name="BtnSelectPoint" Content="选择对象" Width="60" Height="34" Margin="0,0,5,0" VerticalAlignment="Bottom"
-                                          Background="#22FFFFFF" Foreground="White" BorderBrush="#44FFFFFF" Command="{Binding LoadTreeCommand}"/>
-                            
-                            <Popup IsOpen="{Binding IsPopupOpen}" StaysOpen="False" PlacementTarget="{Binding ElementName=BtnSelectPoint}">
-                                <Border Background="#1e1e1e" BorderBrush="#555" BorderThickness="1" MaxHeight="400" Width="350" Padding="5">
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                        <TreeView ItemsSource="{Binding SelectorTree}" Background="Transparent" BorderThickness="0">
-                                            <TreeView.ItemTemplate>
-                                                <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                                                    <StackPanel Orientation="Horizontal">
-                                                        <!-- Icon/Type Indicator could be added here -->
-                                                        <TextBlock Text="{Binding Name}" Foreground="White" Margin="2" ToolTip="{Binding FullDescription}">
-                                                            <TextBlock.InputBindings>
-                                                                <MouseBinding Gesture="LeftDoubleClick" Command="{Binding DataContext.SelectNodeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"/>
-                                                            </TextBlock.InputBindings>
-                                                        </TextBlock>
-                                                    </StackPanel>
-                                                </HierarchicalDataTemplate> 
-                                            </TreeView.ItemTemplate>
-                                        <TreeView.ItemContainerStyle>
-                                            <Style TargetType="TreeViewItem">
-                                                <Setter Property="IsExpanded" Value="False"/>
-                                                <Setter Property="Foreground" Value="White"/>
-                                            </Style>
-                                        </TreeView.ItemContainerStyle>
-                                    </TreeView>
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="#25252B"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Height" Value="35"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton" 
+                                          Background="{TemplateBinding Background}" 
+                                          BorderBrush="{TemplateBinding BorderBrush}" 
+                                          BorderThickness="{TemplateBinding BorderThickness}"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          Grid.ColumnSpan="2"
+                                          Cursor="Hand">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4">
+                                            <Grid HorizontalAlignment="Right" Width="30">
+                                                <Path x:Name="Arrow" Data="M0,0 L4,4 L8,0" Stroke="White" StrokeThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Border" Property="Background" Value="#3F3F46"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <ContentPresenter x:Name="ContentSite" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}"
+                                            ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                            ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                            Margin="{TemplateBinding Padding}"
+                                            VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+                            <Popup x:Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
+                                <Border x:Name="DropDownBorder" Background="#2C2C34" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="4" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="300">
+                                    <ScrollViewer SnapsToDevicePixels="True">
+                                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
                                     </ScrollViewer>
                                 </Border>
                             </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
-                            <Button Content="X" Width="40" Height="34" Style="{StaticResource ActionButton}" Background="#333" BorderBrush="#555" VerticalAlignment="Bottom"
-                                    Command="{Binding ClearBindingCommand}" Margin="0,0,5,0" ToolTip="清除绑定"/>
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="#2C2C34"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource ControlBackgroundBrush}"/>
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
 
-                            <!-- 简化的绑定状态显示 -->
-                            <Border Background="#11FFFFFF" CornerRadius="3" Padding="2" VerticalAlignment="Bottom" Height="34" MinWidth="80">
-                                <Grid VerticalAlignment="Center" HorizontalAlignment="Center">
-                                     <TextBlock Text="未绑定" Foreground="#666" FontStyle="Italic" FontSize="10"
-                                                Visibility="{Binding NewPoint.TargetType, Converter={StaticResource DataTypeToVis}, ConverterParameter=Analog}"/> 
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="#25252B"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="CaretBrush" Value="White"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="4">
+                            <Grid Margin="{TemplateBinding Padding}">
+                                <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True"><Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/></Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter TargetName="bd" Property="Opacity" Value="0.4"/></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
-                                    <StackPanel Orientation="Horizontal">
-                                        <StackPanel.Style>
-                                            <Style TargetType="StackPanel">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding NewPoint.TargetType}" Value="None">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </StackPanel.Style>
-                                        
-                                        <TextBlock Text="{Binding NewPoint.TargetType}" Foreground="#44FF44" FontWeight="Bold" FontSize="10" Margin="0,0,3,0"/>
-                                        <TextBlock Text="{Binding NewPoint.TargetObjId}" Foreground="White" FontSize="10"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-                        </StackPanel>
-                    </GroupBox>
+        <Style x:Key="ModernDataGridStyle" TargetType="DataGrid">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="RowBackground" Value="Transparent"/>
+            <Setter Property="AlternatingRowBackground" Value="#05FFFFFF"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="GridLinesVisibility" Value="None"/>
+            <Setter Property="RowHeight" Value="38"/>
+        </Style>
+        
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
 
-                    <!-- Col 3: 同步转发 -->
-                    <GroupBox Header="同步转发 (Sync)" Grid.Column="3" Margin="0,0,5,0" Foreground="#AAA" BorderBrush="#44FFFFFF" VerticalAlignment="Stretch">
-                        <StackPanel Orientation="Horizontal" Margin="5" VerticalAlignment="Center">
-                             <CheckBox Content="开启" IsChecked="{Binding NewPoint.IsSyncEnabled}" Foreground="White" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                             
-                             <StackPanel Orientation="Horizontal" IsEnabled="{Binding NewPoint.IsSyncEnabled}" VerticalAlignment="Center">
-                                 <StackPanel Margin="0,0,5,0"  >
-                                     <TextBlock Text="目标设备" Foreground="#888" FontSize="10"/>
-                                     <ComboBox ItemsSource="{Binding Devices}" SelectedValue="{Binding NewPoint.SyncTargetDeviceId}"  Width="150"  SelectedValuePath="ID" DisplayMemberPath="Name"/>
-                                 </StackPanel>
-                                 
-                                 <StackPanel Margin="0,0,5,0" >
-                                     <TextBlock Text="地址.位" Foreground="#888" FontSize="10"/>
-                                     <Grid>
-                                         <Grid.ColumnDefinitions>
-                                             <ColumnDefinition Width="*"/>
-                                             <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                         </Grid.ColumnDefinitions>
-                                         <TextBox Grid.Column="0" Width="50"  Text="{Binding NewPoint.SyncTargetAddress}"/>
-                                         <TextBlock Grid.Column="1" Text="." Foreground="White" VerticalAlignment="Bottom" Margin="1,0"/>
-                                        <TextBox Grid.Column="2" Width="30" Text="{Binding NewPoint.SyncTargetBitIndex}"/>
-                                     </Grid>
-                                 </StackPanel>
-                                 
-                                 <StackPanel  >
-                                     <TextBlock Text="模式" Foreground="#888" FontSize="10"/>
-                                     <ComboBox SelectedIndex="{Binding NewPoint.SyncMode}">
-                                         <ComboBoxItem Content="直接"/>
-                                         <ComboBoxItem Content="取反"/>
-                                     </ComboBox>
-                                 </StackPanel>
-                             </StackPanel>
-                        </StackPanel>
-                    </GroupBox>
+        <Style TargetType="DataGridCell">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DataGridCell">
+                        <Border Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
+                            <ContentPresenter VerticalAlignment="Center" Margin="10,0"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#2558A6FF"/>
+                    <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
 
-                    <!-- Col 4: 日志 -->
-                    <GroupBox Header="日志 (Log)" Grid.Column="4" Margin="0,0,5,0" Foreground="#AAA" BorderBrush="#44FFFFFF" VerticalAlignment="Stretch">
-                        <StackPanel Orientation="Horizontal" Margin="5" VerticalAlignment="Center">
-                            <CheckBox Content="开启" IsChecked="{Binding NewPoint.IsLogEnabled}" Foreground="White" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                            
-                            <StackPanel Orientation="Horizontal" IsEnabled="{Binding NewPoint.IsLogEnabled}" VerticalAlignment="Center">
-                                <StackPanel Margin="0,0,5,0" Width="70">
-                                    <TextBlock Text="类型" Foreground="#888" FontSize="10"/>
-                                    <ComboBox SelectedValue="{Binding NewPoint.LogTypeId}" SelectedValuePath="Tag">
-                                        <ComboBoxItem Content="一般">
-                                            <ComboBoxItem.Tag>
-                                                <sys:Int32>1</sys:Int32>
-                                            </ComboBoxItem.Tag>
-                                        </ComboBoxItem>
-                                        <ComboBoxItem Content="报警">
-                                            <ComboBoxItem.Tag>
-                                                <sys:Int32>2</sys:Int32>
-                                            </ComboBoxItem.Tag>
-                                        </ComboBoxItem>
-                                    </ComboBox>
-                                </StackPanel>
-                                
-                                <StackPanel Width="80">
-                                    <TextBlock Text="消息" Foreground="#888" FontSize="10"/>
-                                    <TextBox Text="{Binding NewPoint.LogMessage}" ToolTip="{}{Value}占位符"/>
-                                </StackPanel>
-                                <StackPanel Margin="5,0,0,0" Width="80">
-                                    <TextBlock Text="分组" Foreground="#888" FontSize="10"/>
-                                    <TextBox Text="{Binding NewPoint.Category}" ToolTip="用于过滤"/>
-                                </StackPanel>
-                                <StackPanel Margin="5,0,0,0" Width="40" Visibility="{Binding NewPoint.DataType, Converter={StaticResource DataTypeToVis}, ConverterParameter=Analog}">
-                                    <TextBlock Text="阈值" Foreground="#888" FontSize="10"/>
-                                    <TextBox Text="{Binding NewPoint.LogDeadband}" ToolTip="记录死区"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </StackPanel>
-                    </GroupBox>
+    <Grid>
+        <!-- 🔹 Main Layout Layer -->
+        <Grid Margin="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- Header -->
+                <RowDefinition Height="*"/>    <!-- List -->
+            </Grid.RowDefinitions>
 
-                <!-- Col 5: 添加/保存按钮 -->
-                    <StackPanel Grid.Column="5" Orientation="Horizontal" VerticalAlignment="Center" Margin="5,0,0,0">
-                        <Button Content="{Binding ActionName}" Width="50" Height="40" 
-                                Style="{StaticResource ActionButton}" Command="{Binding AddPointCommand}"/>
+            <!-- 1. 设备选择与头部控制 -->
+            <Border Grid.Row="0" Margin="0,0,0,10" Style="{StaticResource CardStyle}" Padding="15,10">
+                <DockPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Path Data="M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z" 
+                              Fill="{StaticResource PrimaryBrush}" Width="18" Height="18" Stretch="Uniform" Margin="0,0,12,0"/>
+                        <TextBlock Text="点位配置终端" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,25,0"/>
                         
-                        <Button Content="取消" Width="50" Height="40" Margin="5,0,0,0" Background="#333" BorderBrush="#555"
-                                Command="{Binding CancelEditCommand}">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource ActionButton}">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
+                        <Border Background="#15FFFFFF" CornerRadius="6" Padding="12,4" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="受控设备:" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,10,0"/>
+                                <ComboBox ItemsSource="{Binding Devices}" SelectedItem="{Binding SelectedDevice}" DisplayMemberPath="Name" Width="180" Height="28"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Button Command="{Binding OpenAddFormCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="20,0,0,0" Padding="15,0" Height="32">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="+" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="新增点位" VerticalAlignment="Center"/>
+                            </StackPanel>
                         </Button>
                     </StackPanel>
 
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">
+                        <Button Content="批量生成向导" Command="{Binding OpenBatchPopupCommand}" Style="{StaticResource ModernButtonStyle}" Margin="0,0,10,0"/>
+                        <Button Content="地址映射包" Command="{Binding OpenAddressMgrCommand}" Style="{StaticResource ModernButtonStyle}" Margin="0,0,10,0"/>
+                        <Separator Width="1" Height="20" Background="{StaticResource BorderBrush}" Margin="10,0"/>
+                        <Button Content="导入 Excel" Command="{Binding ImportCommand}" Style="{StaticResource ModernButtonStyle}" Margin="10,0,5,0"/>
+                        <Button Content="导出备份" Command="{Binding ExportCommand}" Style="{StaticResource ModernButtonStyle}"/>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- 2. 点位列表 (占满剩余空间) -->
+            <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="0">
+                <Grid>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <Border Background="#0AFFFFFF" Padding="15,10" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="实时点位配置列表" Foreground="{StaticResource TextPrimaryBrush}" FontSize="14" FontWeight="Bold"/>
+                            <TextBlock Text="{Binding Points.Count, StringFormat='({0} items)'}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="10,0,0,0" VerticalAlignment="Bottom"/>
+                            <Button Command="{Binding LoadPointsCommand}" Content="🔄 刷新数据" Margin="20,0,0,0" Padding="10,0" Height="24" Background="#25252B" BorderBrush="{StaticResource BorderBrush}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center" Cursor="Hand" ToolTip="从数据库重新加载所有点位配置"/>
+                        </StackPanel>
+                    </Border>
+                    <!-- 数据展示中心：实时点位配置列表 -->
+                    <DataGrid Grid.Row="1" ItemsSource="{Binding Points}" SelectedItem="{Binding SelectedPoint}" 
+                              Style="{StaticResource ModernDataGridStyle}" AutoGenerateColumns="False" 
+                              CanUserAddRows="False" CanUserSortColumns="True" IsReadOnly="True" SelectionMode="Single"
+                              ToolTip="点表信息预览（如需修改请点击右侧操作按钮）">
+                        <DataGrid.Columns>
+                            <!-- 1. 序号列：由展示模型动态分配 -->
+                            <DataGridTextColumn Header="序号" Binding="{Binding RowIndex}" Width="55" CanUserSort="True">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                                        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+
+                            <!-- 2. 物理坐标：整合地址与位偏移 (如 40001.0) -->
+                            <DataGridTemplateColumn Header="采集物理地址" Width="110" CanUserSort="False">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding FormattedAddress}" HorizontalAlignment="Center" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <!-- 3. 点位所属分类/分组 (前置显示，便于快速识别业务模块) -->
+                            <DataGridTextColumn Header="点位分类/组" Binding="{Binding Entity.Category}" Width="100" CanUserSort="False">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                                        <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+                                        <Setter Property="Opacity" Value="0.8"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+
+                            <!-- 4. 背景描述：权重微调，使其稍微变窄 -->
+                            <DataGridTextColumn Header="点位说明/备注" Binding="{Binding Entity.Description}" Width="1*" CanUserSort="False"/>
+
+                            <!-- 4. 状态字典：映射 0/1 状态的实际意义 -->
+                            <DataGridTemplateColumn Header="状态描述(0/1)" Width="120" CanUserSort="False">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                            <!-- 0状态：采用较浅的冰川青色，代表正常/就绪状态 -->
+                                            <TextBlock Text="{Binding Entity.State0Desc}" Foreground="#FF00D2FF" FontWeight="SemiBold"/>
+                                            <TextBlock Text="/" Margin="4,0" Foreground="{StaticResource BorderBrush}"/>
+                                            <!-- 1状态：采用品牌主题蓝，代表激活/转换状态 -->
+                                            <TextBlock Text="{Binding Entity.State1Desc}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <!-- 5. 模拟量阈值：看板化显示报警高低限 (上下分层) -->
+                            <!-- 6. 模拟量阈值：增加宽度以确保“预警阈值(H/L)”标题完整显示 -->
+                            <DataGridTemplateColumn Header="预警阈值(H/L)" Width="125" CanUserSort="False">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Grid VerticalAlignment="Center" Visibility="{Binding IsAnalog, Converter={StaticResource BoolToVis}}">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding AnalogHighLimitDisplay}" Foreground="#FFFF6B6B" FontSize="10" HorizontalAlignment="Center"/>
+                                                <Rectangle Height="1" Fill="{StaticResource BorderBrush}" Margin="2,1"/>
+                                                <TextBlock Text="{Binding AnalogLowLimitDisplay}" Foreground="{StaticResource PrimaryBrush}" FontSize="10" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <!-- 6. 转发逻辑：跨设备同步配置 -->
+                            <DataGridTemplateColumn Header="同步转发 (Sync)" Width="160" CanUserSort="False">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" Visibility="{Binding Entity.IsSyncEnabled, Converter={StaticResource BoolToVis}}">
+                                            <!-- 同步图标也改为品牌主题蓝 -->
+                                            <TextBlock Text="➡ " Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold"/>
+                                            <TextBlock Text="{Binding FormattedSyncTarget}" FontSize="11" VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Entity.SyncMode}" Value="1">
+                                                                <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <!-- 7. 日志配置：分列平铺显示 -->
+                            <DataGridTemplateColumn Header="日志" Width="60" CanUserSort="False">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="4" Padding="4,1" HorizontalAlignment="Center" Visibility="{Binding Entity.IsLogEnabled, Converter={StaticResource BoolToVis}}">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="#15FFFFFF"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Entity.LogTypeId}" Value="2">
+                                                            <Setter Property="Background" Value="#25FF5252"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="{Binding LogTypeDisplay}" FontSize="10">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Entity.LogTypeId}" Value="2">
+                                                                <Setter Property="Foreground" Value="White"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <!-- 8. 业务全息绑定路径 (核心业务点) -->
+                            <DataGridTemplateColumn Header="关联业务 UI 全路径" Width="2*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="🔗 " Foreground="{StaticResource AccentPurpleBrush}" FontSize="11"/>
+                                            <TextBlock Text="{Binding BindingFullPath}" VerticalAlignment="Center" FontSize="11">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding BindingFullPath}" Value="未绑定">
+                                                                <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+                                                                <Setter Property="Opacity" Value="0.4"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <!-- 9. 操作阵列 -->
+                            <DataGridTemplateColumn Header="操作" Width="110" CanUserSort="False">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                            <Button Content="修改" Command="{Binding DataContext.StartEditCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" 
+                                                    Foreground="{StaticResource PrimaryBrush}" Style="{StaticResource {x:Static ToolBar.ButtonStyleKey}}" Margin="0,0,8,0"/>
+                                            <Button Content="删除" Command="{Binding DataContext.DeletePointCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" 
+                                                    Foreground="{StaticResource DangerBrush}" Style="{StaticResource {x:Static ToolBar.ButtonStyleKey}}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
                 </Grid>
-            </Grid>
-        </Border>
+            </Border>
+        </Grid>
 
-            <!-- 3. 底部：数据列表 -->
-        <DataGrid Grid.Row="2" ItemsSource="{Binding Points}" SelectedItem="{Binding SelectedPoint}" 
-                  AutoGenerateColumns="False" CanUserAddRows="False" 
-                  CanUserSortColumns="False" IsReadOnly="True"
-                  BorderThickness="1" Background="#0Affffff" HeadersVisibility="Column">
-            <!-- 双击进入编辑模式 -->
-            <DataGrid.InputBindings>
-                <MouseBinding Gesture="LeftDoubleClick" Command="{Binding StartEditCommand}"/>
-            </DataGrid.InputBindings>
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="序号" Binding="{Binding RowIndex}" IsReadOnly="True" Width="Auto" MinWidth="40"/>
-                <DataGridTextColumn Header="地址" Binding="{Binding Address}" Width="Auto" MinWidth="60"/>
-                <DataGridTextColumn Header="位" Binding="{Binding BitIndex}" Width="Auto" MinWidth="30"/>
-                <DataGridTextColumn Header="类型" Binding="{Binding DataType}" Width="Auto" MinWidth="50"/>
+        <!-- 🔹 Popup Editor Layer (Modal) -->
+        <Grid Visibility="{Binding IsEditorVisible, Converter={StaticResource BoolToVis}}">
+            <!-- Semi-transparent Dimmer Background (Click to close) -->
+            <Button Command="{Binding CancelEditCommand}" Opacity="0.8">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="Black"/>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+            
+            <Border Style="{StaticResource CardStyle}" Width="1100" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="25">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/> <!-- Title & Close -->
+                        <RowDefinition Height="Auto"/> <!-- Main Form -->
+                        <RowDefinition Height="Auto"/> <!-- Actions -->
+                    </Grid.RowDefinitions>
 
-                <!-- 逻辑关联信息 -->
-                <DataGridTextColumn Header="逻辑键 (Key)" Binding="{Binding UiBinding}" Width="Auto" MinWidth="100"/>
-                <DataGridTextColumn Header="角色 (Role)" Binding="{Binding BindingRole}" Width="Auto" MinWidth="60"/>
-                
-                <!-- 动态/高级列 -->
-                <DataGridTextColumn Header="高限" Binding="{Binding HighLimit}" Width="Auto" MinWidth="50"/>
-                <DataGridTextColumn Header="低限" Binding="{Binding LowLimit}" Width="Auto" MinWidth="50"/>
-                <DataGridTextColumn Header="State0" Binding="{Binding State0Desc}" Width="Auto" MinWidth="60"/>
-                <DataGridTextColumn Header="State1" Binding="{Binding State1Desc}" Width="Auto" MinWidth="60"/>
-                <DataGridTextColumn Header="报警值" Binding="{Binding AlarmTargetValue}" Width="Auto" MinWidth="50"/>
-                
-                <!-- 绑定 Names -->
-                <DataGridTextColumn Header="Obj" Binding="{Binding TargetObjName}" Width="Auto" MinWidth="80"/>
-                <DataGridTextColumn Header="Cfg" Binding="{Binding TargetBitConfigName}" Width="Auto" MinWidth="80"/>
-                
-                <!-- 同步 Names -->
-                <DataGridCheckBoxColumn Header="Sync" Binding="{Binding IsSyncEnabled}" Width="Auto" MinWidth="40"/>
-                <DataGridTextColumn Header="SyncDev" Binding="{Binding SyncTargetDeviceName}" Width="Auto" MinWidth="80"/>
-                <DataGridTextColumn Header="SyncAddr" Binding="{Binding SyncTargetAddress}" Width="Auto" MinWidth="60"/>
-                <DataGridTextColumn Header="SyncBit" Binding="{Binding SyncTargetBitIndex}" Width="Auto" MinWidth="50"/>
-                <DataGridTextColumn Header="SyncMode" Binding="{Binding SyncMode}" Width="Auto" MinWidth="40"/>
-                
-                <!-- 日志 -->
-                <DataGridCheckBoxColumn Header="Log" Binding="{Binding IsLogEnabled}" Width="Auto" MinWidth="40"/>
-                <DataGridTextColumn Header="LogMsg" Binding="{Binding LogMessage}" Width="Auto" MinWidth="100"/>
-                <DataGridTextColumn Header="类型" Binding="{Binding Category}" Width="Auto" MinWidth="60"/>
-                
-                <DataGridTextColumn Header="备注" Binding="{Binding Description}" Width="*"/>
-            </DataGrid.Columns>
-        </DataGrid>
+                    <DockPanel Margin="0,0,0,20">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Width="4" Height="18" Background="{StaticResource PrimaryBrush}" CornerRadius="2" Margin="0,0,12,0"/>
+                            <TextBlock Text="{Binding ActionName, StringFormat='{}配置单元 / {0}', TargetNullValue='配置单元 / 点位维护'}" 
+                                       FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                        </StackPanel>
+                        <Button DockPanel.Dock="Right" Content="✕" Command="{Binding CancelEditCommand}" Foreground="{StaticResource TextSecondaryBrush}" Background="Transparent" BorderThickness="0" FontSize="20" HorizontalAlignment="Right" Cursor="Hand"/>
+                    </DockPanel>
 
+                    <Grid Grid.Row="1" Margin="0,0,0,25">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.2*"/> <!-- 1. Source -->
+                            <ColumnDefinition Width="15"/>
+                            <ColumnDefinition Width="1*"/>   <!-- 2. Logic -->
+                            <ColumnDefinition Width="15"/>
+                            <ColumnDefinition Width="1*"/>   <!-- 3. Binding -->
+                            <ColumnDefinition Width="15"/>
+                            <ColumnDefinition Width="0.9*"/> <!-- 4. Sync -->
+                            <ColumnDefinition Width="15"/>
+                            <ColumnDefinition Width="0.9*"/> <!-- 5. Log -->
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Section 1: Source -->
+                        <Border Grid.Column="0" Style="{StaticResource EditorSectionBorderStyle}">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,10">
+                                    <TextBlock Text="采集源 (SOURCE)" Style="{StaticResource SectionHeaderStyle}"/>
+                                    <Path Data="M12,18H6V14H12M21,14V12L12,6V10H10V6L1,12V14H3V20H21V14M19,18H5V14H19V18Z" Fill="#11FFFFFF" HorizontalAlignment="Right" Width="40" Height="40" Stretch="Uniform"/>
+                                </Grid>
+                                <UniformGrid Columns="2" Margin="0,0,0,10">
+                                    <StackPanel Margin="0,0,8,0">
+                                        <TextBlock Text="寄存器地址" Style="{StaticResource LabelText}"/>
+                                        <TextBox Text="{Binding NewPoint.Address}" Height="40"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="8,0,0,0">
+                                        <TextBlock Text="位偏移 (0-15)" Style="{StaticResource LabelText}"/>
+                                        <TextBox Text="{Binding NewPoint.BitIndex}" Height="40" HorizontalContentAlignment="Center"/>
+                                    </StackPanel>
+                                </UniformGrid>
+                                <UniformGrid Columns="2" Margin="0,0,0,10">
+                                    <StackPanel Margin="0,0,8,0">
+                                        <TextBlock Text="数据类型" Style="{StaticResource LabelText}"/>
+                                        <ComboBox SelectedValue="{Binding NewPoint.DataType}" SelectedValuePath="Content" Height="40">
+                                            <ComboBoxItem Content="Bool"/><ComboBoxItem Content="Word"/><ComboBoxItem Content="DWord"/><ComboBoxItem Content="Float"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                    <StackPanel Margin="8,0,0,0">
+                                        <TextBlock Text="功能码 (Area)" Style="{StaticResource LabelText}"/>
+                                        <TextBox Text="{Binding NewPoint.FunctionCode}" Height="40" HorizontalContentAlignment="Center"/>
+                                    </StackPanel>
+                                </UniformGrid>
+                                <UniformGrid Columns="2" Margin="0,0,0,10">
+                                    <StackPanel Margin="0,0,8,0">
+                                        <TextBlock Text="分类 (Category)" Style="{StaticResource LabelText}"/>
+                                        <TextBox Text="{Binding NewPoint.Category}" Height="40"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="8,0,0,0">
+                                        <TextBlock Text="条目标识 (UID)" Style="{StaticResource LabelText}" ToolTip="数据库唯一主键。新增时为0，系统保存后自动分配。"/>
+                                        <Border Height="40" Background="#15FFFFFF" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="4" ToolTip="这是该配置在数据库中的唯一流水号">
+                                            <TextBlock Text="{Binding NewPoint.Id}" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" HorizontalAlignment="Center" FontWeight="Bold"/>
+                                        </Border>
+                                    </StackPanel>
+                                </UniformGrid>
+                                <StackPanel>
+                                    <TextBlock Text="点位详细说明" Style="{StaticResource LabelText}"/>
+                                    <TextBox Text="{Binding NewPoint.Description}" Height="40"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Section 2: Logic -->
+                        <Border Grid.Column="2" Style="{StaticResource EditorSectionBorderStyle}">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,10">
+                                    <TextBlock Text="业务逻辑 (LOGIC)" Style="{StaticResource SectionHeaderStyle}"/>
+                                    <Path Data="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M16.2,16.2L11,13V7H12.5V12.2L17,14.9L16.2,16.2Z" Fill="#11FFFFFF" HorizontalAlignment="Right" Width="40" Height="40" Stretch="Uniform"/>
+                                </Grid>
+                                <Grid>
+                                    <StackPanel Visibility="{Binding NewPoint.DataType, Converter={StaticResource DataTypeToVis}, ConverterParameter=Analog}">
+                                        <UniformGrid Columns="2" Margin="0,0,0,12">
+                                            <StackPanel Margin="0,0,6,0">
+                                                <TextBlock Text="高限报警" Style="{StaticResource LabelText}"/>
+                                                <TextBox Text="{Binding NewPoint.HighLimit}" Foreground="{StaticResource DangerBrush}" Height="40"/>
+                                            </StackPanel>
+                                            <StackPanel Margin="6,0,0,0">
+                                                <TextBlock Text="低限报警" Style="{StaticResource LabelText}"/>
+                                                <TextBox Text="{Binding NewPoint.LowLimit}" Foreground="{StaticResource PrimaryBrush}" Height="40"/>
+                                            </StackPanel>
+                                        </UniformGrid>
+                                        <Border Background="#1558A6FF" Padding="12" CornerRadius="8" HorizontalAlignment="Stretch" Margin="0,5,0,0">
+                                            <TextBlock Text="🔍 已开启模拟量关键数值阈值监控" FontSize="11" Foreground="{StaticResource PrimaryBrush}" TextAlignment="Center"/>
+                                        </Border>
+                                    </StackPanel>
+                                    <StackPanel Visibility="{Binding NewPoint.DataType, Converter={StaticResource DataTypeToVis}, ConverterParameter=Bool}">
+                                        <UniformGrid Columns="2" Margin="0,0,0,12">
+                                            <StackPanel Margin="0,0,6,0">
+                                                <TextBlock Text="0 状态文本" Style="{StaticResource LabelText}"/>
+                                                <TextBox Text="{Binding NewPoint.State0Desc}" Height="40"/>
+                                            </StackPanel>
+                                            <StackPanel Margin="6,0,0,0">
+                                                <TextBlock Text="1 状态文本" Style="{StaticResource LabelText}"/>
+                                                <TextBox Text="{Binding NewPoint.State1Desc}" Foreground="{StaticResource SuccessBrush}" Height="40"/>
+                                            </StackPanel>
+                                        </UniformGrid>
+                                        <TextBlock Text="报警触发策略" Style="{StaticResource LabelText}"/>
+                                        <ComboBox SelectedValue="{Binding NewPoint.AlarmTargetValue}" SelectedValuePath="Tag" Height="40">
+                                            <ComboBoxItem Content="不触发报警 (无监控)" Tag="{x:Null}"/>
+                                            <ComboBoxItem Content="低电平报警 (0)" Tag="0"/>
+                                            <ComboBoxItem Content="高电平报警 (1)" Tag="1"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Section 3: Binding -->
+                        <Border Grid.Column="4" Style="{StaticResource EditorSectionBorderStyle}">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,10">
+                                    <TextBlock Text="逻辑绑定 (BINDING)" Style="{StaticResource SectionHeaderStyle}"/>
+                                    <Path Data="M10.59,13.41C11,13.8 11,14.44 10.59,14.83L8.28,17.14C7.89,17.53 7.25,17.53 6.86,17.14L4.55,14.83C4.16,14.44 4.16,13.8 4.55,13.41L5.61,12.35L6.86,13.6L6.5,13.97L8.28,15.75L10.06,13.97L9.7,13.6L10.95,12.35L12,13.41" Fill="#11FFFFFF" HorizontalAlignment="Right" Width="40" Height="40" Stretch="Uniform"/>
+                                </Grid>
+                                <StackPanel Margin="0,0,0,12">
+                                    <TextBlock Text="UI 逻辑绑定键 (UID)" Style="{StaticResource LabelText}" ToolTip="底层通讯使用的逻辑键名"/>
+                                    <Grid Margin="0,0,0,5">
+                                        <TextBox Text="{Binding NewPoint.UiBinding}" IsReadOnly="True" Height="40" Foreground="{StaticResource AccentPurpleBrush}" FontWeight="Bold" Padding="10,0,35,0" ToolTip="{Binding NewPointBindingPath}"/>
+                                        <Button Content="✕" HorizontalAlignment="Right" Command="{Binding ClearBindingCommand}" Background="Transparent" BorderThickness="0" Width="30" Foreground="{StaticResource TextSecondaryBrush}" Opacity="0.6" ToolTip="清除当前绑定"/>
+                                    </Grid>
+                                    <!-- 新增：全路径预览，解决 UID 不直观的问题 -->
+                                    <TextBlock Text="{Binding NewPointBindingPath}" FontSize="10" Foreground="{StaticResource SuccessBrush}" TextWrapping="Wrap" MaxHeight="32" ToolTip="{Binding NewPointBindingPath}"/>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,0,12">
+                                    <TextBlock Text="关联业务角色 (Role)" Style="{StaticResource LabelText}"/>
+                                    <Border Background="#15FFFFFF" Height="40" CornerRadius="6" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                        <TextBlock Text="{Binding NewPoint.BindingRole}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center" FontSize="14"/>
+                                    </Border>
+                                </StackPanel>
+                                <ToggleButton x:Name="BtnSelectPoint" IsChecked="{Binding IsPopupOpen}" 
+                                              Style="{StaticResource PrimaryToggleButtonStyle}" Height="45" Background="{StaticResource AccentPurpleBrush}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="📁" Margin="0,0,8,0" VerticalAlignment="Center" FontSize="16"/>
+                                        <TextBlock Text="浏览系统对象树" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                                <Popup IsOpen="{Binding IsPopupOpen}" StaysOpen="False" PlacementTarget="{Binding ElementName=BtnSelectPoint}" PopupAnimation="Slide" VerticalOffset="8" AllowsTransparency="True">
+                                    <Border Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource PrimaryBrush}" BorderThickness="1" MaxHeight="400" Width="450" CornerRadius="12" Padding="10" Effect="{StaticResource CardShadow}">
+                                        <TreeView ItemsSource="{Binding SelectorTree}" Background="Transparent" BorderThickness="0">
+                                            <TreeView.Resources>
+                                                <!-- 同步更新：使用重命名后的 UiSelectorNode 类型 -->
+                                                <HierarchicalDataTemplate DataType="{x:Type ui:UiSelectorNode}" ItemsSource="{Binding Children}">
+                                                    <Grid Margin="2,4">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="20"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        
+                                                        <!-- 1. Icon (Left) -->
+                                                        <Path x:Name="IconPath" Width="14" Height="14" Fill="White" Stretch="Uniform" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                                        
+                                                        <!-- 2. Select Button (Middle) -->
+                                                        <Button Grid.Column="1" Content="选择" Command="{Binding DataContext.SelectNodeCommand, RelativeSource={RelativeSource AncestorType=TreeView}}" CommandParameter="{Binding}" Margin="8,0,0,0" Height="26" Padding="12,0" FontSize="11" VerticalAlignment="Center">
+                                                            <Button.Style>
+                                                                <Style TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding NodeType}" Value="Config"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
+                                                                        <DataTrigger Binding="{Binding NodeType}" Value="Param"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Button.Style>
+                                                        </Button>
+
+                                                        <!-- 3. Text (Right) -->
+                                                        <TextBlock Grid.Column="2" Text="{Binding Name}" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="13"/>
+                                                    </Grid>
+                                                    <HierarchicalDataTemplate.Triggers>
+                                                        <!-- 🚉 Station -->
+                                                        <DataTrigger Binding="{Binding NodeType}" Value="Station">
+                                                            <Setter TargetName="IconPath" Property="Data" Value="M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z"/>
+                                                            <Setter TargetName="IconPath" Property="Fill" Value="{StaticResource PrimaryBrush}"/>
+                                                        </DataTrigger>
+                                                        <!-- 📂 Group -->
+                                                        <DataTrigger Binding="{Binding NodeType}" Value="Group">
+                                                            <Setter TargetName="IconPath" Property="Data" Value="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z"/>
+                                                            <Setter TargetName="IconPath" Property="Opacity" Value="0.7"/>
+                                                        </DataTrigger>
+                                                        <!-- 🚪 Door -->
+                                                        <DataTrigger Binding="{Binding NodeType}" Value="Door">
+                                                            <Setter TargetName="IconPath" Property="Data" Value="M19,19H5V5H19M19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M12,6H7V18H12V6M17,6H13V18H17V6"/>
+                                                        </DataTrigger>
+                                                        <!-- 📟 Panel -->
+                                                        <DataTrigger Binding="{Binding NodeType}" Value="Panel">
+                                                            <Setter TargetName="IconPath" Property="Data" Value="M21,16H3V4H21M21,2H3C1.89,2 1,2.89 1,4V16A2,2 0 0,0 3,18H10V20H8V22H16V20H14V18H21A2,2 0 0,0 23,16V4C23,2.89 22.1,2 21,2Z"/>
+                                                        </DataTrigger>
+                                                        <!-- ⚙️ Config -->
+                                                        <DataTrigger Binding="{Binding NodeType}" Value="Config">
+                                                            <Setter TargetName="IconPath" Property="Data" Value="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.35 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.35 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,13L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.04 4.95,18.95L7.44,17.95C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.95L19.05,18.95C19.27,19.04 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"/>
+                                                            <Setter TargetName="IconPath" Property="Opacity" Value="0.6"/>
+                                                        </DataTrigger>
+                                                        <!-- 💎 Param -->
+                                                        <DataTrigger Binding="{Binding NodeType}" Value="Param">
+                                                            <Setter TargetName="IconPath" Property="Data" Value="M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z"/>
+                                                            <Setter TargetName="IconPath" Property="RenderTransform">
+                                                                <Setter.Value>
+                                                                    <RotateTransform Angle="90" CenterX="7" CenterY="7"/>
+                                                                </Setter.Value>
+                                                            </Setter>
+                                                            <Setter TargetName="IconPath" Property="Width" Value="10"/>
+                                                            <Setter TargetName="IconPath" Property="Height" Value="10"/>
+                                                            <Setter TargetName="IconPath" Property="Fill" Value="{StaticResource AccentPurpleBrush}"/>
+                                                        </DataTrigger>
+                                                    </HierarchicalDataTemplate.Triggers>
+                                                </HierarchicalDataTemplate>
+                                                <Style TargetType="TreeViewItem">
+                                                    <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsSelected" Value="True">
+                                                            <Setter Property="Background" Value="#2558A6FF"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TreeView.Resources>
+                                        </TreeView>
+                                    </Border>
+                                </Popup>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Section 4: Sync -->
+                        <Border Grid.Column="6" Style="{StaticResource EditorSectionBorderStyle}">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,10">
+                                    <TextBlock Text="数据转发 (SYNC)" Style="{StaticResource SectionHeaderStyle}"/>
+                                    <Path Data="M12,4V1L8,5L12,9V6A8,8 0 0,1 20,14A8,8 0 0,1 12,22A8,8 0 0,1 4,14H2A10,10 0 0,0 12,24A10,10 0 0,0 22,14A10,10 0 0,0 12,4Z" Fill="#11FFFFFF" HorizontalAlignment="Right" Width="40" Height="40" Stretch="Uniform"/>
+                                </Grid>
+                                <CheckBox IsChecked="{Binding NewPoint.IsSyncEnabled}" Content="开启跨设备同步" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,12" FontSize="12"/>
+                                <StackPanel Visibility="{Binding NewPoint.IsSyncEnabled, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="目标设备" Style="{StaticResource LabelText}"/>
+                                    <ComboBox ItemsSource="{Binding Devices}" SelectedValue="{Binding NewPoint.SyncTargetDeviceId}" SelectedValuePath="ID" DisplayMemberPath="Name" Margin="0,0,0,10" Height="40"/>
+                                    <UniformGrid Columns="2" Margin="0,0,0,10">
+                                        <StackPanel Margin="0,0,5,0">
+                                            <TextBlock Text="写入地址" Style="{StaticResource LabelText}"/>
+                                            <TextBox Text="{Binding NewPoint.SyncTargetAddress}" Height="40"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="5,0,0,0">
+                                            <TextBlock Text="目标位" Style="{StaticResource LabelText}"/>
+                                            <TextBox Text="{Binding NewPoint.SyncTargetBitIndex}" Height="40"/>
+                                        </StackPanel>
+                                    </UniformGrid>
+                                    <TextBlock Text="同步模式" Style="{StaticResource LabelText}"/>
+                                    <ComboBox SelectedIndex="{Binding NewPoint.SyncMode}" Height="40">
+                                        <ComboBoxItem Content="直接转发"/><ComboBoxItem Content="取反同步"/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Section 5: Log -->
+                        <Border Grid.Column="8" Style="{StaticResource EditorSectionBorderStyle}">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,10">
+                                    <TextBlock Text="记录日志 (LOG)" Style="{StaticResource SectionHeaderStyle}"/>
+                                    <Path Data="M14,10H19.5L14,4.5V10M5,3H15L21,9V19A2,2 0 0,1 19,21H5C3.89,21 3,20.1 3,19V5C3,3.89 3.89,3 5,3M5,5V19H19V12H12V5H5Z" Fill="#11FFFFFF" HorizontalAlignment="Right" Width="40" Height="40" Stretch="Uniform"/>
+                                </Grid>
+                                <CheckBox IsChecked="{Binding NewPoint.IsLogEnabled}" Content="开启数据采集日志" Foreground="{StaticResource SuccessBrush}" Margin="0,0,0,12" FontSize="12"/>
+                                <StackPanel Visibility="{Binding NewPoint.IsLogEnabled, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="日志分类" Style="{StaticResource LabelText}"/>
+                                    <ComboBox ItemsSource="{Binding LogTypes}" SelectedValue="{Binding NewPoint.LogTypeId}" SelectedValuePath="Id" DisplayMemberPath="Name" Height="40" Margin="0,0,0,10" />
+                                    <TextBlock Text="触发策略" Style="{StaticResource LabelText}"/>
+                                    <ComboBox SelectedIndex="{Binding NewPoint.LogTriggerState}" Height="40" Margin="0,0,0,10">
+                                        <ComboBoxItem Content="变化(0->1)"/><ComboBoxItem Content="恢复(1->0)"/><ComboBoxItem Content="双向变化"/>
+                                    </ComboBox>
+                                    <TextBlock Text="死区/消息" Style="{StaticResource LabelText}"/>
+                                    <TextBox Text="{Binding NewPoint.LogDeadband}" Height="30" Margin="0,0,0,5" ToolTip="模拟量死区"/>
+                                    <TextBox Text="{Binding NewPoint.LogMessage}" Height="40" Opacity="0.8" Tag="自定义消息"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="放弃返回" Command="{Binding CancelEditCommand}" Style="{StaticResource ModernButtonStyle}" Width="140" Height="45" Margin="0,0,15,0" FontSize="14"/>
+                        <Button Content="{Binding ActionName}" Command="{Binding AddPointCommand}" Style="{StaticResource PrimaryButtonStyle}" Width="200" Height="45" FontSize="15"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- 🔹 Batch Generation Wizard Popup -->
+        <Grid Visibility="{Binding IsBatchPopupVisible, Converter={StaticResource BoolToVis}}">
+            <!-- Semi-transparent Dimmer Background -->
+            <Button Command="{Binding CloseBatchPopupCommand}" Opacity="0.8">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="Black"/>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+            
+            <Border Style="{StaticResource CardStyle}" Width="600" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="30">
+                <StackPanel>
+                    <!-- Header -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,25">
+                         <Path Data="M19,3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M19,19H5V5H19V19M17,17H7V7H17V17M12,9V11H10V9H12M12,13V15H10V13H12" 
+                               Fill="{StaticResource PrimaryBrush}" Width="24" Height="24" Stretch="Uniform" Margin="0,0,15,0"/>
+                         <TextBlock Text="批量生成点位配置" FontSize="20" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Config Form -->
+                    <TextBlock Text="目标设备 (PLC)" Style="{StaticResource LabelText}"/>
+                    <TextBox Text="{Binding SelectedDevice.Name, Mode=OneWay}" IsReadOnly="True" Opacity="0.6" Height="40" Margin="0,0,0,15"/>
+
+                    <UniformGrid Columns="2" Margin="0,0,0,15">
+                        <StackPanel Margin="0,0,10,0">
+                            <TextBlock Text="生成对象类型" Style="{StaticResource LabelText}"/>
+                            <ComboBox ItemsSource="{Binding BatchTargetTypes}" SelectedItem="{Binding SelectedBatchTargetType}" Height="40"/>
+                        </StackPanel>
+                        <StackPanel Margin="10,0,0,0">
+                            <!-- 所属站台 -->
+                            <TextBlock Text="所属站台" Style="{StaticResource LabelText}"/>
+                            <ComboBox ItemsSource="{Binding BatchStations}" SelectedItem="{Binding SelectedBatchStation}" DisplayMemberPath="StationName" Height="40"/>
+                        </StackPanel>
+                    </UniformGrid>
+
+
+
+                    <TextBlock Text="选择目标组 (门组/面板组)" Style="{StaticResource LabelText}" ToolTip="指定该站台下的具体业务组。"/>
+                    <ComboBox ItemsSource="{Binding BatchGroups}" SelectedItem="{Binding SelectedBatchGroup}" DisplayMemberPath="Name" Height="40" Margin="0,0,0,25"/>
+
+                    <!-- 地址计算模式：提供起始地址和步长作为模型未配置时的兜底 -->
+                    <UniformGrid Columns="2" Margin="0,0,0,25">
+                        <StackPanel Margin="0,0,10,0">
+                             <TextBlock Text="PLC 起始地址 (Start Addr)" Style="{StaticResource LabelText}" ToolTip="批量生成的物理基准。若模型已有地址配置，则以此为修正偏置。"/>
+                             <TextBox Text="{Binding BatchStartAddress}" Height="40" HorizontalContentAlignment="Center" FontSize="16" FontWeight="Bold"/>
+                        </StackPanel>
+                        <StackPanel Margin="10,0,0,0">
+                             <TextBlock Text="地址步长 (Stride)" Style="{StaticResource LabelText}" ToolTip="对象间的地址间隔（仅当模型内地址为0时生效）。"/>
+                             <TextBox Text="{Binding BatchStride}" Height="40" HorizontalContentAlignment="Center" FontSize="16" FontWeight="Bold"/>
+                        </StackPanel>
+                    </UniformGrid>
+
+                    <!-- Info -->
+                    <Border Background="#10FFFFFF" Padding="15" CornerRadius="4" Margin="0,0,0,25">
+                        <StackPanel>
+                            <TextBlock Text="💡 地址生成的规则优先级：" Foreground="{StaticResource SuccessBrush}" FontWeight="Bold" Margin="0,0,0,5"/>
+                            <TextBlock Text="1. 优先：若模型已配置地址，则 实际地址 = [PLC起始地址] + [模型地址] + [模板位偏移]。" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,3"/>
+                            <TextBlock Text="2. 兜底：若模型地址为0，则 实际地址 = [PLC起始地址] + (序号 * 步长) + [模板位偏移]。" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,8"/>
+                            <TextBlock Text="ℹ️ 生成操作将覆盖同名地址的点位，生成的点位将自动关联至当前选中的设备。" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" FontSize="11" LineHeight="16" Opacity="0.8"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Actions -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="取消" Command="{Binding CloseBatchPopupCommand}" Style="{StaticResource ModernButtonStyle}" Width="120" Height="40" Margin="0,0,15,0"/>
+                        <Button Content="立即生成" Command="{Binding ConfirmBatchGenerateCommand}" Style="{StaticResource PrimaryButtonStyle}" Width="160" Height="40"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>

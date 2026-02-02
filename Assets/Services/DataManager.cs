@@ -37,7 +37,7 @@ namespace DoorMonitorSystem.Assets.Services
         private readonly Dictionary<string, DoorBitConfig> _doorBitCache = new();
         private readonly Dictionary<string, PanelBitConfig> _panelBitCache = new();
         // 门模型缓存，用于快速查找并刷新视觉裁决
-        private readonly Dictionary<int, DoorModel> _doorCache = new();
+        private readonly Dictionary<string, DoorModel> _doorCache = new();
         
         private bool _isCacheBuilt = false;
         private bool _debugKeysPrinted = false;
@@ -96,6 +96,9 @@ namespace DoorMonitorSystem.Assets.Services
                                $"User ID={GlobalData.SysCfg.UserName};" +
                                $"Password={GlobalData.SysCfg.UserPassword};" +
                                $"CharSet=utf8mb4;";
+
+                // 确保业务数据库结构最新 (包含 KeyId 迁移)
+                BusinessDatabaseFixer.FixSchema(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
 
                 var stationService = new StationDataService(connStr);
                 var stations = await Task.Run(() => stationService.LoadAllStations());
@@ -902,7 +905,7 @@ namespace DoorMonitorSystem.Assets.Services
         /// UI批量更新队列
         ///用于缓冲来自通讯层的快速状态变更，避免UI线程过载
         /// </summary>
-        private readonly System.Collections.Concurrent.ConcurrentQueue<(int targetObjId, int bitConfigId, TargetType targetType, bool value)> _uiUpdateQueue = new();
+        private readonly System.Collections.Concurrent.ConcurrentQueue<(string targetObjKeyId, string bitConfigKeyId, TargetType targetType, bool value)> _uiUpdateQueue = new();
         private bool _isBatchLoopRunning = false;
 
         /// <summary>
@@ -913,12 +916,12 @@ namespace DoorMonitorSystem.Assets.Services
         /// <param name="bitConfigId">点位配置ID</param>
         /// <param name="targetType">目标类型 (门/面板)</param>
         /// <param name="value">新的布尔值</param>
-        public void UpdatePointValue(int targetObjId, int bitConfigId, TargetType targetType, bool value)
+        public void UpdatePointValue(string targetObjKeyId, string bitConfigKeyId, TargetType targetType, bool value)
         {
             if (!_isCacheBuilt) BuildBitCache();
 
             // 将更新请求加入队列，不再直接Invoke
-            _uiUpdateQueue.Enqueue((targetObjId, bitConfigId, targetType, value));
+            _uiUpdateQueue.Enqueue((targetObjKeyId, bitConfigKeyId, targetType, value));
 
             if (!_isBatchLoopRunning)
             {
@@ -948,7 +951,7 @@ namespace DoorMonitorSystem.Assets.Services
                         }
 
                         // 取出当前队列中所有待更新项（批量处理）
-                        var batch = new List<(int targetObjId, int bitConfigId, TargetType targetType, bool value)>();
+                        var batch = new List<(string targetObjKeyId, string bitConfigKeyId, TargetType targetType, bool value)>();
                         // 限制单次批处理数量，防止单帧耗时过长导致界面卡顿 (拖动发飘)
                         // 每次最多处理 200 个状态变化，剩余的留到下一帧
                         while (batch.Count < 200 && _uiUpdateQueue.TryDequeue(out var item))
@@ -964,16 +967,16 @@ namespace DoorMonitorSystem.Assets.Services
                             var dirtyDoors = new HashSet<DoorModel>();
 
                             // 1. 先在后台线程处理数值更新（不涉及 UI 的部分）
-                            foreach (var (targetObjId, bitConfigId, targetType, value) in batch)
+                            foreach (var (targetObjKeyId, bitConfigKeyId, targetType, value) in batch)
                             {
-                                string key = $"{targetObjId}_{bitConfigId}";
+                                string key = $"{targetObjKeyId}_{bitConfigKeyId}";
 
                                 if (targetType == TargetType.Door)
                                 {
                                     if (_doorBitCache.TryGetValue(key, out var bit))
                                     {
                                         bit.BitValue = value;
-                                        if (_doorCache.TryGetValue(targetObjId, out var door))
+                                        if (_doorCache.TryGetValue(targetObjKeyId, out var door))
                                         {
                                             dirtyDoors.Add(door);
                                         }
@@ -1034,10 +1037,10 @@ namespace DoorMonitorSystem.Assets.Services
                     {
                         foreach (var door in doorGroup.Doors)
                         {
-                            _doorCache[door.DoorId] = door; // 缓存门模型
+                            _doorCache[door.KeyId] = door; // 缓存门模型
                             foreach (var bit in door.Bits)
                             {
-                                _doorBitCache[$"{door.DoorId}_{bit.BitId}"] = bit;
+                                _doorBitCache[$"{door.KeyId}_{bit.KeyId}"] = bit;
                             }
                         }
                     }
@@ -1048,7 +1051,7 @@ namespace DoorMonitorSystem.Assets.Services
                         {
                             foreach (var bit in panel.BitList)
                             {
-                                _panelBitCache[$"{panel.PanelId}_{bit.BitId}"] = bit;
+                                _panelBitCache[$"{panel.KeyId}_{bit.KeyId}"] = bit;
                             }
                         }
                     }

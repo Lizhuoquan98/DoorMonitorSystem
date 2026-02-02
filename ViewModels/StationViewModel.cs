@@ -35,24 +35,34 @@ namespace DoorMonitorSystem.ViewModels
         {
             DisplayItems.Clear();
 
-            var allItems = new System.Collections.Generic.List<(int SortOrder, object Item)>();
+            // 根据站台类型（StationType）决定组件排列顺序
+            // 岛式 (Island, 1): 门模组在上，面板模组在下
+            // 侧式 (Side, 2): 面板模组在上，门模组在下
+            // 三线站台 (ThreeTrack, 3): 同岛式，默认门在上
 
-            // 添加所有门组
-            foreach (var doorGroup in _station.DoorGroups)
+            if (_station.StationType == StationType.Side)
             {
-                allItems.Add((doorGroup.SortOrder, doorGroup));
+                // 侧式站台：优先显示面板组，再显示门组
+                foreach (var pg in _station.PanelGroups.OrderBy(x => x.SortOrder))
+                {
+                    DisplayItems.Add(pg);
+                }
+                foreach (var dg in _station.DoorGroups.OrderBy(x => x.SortOrder))
+                {
+                    DisplayItems.Add(dg);
+                }
             }
-
-            // 添加所有面板组
-            foreach (var panelGroup in _station.PanelGroups)
+            else
             {
-                allItems.Add((panelGroup.SortOrder, panelGroup));
-            }
-
-            // 按 SortOrder 排序后添加到显示集合
-            foreach (var item in allItems.OrderBy(x => x.SortOrder))
-            {
-                DisplayItems.Add(item.Item);
+                // 岛式或三线站台：优先显示门组，再显示面板组
+                foreach (var dg in _station.DoorGroups.OrderBy(x => x.SortOrder))
+                {
+                    DisplayItems.Add(dg);
+                }
+                foreach (var pg in _station.PanelGroups.OrderBy(x => x.SortOrder))
+                {
+                    DisplayItems.Add(pg);
+                }
             }
         }
     }

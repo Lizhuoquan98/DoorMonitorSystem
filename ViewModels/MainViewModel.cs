@@ -181,6 +181,11 @@ namespace DoorMonitorSystem.ViewModels
         /// </summary>
         public ICommand OpenDoorDetailCommand { get; set; }
 
+        /// <summary>
+        /// 刷新 UI 数据命令
+        /// </summary>
+        public ICommand RefreshCommand { get; set; }
+
         #endregion
 
         #region Constructor (构造函数)
@@ -193,6 +198,7 @@ namespace DoorMonitorSystem.ViewModels
             // 初始化命令
             ClosePopupCommand = new RelayCommand(OnClosePopup);
             OpenDoorDetailCommand = new RelayCommand(OnOpenDoorDetail);
+            RefreshCommand = new RelayCommand(async _ => await LoadDataAsync());
 
             // 异步加载业务数据 (站台/门/点位)
             _ = LoadDataAsync();
@@ -292,18 +298,8 @@ namespace DoorMonitorSystem.ViewModels
         {
             await DataManager.Instance.LoadBusinessDataAsync();
 
-            // 注入命令（避免 XAML 绑定时的 RelativeSource 查找问题）
-            foreach (var station in Stations)
-            {
-                if (station.Station == null) continue;
-                foreach (var group in station.Station.DoorGroups)
-                {
-                    foreach (var door in group.Doors)
-                    {
-                        door.OpenDetailCommand = OpenDoorDetailCommand;
-                    }
-                }
-            }
+            // 注入命令逻辑已被 View 层 RelativeSource 替代，此处不再通过代码注入
+            // foreach (var station in Stations) ...
 
             Debug.WriteLine($"[MainVM] Data loading completed. Status: {Stations.Count} stations.");
         }

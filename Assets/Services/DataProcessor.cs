@@ -198,7 +198,7 @@ namespace DoorMonitorSystem.Assets.Services
             }
 
             // 2. 发射到 UI DataManager：让全局画面动起来
-            DataManager.Instance.UpdatePointValue(p.TargetObjId, p.TargetBitConfigId, p.TargetType, bitValue);
+            DataManager.Instance.UpdatePointValue(p.TargetKeyId, p.TargetBitConfigKeyId, p.TargetType, bitValue);
 
             // 3. 发射到转发引擎：如果点位开启了转发，则尝试操作目标设备
             if (p.IsSyncEnabled)

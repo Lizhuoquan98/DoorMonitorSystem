@@ -85,7 +85,7 @@
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Margin="0,5,15,5">
-                        <TextBlock Text="等级:" Foreground="#a0b0c0" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBlock Text="日志类型:" Foreground="#a0b0c0" VerticalAlignment="Center" Margin="0,0,5,0"/>
                         <ComboBox ItemsSource="{Binding LogLevelOptions}" SelectedItem="{Binding SelectedLogLevel}" Width="80" Height="28" 
                                   VerticalContentAlignment="Center"/>
                     </StackPanel>
@@ -191,13 +191,13 @@
             <DataGrid.Columns>
                 <DataGridTextColumn Header="序号" Binding="{Binding RowIndex}" Width="60" ElementStyle="{StaticResource CenterText}"/>
                 <DataGridTextColumn Header="记录时间" Binding="{Binding LogTime, StringFormat='yyyy-MM-dd HH:mm:ss.fff'}" Width="190" ElementStyle="{StaticResource CenterText}"/>
-                <DataGridTextColumn Header="类型" Binding="{Binding LogTypeDisplay}" Width="80" ElementStyle="{StaticResource CenterText}"/>
+                <DataGridTextColumn Header="日志分类" Binding="{Binding LogTypeDisplay}" Width="80" ElementStyle="{StaticResource CenterText}"/>
                 <!-- Configured to show Category/UserName instead of Device/Address -->
-                <DataGridTextColumn Header="分组" Binding="{Binding Category}" Width="100" ElementStyle="{StaticResource CenterText}"/>
-                <DataGridTextColumn Header="用户名" Binding="{Binding UserName}" Width="100" ElementStyle="{StaticResource CenterText}"/>
-                
-                <DataGridTextColumn Header="值" Binding="{Binding ValDisplay}" Width="60" ElementStyle="{StaticResource CenterText}"/>
-                <DataGridTextColumn Header="消息内容" Binding="{Binding Message}" Width="*" HeaderStyle="{StaticResource LeftHeaderStyle}">
+                <DataGridTextColumn Header="业务分组" Binding="{Binding Category}" Width="100" ElementStyle="{StaticResource CenterText}"/>
+                <DataGridTextColumn Header="变量地址" Binding="{Binding Address}" Width="120" ElementStyle="{StaticResource CenterText}"/>
+                <DataGridTextColumn Header="用户" Binding="{Binding UserName}" Width="80" ElementStyle="{StaticResource CenterText}"/>
+                <DataGridTextColumn Header="值" Binding="{Binding ValDisplay}" Width="80" ElementStyle="{StaticResource CenterText}"/>
+                <DataGridTextColumn Header="日志内容" Binding="{Binding Message}" Width="*" HeaderStyle="{StaticResource LeftHeaderStyle}">
                     <DataGridTextColumn.ElementStyle>
                         <Style TargetType="TextBlock">
                             <Setter Property="HorizontalAlignment" Value="Left"/>
@@ -233,10 +233,21 @@
                     <TextBlock Text="{Binding TotalPages}" Foreground="White" Margin="5,0" VerticalAlignment="Center"/>
                     <TextBlock Text="页" Foreground="#a0b0c0" VerticalAlignment="Center" Margin="0,0,15,0"/>
 
+                    <Button Content="首页" Command="{Binding FirstPageCommand}" 
+                            Style="{StaticResource ActionButton}" Height="25" Width="60" Background="#37474f" Margin="0,0,5,0"/>
                     <Button Content="上一页" Command="{Binding PrevPageCommand}" 
-                            Style="{StaticResource ActionButton}" Height="25" Width="70" Background="#37474f"/>
+                            Style="{StaticResource ActionButton}" Height="25" Width="70" Background="#37474f" Margin="0,0,5,0"/>
                     <Button Content="下一页" Command="{Binding NextPageCommand}" 
-                            Style="{StaticResource ActionButton}" Height="25" Width="70" Background="#37474f"/>
+                            Style="{StaticResource ActionButton}" Height="25" Width="70" Background="#37474f" Margin="0,0,5,0"/>
+                    <Button Content="尾页" Command="{Binding LastPageCommand}" 
+                            Style="{StaticResource ActionButton}" Height="25" Width="60" Background="#37474f" Margin="0,0,15,0"/>
+
+                    <TextBlock Text="跳转至" Foreground="#a0b0c0" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                    <TextBox Text="{Binding JumpPage, UpdateSourceTrigger=PropertyChanged}" 
+                             Width="50" Height="25" VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
+                             Background="#11FFFFFF" Foreground="White" BorderBrush="#44FFFFFF"/>
+                    <Button Content="GO" Command="{Binding GoToPageCommand}" 
+                            Style="{StaticResource ActionButton}" Height="25" Width="40" Background="#1976d2" Margin="5,0,0,0"/>
                 </StackPanel>
             </Grid>
         </Border>

@@ -69,6 +69,14 @@
 
             <!-- Right: User & Exit -->
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Refresh Button -->
+                <Button Command="{Binding RefreshUICommand}" Style="{StaticResource ActionButton}" Margin="0,0,10,0" Padding="10,5" Height="44" ToolTip="刷新数据">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="🔄" FontSize="18" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBlock Text="刷新" FontSize="14" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
                 <!-- User Info Card (Clickable) -->
                 <Button Command="{Binding OpenUserInfoCommand}"  Style="{StaticResource ActionButton}" Margin="0,0,15,0" Padding="0" Background="Transparent" BorderThickness="0" Height="44">
                     <Border Background="#22FFFFFF" CornerRadius="6" Padding="12,5">
@@ -110,6 +118,8 @@
                                  Command="{Binding NavigationCommand}" CommandParameter="{x:Type dc:GraphicEditingViewModel}" />
                     <RadioButton Content="设备列表" GroupName="NavGroup" Style="{StaticResource NavRadioButtonStyle}" 
                                  Command="{Binding NavigationCommand}" CommandParameter="{x:Type dc:DeployViewModel}" />
+                    <RadioButton Content="布局配置" GroupName="NavGroup" Style="{StaticResource NavRadioButtonStyle}" 
+                                 Command="{Binding NavigationCommand}" CommandParameter="{x:Type dc:LayoutConfigurationViewModel}" />
                     <RadioButton Content="系统日志" GroupName="NavGroup" Style="{StaticResource NavRadioButtonStyle}"
                                  Command="{Binding NavigationCommand}" CommandParameter="{x:Type dc:SystemLogViewModel}" />
                 </StackPanel>

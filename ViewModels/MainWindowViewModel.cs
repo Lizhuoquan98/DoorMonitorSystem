@@ -116,6 +116,7 @@ namespace DoorMonitorSystem.ViewModels
         /// </summary>
         public ICommand NavigationCommand { get; private set; }
         public ICommand OpenUserInfoCommand { get; private set; }
+        public ICommand RefreshUICommand { get; private set; }
 
         #endregion
 
@@ -184,6 +185,10 @@ namespace DoorMonitorSystem.ViewModels
             DeployCommand = new RelayCommand(DeployCommandCallback);
             NavigationCommand = new RelayCommand(NavigationCommandCallback);
             OpenUserInfoCommand = new RelayCommand(OpenUserInfoCallback);
+            RefreshUICommand = new RelayCommand(async _ => 
+            {
+                await Assets.Services.DataManager.Instance.LoadBusinessDataAsync();
+            });
 
 
         }

@@ -11,6 +11,9 @@ namespace DoorMonitorSystem.Models.RunModels
         /// <summary>站台ID（主键）</summary>
         public int StationId { get; set; }
 
+        /// <summary>全局唯一标识 (GUID)</summary>
+        public string KeyId { get; set; }
+
         /// <summary>站台名称</summary>
         public string StationName { get; set; } = "";
 

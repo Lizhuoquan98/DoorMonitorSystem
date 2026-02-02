@@ -15,6 +15,9 @@ namespace DoorMonitorSystem.Models.RunModels
         /// <summary>点位ID（主键，点位模板的唯一标识）</summary>
         public int BitId { get; set; }
 
+        /// <summary>全局唯一标识 (GUID)</summary>
+        public string KeyId { get; set; }
+
         /// <summary>点位描述，如：开门、关门、故障、锁闭等</summary>
         private string _description = "";
         public string Description

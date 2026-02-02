@@ -11,6 +11,9 @@ namespace DoorMonitorSystem.Models.RunModels
         /// <summary>点位ID（主键）</summary>
         public int BitId { get; set; }
 
+        /// <summary>全局唯一标识 (GUID)</summary>
+        public string KeyId { get; set; }
+
         /// <summary>所属面板ID（外键）</summary>
         public int PanelId { get; set; }
 

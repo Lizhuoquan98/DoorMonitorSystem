@@ -4,6 +4,7 @@ using DoorMonitorSystem.Models.ConfigEntity;
 using DoorMonitorSystem.Models.ConfigEntity.Door;
 using DoorMonitorSystem.Models.ConfigEntity.Group;
 using DoorMonitorSystem.Models.RunModels;
+using DoorMonitorSystem.Assets.Helper;
 using MySql.Data.MySqlClient;
 using System;
 using System.Collections.Generic;
@@ -121,7 +122,7 @@ namespace DoorMonitorSystem.Assets.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"加载站台数据失败: {ex.Message}");
+                LogHelper.Error("加载所有站台数据失败", ex);
             }
 
             return stations;
@@ -135,21 +136,22 @@ namespace DoorMonitorSystem.Assets.Services
             var station = new StationMainGroup
             {
                 StationId = entity.Id,
+                KeyId = entity.KeyId,
                 StationName = entity.StationName,
                 StationCode = entity.StationCode,
                 StationType = (StationType)entity.StationType,
                 SortOrder = entity.SortOrder
             };
 
-            // 加载门组
-            var doorGroups = LoadDoorGroups(entity.Id, conn);
+            // 加载门组 (传入 Id 用于运行时模型，KeyId 用于 SQL 查询)
+            var doorGroups = LoadDoorGroups(entity.Id, entity.KeyId, conn);
             foreach (var doorGroup in doorGroups)
             {
                 station.DoorGroups.Add(doorGroup);
             }
 
-            // 加载面板组
-            var panelGroups = LoadPanelGroups(entity.Id, conn);
+            // 加载面板组 (传入 Id 用于运行时模型，KeyId 用于 SQL 查询)
+            var panelGroups = LoadPanelGroups(entity.Id, entity.KeyId, conn);
             foreach (var panelGroup in panelGroups)
             {
                 station.PanelGroups.Add(panelGroup);
@@ -161,13 +163,13 @@ namespace DoorMonitorSystem.Assets.Services
         /// <summary>
         /// 加载站台的所有门组
         /// </summary>
-        private List<DoorGroup> LoadDoorGroups(int stationId, MySqlConnection conn)
+        private List<DoorGroup> LoadDoorGroups(int stationId, string stationKeyId, MySqlConnection conn)
         {
             var doorGroups = new List<DoorGroup>();
 
             var doorGroupEntities = conn.Query<DoorGroupEntity>(
-                "SELECT * FROM DoorGroup WHERE StationId = @StationId ORDER BY SortOrder",
-                new { StationId = stationId }
+                "SELECT * FROM DoorGroup WHERE StationKeyId = @StationKeyId ORDER BY SortOrder",
+                new { StationKeyId = stationKeyId }
             ).ToList();
 
             foreach (var entity in doorGroupEntities)
@@ -175,12 +177,20 @@ namespace DoorMonitorSystem.Assets.Services
                 var doorGroup = new DoorGroup
                 {
                     DoorGroupId = entity.Id,
-                    StationId = entity.StationId,
+                    KeyId = entity.KeyId,
+                    StationId = stationId,
                     SortOrder = entity.SortOrder
                 };
 
                 // 加载门组中的所有门
-                var doors = LoadDoors(entity.Id, conn);
+                var doors = LoadDoors(entity.Id, entity.KeyId, conn);
+                
+                // 如果配置为逆序，则反转门列表
+                if (entity.IsReverseOrder)
+                {
+                    doors.Reverse();
+                }
+
                 foreach (var door in doors)
                 {
                     doorGroup.Doors.Add(door);
@@ -195,27 +205,28 @@ namespace DoorMonitorSystem.Assets.Services
         /// <summary>
         /// 加载门组的所有门
         /// </summary>
-        private List<DoorModel> LoadDoors(int doorGroupId, MySqlConnection conn)
+        private List<DoorModel> LoadDoors(int doorGroupId, string parentKeyId, MySqlConnection conn)
         {
             var doors = new List<DoorModel>();
 
             var doorEntities = conn.Query<DoorEntity>(
-                "SELECT * FROM Door WHERE DoorGroupId = @DoorGroupId ORDER BY SortOrder",
-                new { DoorGroupId = doorGroupId }
+                "SELECT * FROM Door WHERE ParentKeyId = @ParentKeyId ORDER BY SortOrder",
+                new { ParentKeyId = parentKeyId }
             ).ToList();
 
             foreach (var entity in doorEntities)
             {
-                // 获取门类型信息
+                // 获取门类型信息 (关键: 使用 DoorTypeKeyId)
                 var doorTypeEntity = conn.QueryFirstOrDefault<DoorTypeEntity>(
-                    "SELECT * FROM DoorType WHERE Id = @DoorTypeId",
-                    new { DoorTypeId = entity.DoorTypeId }
+                    "SELECT * FROM DoorType WHERE KeyId = @DoorTypeKeyId",
+                    new { DoorTypeKeyId = entity.DoorTypeKeyId }
                 );
 
                 var door = new DoorModel
                 {
                     DoorId = entity.Id,
-                    DoorGroupId = entity.DoorGroupId,
+                    KeyId = entity.KeyId,
+                    DoorGroupId = doorGroupId,
                     DoorName = entity.DoorName,
                     DoorType = DoorType.SlidingDoor, // 默认值，实际从 Code 映射
                     DoorTypeCode = doorTypeEntity?.Code ?? "",
@@ -231,7 +242,7 @@ namespace DoorMonitorSystem.Assets.Services
                 // 加载门的点位配置（从门类型的点位模板复制）
                 if (doorTypeEntity != null)
                 {
-                    var bitConfigs = LoadDoorBitConfigs(doorTypeEntity.Id, conn);
+                    var bitConfigs = LoadDoorBitConfigs(doorTypeEntity.Id, doorTypeEntity.KeyId, conn);
                     foreach (var bitConfig in bitConfigs)
                     {
                         door.Bits.Add(bitConfig);
@@ -247,13 +258,13 @@ namespace DoorMonitorSystem.Assets.Services
         /// <summary>
         /// 加载门类型的点位配置模板
         /// </summary>
-        private List<DoorBitConfig> LoadDoorBitConfigs(int doorTypeId, MySqlConnection conn)
+        private List<DoorBitConfig> LoadDoorBitConfigs(int doorTypeId, string doorTypeKeyId, MySqlConnection conn)
         {
             var bitConfigs = new List<DoorBitConfig>();
 
             var bitEntities = conn.Query<DoorBitConfigEntity>(
-                "SELECT * FROM DoorBitConfig WHERE DoorTypeId = @DoorTypeId ORDER BY SortOrder",
-                new { DoorTypeId = doorTypeId }
+                "SELECT * FROM DoorBitConfig WHERE DoorTypeKeyId = @DoorTypeKeyId ORDER BY SortOrder",
+                new { DoorTypeKeyId = doorTypeKeyId }
             ).ToList();
 
             foreach (var entity in bitEntities)
@@ -261,9 +272,10 @@ namespace DoorMonitorSystem.Assets.Services
                 var bitConfig = new DoorBitConfig
                 {
                     BitId = entity.Id,
+                    KeyId = entity.KeyId,
                     Description = entity.Description,
                     BitValue = false,
-                    BindingDoorType = (DoorType)entity.DoorTypeId,
+                    BindingDoorType = DoorType.SlidingDoor, // 这里原先强转 enum，GUID 系统下需要另行处理或固定
                     CategoryId = entity.CategoryId,
                     SortOrder = entity.SortOrder,
                     HeaderPriority = entity.HeaderPriority,
@@ -294,13 +306,13 @@ namespace DoorMonitorSystem.Assets.Services
         /// <summary>
         /// 加载站台的所有面板组
         /// </summary>
-        private List<PanelGroup> LoadPanelGroups(int stationId, MySqlConnection conn)
+        private List<PanelGroup> LoadPanelGroups(int stationId, string stationKeyId, MySqlConnection conn)
         {
             var panelGroups = new List<PanelGroup>();
 
             var panelGroupEntities = conn.Query<PanelGroupEntity>(
-                "SELECT * FROM PanelGroup WHERE StationId = @StationId ORDER BY SortOrder",
-                new { StationId = stationId }
+                "SELECT * FROM PanelGroup WHERE StationKeyId = @StationKeyId ORDER BY SortOrder",
+                new { StationKeyId = stationKeyId }
             ).ToList();
 
             foreach (var entity in panelGroupEntities)
@@ -308,12 +320,13 @@ namespace DoorMonitorSystem.Assets.Services
                 var panelGroup = new PanelGroup
                 {
                     PanelGroupId = entity.Id,
-                    StationId = entity.StationId,
+                    KeyId = entity.KeyId,
+                    StationId = stationId,
                     SortOrder = entity.SortOrder
                 };
 
                 // 加载面板组中的所有面板
-                var panels = LoadPanels(entity.Id, conn);
+                var panels = LoadPanels(entity.Id, entity.KeyId, conn);
                 foreach (var panel in panels)
                 {
                     panelGroup.Panels.Add(panel);
@@ -328,13 +341,13 @@ namespace DoorMonitorSystem.Assets.Services
         /// <summary>
         /// 加载面板组的所有面板
         /// </summary>
-        private List<PanelModel> LoadPanels(int panelGroupId, MySqlConnection conn)
+        private List<PanelModel> LoadPanels(int panelGroupId, string parentKeyId, MySqlConnection conn)
         {
             var panels = new List<PanelModel>();
 
             var panelEntities = conn.Query<PanelEntity>(
-                "SELECT * FROM Panel WHERE PanelGroupId = @PanelGroupId ORDER BY SortOrder",
-                new { PanelGroupId = panelGroupId }
+                "SELECT * FROM Panel WHERE ParentKeyId = @ParentKeyId ORDER BY SortOrder",
+                new { ParentKeyId = parentKeyId }
             ).ToList();
 
             foreach (var entity in panelEntities)
@@ -342,7 +355,8 @@ namespace DoorMonitorSystem.Assets.Services
                 var panel = new PanelModel
                 {
                     PanelId = entity.Id,
-                    PanelGroupId = entity.PanelGroupId,
+                    KeyId = entity.KeyId,
+                    PanelGroupId = panelGroupId,
                     PanelName = entity.PanelName,
                     TitlePosition = (PanelTitlePosition)entity.TitlePosition,
                     LayoutRows = entity.LayoutRows,
@@ -350,8 +364,8 @@ namespace DoorMonitorSystem.Assets.Services
                     SortOrder = entity.SortOrder
                 };
 
-                // 加载面板的点位配置
-                var bitConfigs = LoadPanelBitConfigs(entity.Id, conn);
+                // 加载面板的点位配置 (传入 PanelKeyId)
+                var bitConfigs = LoadPanelBitConfigs(entity.Id, entity.KeyId, conn);
                 foreach (var bitConfig in bitConfigs)
                 {
                     panel.BitList.Add(bitConfig);
@@ -364,28 +378,17 @@ namespace DoorMonitorSystem.Assets.Services
         }
 
         /// <summary>
-        /// 加载面板的点位配置（从面板类型的点位模板获取）
+        /// 加载面板的点位配置（从面板实例对应的配置表获取）
         /// </summary>
-        private List<PanelBitConfig> LoadPanelBitConfigs(int panelId, MySqlConnection conn)
+        private List<PanelBitConfig> LoadPanelBitConfigs(int panelId, string panelKeyId, MySqlConnection conn)
         {
             var bitConfigs = new List<PanelBitConfig>();
 
-            // 首先获取面板的类型ID
-            var panel = conn.QueryFirstOrDefault<PanelEntity>(
-                "SELECT * FROM Panel WHERE Id = @PanelId",
-                new { PanelId = panelId }
-            );
-
-            if (panel == null) return bitConfigs;
-
-            // 从面板类型模板加载点位配置
-            // 注意：这里需要一个 PanelType 表或者在 Panel 表中添加 PanelTypeId 字段
-            // 暂时假设每个面板都有自己的点位配置
-            // TODO: 如果数据库中有 PanelType 表，需要修改此处逻辑
+            if (string.IsNullOrEmpty(panelKeyId)) return bitConfigs;
 
             var bitEntities = conn.Query<PanelBitConfigEntity>(
-                "SELECT * FROM PanelBitConfig WHERE PanelTypeId = @PanelTypeId ORDER BY SortOrder",
-                new { PanelTypeId = panelId } // 临时方案：使用 PanelId 作为类型ID
+                "SELECT * FROM PanelBitConfig WHERE PanelKeyId = @PanelKeyId ORDER BY SortOrder",
+                new { PanelKeyId = panelKeyId }
             ).ToList();
 
             foreach (var entity in bitEntities)
@@ -393,6 +396,7 @@ namespace DoorMonitorSystem.Assets.Services
                 var bitConfig = new PanelBitConfig
                 {
                     BitId = entity.Id,
+                    KeyId = entity.KeyId,
                     PanelId = panelId,
                     Description = entity.Description,
                     BitValue = false,

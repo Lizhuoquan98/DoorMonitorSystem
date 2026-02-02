@@ -138,7 +138,11 @@ namespace DoorMonitorSystem.Assets.Services
 
             if (shouldLog)
             {
-                string logMsg = string.IsNullOrWhiteSpace(p.LogMessage) ? p.Description : p.LogMessage;
+                // 增强默认消息内容：如果未配置模板，自动补齐分类前缀 [分类名] 描述
+                string logMsg = string.IsNullOrWhiteSpace(p.LogMessage) ? 
+                    (!string.IsNullOrEmpty(p.Category) ? $"[{p.Category}] {p.Description}" : p.Description) : 
+                    p.LogMessage;
+
                 string valText = "";
 
                 if (isDigital)
@@ -149,28 +153,28 @@ namespace DoorMonitorSystem.Assets.Services
                 }
                 else
                 {
-                     // 模拟量文本
-                     valText = rawValue.ToString();
-                     
-                     // 如果触发了高低限，可在消息中追加提示? 用户只说要记录值。
-                     // 日志消息模板替换
+                     valText = rawValue?.ToString() ?? "";
                 }
 
-                logMsg = logMsg?.Replace("{Value}", valText) ?? "";
+                // 支持模板替换：{Value} {Category} {Description} {Address}
+                logMsg = logMsg?.Replace("{Value}", valText)
+                                .Replace("{Category}", p.Category ?? "")
+                                .Replace("{Description}", p.Description ?? "")
+                                .Replace("{Address}", p.Address ?? "") ?? "";
 
                 var entity = new PointLogEntity
                 {
                     PointID = p.Id,
                     DeviceID = p.SourceDeviceId,
-                    Address = $"{p.Address}.{p.BitIndex}",
-                    Val = bitValue ? 1 : 0, // 仅保留位状态
-                    ValText = valText,      // 核心：存储实际文本
-                    LogType = logType,      // 可能被高低限覆盖
+                    Address = isDigital ? $"{p.Address}.{p.BitIndex}" : p.Address,
+                    Val = bitValue ? 1 : 0, 
+                    ValText = valText,     
+                    LogType = logType,     
                     Message = logMsg,
                     Category = p.Category, 
                     UserName = GlobalData.CurrentUser?.Username ?? "System",
                     LogTime = DateTime.Now,
-                    IsAnalog = !isDigital // 标记来源
+                    IsAnalog = !isDigital 
                 };
 
                 _logQueue.Add(entity);

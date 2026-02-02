@@ -13,6 +13,9 @@ namespace DoorMonitorSystem.Models.RunModels
         /// <summary>面板ID（主键，用于UI路径定位）</summary>
         public int PanelId { get; set; }
 
+        /// <summary>全局唯一标识 (GUID)</summary>
+        public string KeyId { get; set; }
+
         /// <summary>所属面板组ID（外键）</summary>
         public int PanelGroupId { get; set; }
 

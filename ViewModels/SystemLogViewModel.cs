@@ -9,9 +9,18 @@ using System.Collections.Generic;
 using Base;
 using System.Linq;
 using DoorMonitorSystem.Models.ConfigEntity;
+using DoorMonitorSystem.Models.ConfigEntity.Log;
 
 namespace DoorMonitorSystem.ViewModels
 {
+    /// <summary>
+    /// 系统日志视图模型。
+    /// 负责管理系统日志查询界面的业务逻辑，包括：
+    /// 1. 多维度筛选（时间范围、关键字、业务分组、日志等级）。
+    /// 2. 分页查询与后台静默加载（提升大数据量下的响应速度）。
+    /// 3. 数据导出（支持 Excel/CSV）。
+    /// 4. 动态图表支持（判定是否包含模拟量数据）。
+    /// </summary>
     public class SystemLogViewModel : NotifyPropertyChanged
     {
         private DateTime _startDate = DateTime.Now;
@@ -33,12 +42,20 @@ namespace DoorMonitorSystem.ViewModels
             set { _endDate = value; OnPropertyChanged(); OnPropertyChanged(nameof(EndFullDateTime)); }
         }
 
+        /// <summary>
+        /// 搜索关键字。
+        /// 支持模糊匹配日志内容、地址或状态值。
+        /// </summary>
         public string Keyword
         {
             get => _keyword;
             set { _keyword = value; OnPropertyChanged(); }
         }
 
+        /// <summary>
+        /// 加载状态标识。
+        /// 用于控制界面 loading 遮罩层的显示。
+        /// </summary>
         public bool IsLoading
         {
             get => _isLoading;
@@ -48,6 +65,9 @@ namespace DoorMonitorSystem.ViewModels
         // 分类筛选
         public ObservableCollection<string> Categories { get; set; } = new ObservableCollection<string>();
         
+        /// <summary>
+        /// 当前选中的业务分组（如："1号门"、"值班室"）。
+        /// </summary>
         private string _selectedCategory = "全部";
         public string SelectedCategory
         {
@@ -55,10 +75,19 @@ namespace DoorMonitorSystem.ViewModels
             set { _selectedCategory = value; OnPropertyChanged(); }
         }
 
-        // 记录等级筛选 (1=状态, 2=报警)
-        public List<string> LogLevelOptions { get; set; } = new List<string> { "全部", "状态", "报警" };
+        // 记录等级筛选 (从数据库 LogType 加载)
+        private List<string> _logLevelOptions = new List<string> { "全部" };
+        public List<string> LogLevelOptions
+        {
+            get => _logLevelOptions;
+            set { _logLevelOptions = value; OnPropertyChanged(); }
+        }
 
         private string _selectedLogLevel = "全部";
+        /// <summary>
+        /// 当前选中的日志等级（如："报警记录"、"一般记录"）。
+        /// 切换时会自动触发重新加载。
+        /// </summary>
         public string SelectedLogLevel
         {
             get => _selectedLogLevel;
@@ -75,6 +104,11 @@ namespace DoorMonitorSystem.ViewModels
         public List<string> LogTableTypes { get; set; } = new List<string> { "系统日志", "模拟量数据" };
         
         private string _selectedTableType = "系统日志";
+        /// <summary>
+        /// 当前查看的日志表类型。
+        /// "系统日志" 对应 PointLogs 表（开关量为主）。
+        /// "模拟量数据" 对应 AnalogLogs 表（连续数值）。
+        /// </summary>
         public string SelectedTableType
         {
             get => _selectedTableType;
@@ -88,12 +122,19 @@ namespace DoorMonitorSystem.ViewModels
         }
 
         private bool _hasAnalogPoints = false;
+        /// <summary>
+        /// 系统中是否存在开启了日志记录的模拟量点位。
+        /// 用于控制界面上是否显示“模拟量数据”切换选项。
+        /// </summary>
         public bool HasAnalogPoints
         {
             get => _hasAnalogPoints;
             set { _hasAnalogPoints = value; OnPropertyChanged(); }
         }
 
+        /// <summary>
+        /// 当前页显示的日志数据集合。
+        /// </summary>
         public ObservableCollection<PointLogEntity> Logs { get; set; } = new ObservableCollection<PointLogEntity>();
 
         // 分页属性
@@ -102,18 +143,45 @@ namespace DoorMonitorSystem.ViewModels
         private int _totalCount = 0;
         private int _pageSize = 1000;
 
+        /// <summary>
+        /// 当前页码 (1-based)。
+        /// </summary>
+        /// <summary>
+        /// 当前页码 (1-based)。
+        /// </summary>
         public int CurrentPage
         {
             get => _currentPage;
-            set { _currentPage = value; OnPropertyChanged(); }
+            set 
+            {
+                _currentPage = value; 
+                OnPropertyChanged();
+                JumpPage = value; // 同步更新跳转框
+            }
         }
 
+        private int _jumpPage = 1;
+        /// <summary>
+        /// 跳转页码输入框绑定的属性。
+        /// </summary>
+        public int JumpPage
+        {
+            get => _jumpPage;
+            set { _jumpPage = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>
+        /// 总页数。
+        /// </summary>
         public int TotalPages
         {
             get => _totalPages;
             set { _totalPages = value; OnPropertyChanged(); }
         }
 
+        /// <summary>
+        /// 查询结果总记录数。
+        /// </summary>
         public int TotalCount
         {
             get => _totalCount;
@@ -136,6 +204,10 @@ namespace DoorMonitorSystem.ViewModels
             set { _searchEndTime = value; OnPropertyChanged(); OnPropertyChanged(nameof(EndFullDateTime)); }
         }
 
+        /// <summary>
+        /// 完整的起始搜索时间（日期 + 时间）。
+        /// 包含互锁逻辑：若起始时间晚于结束时间，会自动推迟结束时间。
+        /// </summary>
         public DateTime StartFullDateTime
         {
             get 
@@ -159,6 +231,10 @@ namespace DoorMonitorSystem.ViewModels
             }
         }
 
+        /// <summary>
+        /// 完整的结束搜索时间（日期 + 时间）。
+        /// 包含互锁逻辑：若结束时间早于起始时间，会自动提前起始时间。
+        /// </summary>
         public DateTime EndFullDateTime
         {
             get
@@ -186,18 +262,27 @@ namespace DoorMonitorSystem.ViewModels
         public ICommand PrevPageCommand { get; set; }
         public ICommand NextPageCommand { get; set; }
         public ICommand FirstPageCommand { get; set; } // 首页
+        public ICommand LastPageCommand { get; set; } // 尾页
+        public ICommand GoToPageCommand { get; set; } // 跳转
         public ICommand ResetCommand { get; set; }
         public ICommand ExportCommand { get; set; }
 
+        /// <summary>
+        /// 构造函数。
+        /// 初始化命令绑定，加载分类筛选数据，并自动触发首次默认查询。
+        /// </summary>
         public SystemLogViewModel()
         {
             SearchCommand = new RelayCommand(OnSearch);
             PrevPageCommand = new RelayCommand(OnPrevPage);
             NextPageCommand = new RelayCommand(OnNextPage);
+            FirstPageCommand = new RelayCommand(OnFirstPage);
+            LastPageCommand = new RelayCommand(OnLastPage);
+            GoToPageCommand = new RelayCommand(OnGoToPage);
             ResetCommand = new RelayCommand(OnReset);
             ExportCommand = new RelayCommand(OnExport);
 
-            ExportCommand = new RelayCommand(OnExport);
+            // ExportCommand = new RelayCommand(OnExport); // Duplicate line removed
 
             // 加载分类
             LoadCategories();
@@ -206,12 +291,20 @@ namespace DoorMonitorSystem.ViewModels
             _ = LoadLogsAsync();
         }
 
+        /// <summary>
+        /// 执行查询操作。
+        /// 重置到第一页并触发异步加载。
+        /// </summary>
         private void OnSearch(object obj)
         {
             CurrentPage = 1;
             _ = LoadLogsAsync();
         }
 
+        /// <summary>
+        /// 翻到上一页。
+        /// 仅更新显示层数据，不重新查询数据库（除非缓存未命中）。
+        /// </summary>
         private void OnPrevPage(object obj)
         {
             if (CurrentPage > 1)
@@ -221,11 +314,56 @@ namespace DoorMonitorSystem.ViewModels
             }
         }
 
+        /// <summary>
+        /// 翻到下一页。
+        /// </summary>
+        /// <summary>
+        /// 翻到下一页。
+        /// </summary>
         private void OnNextPage(object obj)
         {
             if (CurrentPage < TotalPages)
             {
                 CurrentPage++;
+                _ = UpdateDisplayLogsAsync();
+            }
+        }
+
+        /// <summary>
+        /// 跳转到首页。
+        /// </summary>
+        private void OnFirstPage(object obj)
+        {
+            if (CurrentPage > 1)
+            {
+                CurrentPage = 1;
+                _ = UpdateDisplayLogsAsync();
+            }
+        }
+
+        /// <summary>
+        /// 跳转到尾页。
+        /// </summary>
+        private void OnLastPage(object obj)
+        {
+            if (CurrentPage < TotalPages)
+            {
+                CurrentPage = TotalPages;
+                _ = UpdateDisplayLogsAsync();
+            }
+        }
+
+        /// <summary>
+        /// 跳转到指定页。
+        /// </summary>
+        private void OnGoToPage(object obj)
+        {
+            if (JumpPage < 1) JumpPage = 1;
+            if (JumpPage > TotalPages) JumpPage = TotalPages;
+            
+            if (JumpPage != CurrentPage)
+            {
+                CurrentPage = JumpPage;
                 _ = UpdateDisplayLogsAsync();
             }
         }
@@ -290,8 +428,14 @@ namespace DoorMonitorSystem.ViewModels
         }
 
         /// <summary>
-        /// 辅助方法：构建查询条件
+        /// 辅助方法：构建 SQL 查询条件。
+        /// 根据当前 UI 的所有筛选条件（时间、分类、类型、关键字）生成 FROM 和 WHERE 子句。
+        /// 自动处理跨月分表查询（UNION ALL）。
         /// </summary>
+        /// <returns>
+        /// fromSource: 包含 UNION ALL 的多表查询源，或者单表名。
+        /// baseWhere: 综合 WHERE 查询条件字符串。
+        /// </returns>
         private (string fromSource, string baseWhere) GetSearchCriteria()
         {
             if (GlobalData.SysCfg == null) return ("", "");
@@ -329,12 +473,22 @@ namespace DoorMonitorSystem.ViewModels
             {
                 baseWhere += $" AND Category = '{SelectedCategory}'";
             }
-            if (SelectedLogLevel == "状态") baseWhere += " AND LogType <> 2";
-            else if (SelectedLogLevel == "报警") baseWhere += " AND LogType = 2";
+            if (SelectedLogLevel != "全部")
+            {
+                // 反查 ID
+                var logTypeId = PointLogEntity.LogTypeMap.FirstOrDefault(x => x.Value == SelectedLogLevel).Key;
+                if (logTypeId > 0)
+                {
+                    baseWhere += $" AND LogType = {logTypeId}";
+                }
+            }
 
             return (fromSource, baseWhere);
         }
 
+        /// <summary>
+        /// 重置所有筛选条件到默认值（显示当前的全部系统日志）。
+        /// </summary>
         private void OnReset(object obj)
         {
             StartDate = DateTime.Now;
@@ -353,6 +507,10 @@ namespace DoorMonitorSystem.ViewModels
             _ = LoadLogsAsync();
         }
 
+        /// <summary>
+        /// 导出当前查询条件下的所有日志数据。
+        /// 支持 Excel (*.xlsx) 和 CSV 格式。Excel 包含中文表头，适合报表；CSV 用于极大数据量备份。
+        /// </summary>
         private async void OnExport(object obj)
         {
             if (TotalCount == 0)
@@ -480,6 +638,15 @@ namespace DoorMonitorSystem.ViewModels
             return text;
         }
 
+        /// <summary>
+        /// 异步加载日志列表（核心查询逻辑）。
+        /// 流程：
+        /// 1. 取消上次未完成的查询。
+        /// 2. 构建跨月查询表名集合。
+        /// 3. 查询总数 (COUNT) 并计算分页参数。
+        /// 4. 优先加载第一页数据并刷新 UI。
+        /// 5. 启动后台静默线程加载剩余数据到内存缓存。
+        /// </summary>
         private async Task LoadLogsAsync()
         {
             if (IsLoading) return;
@@ -562,7 +729,9 @@ namespace DoorMonitorSystem.ViewModels
         }
 
         /// <summary>
-        /// 后台批量加载逻辑：每 5000 条一组拉取
+        /// 后台静默批量加载。
+        /// 在主线程显示第一页数据后，此方法会在后台分批次（每批5000条）拉取剩余数据到内存缓存。
+        /// 目的：实现“秒开”体验，同时支持大数据的快速翻页。
         /// </summary>
         private async Task BackgroundBatchLoad(string fromSource, string baseWhere, int totalCount, System.Threading.CancellationToken token)
         {
@@ -601,6 +770,14 @@ namespace DoorMonitorSystem.ViewModels
             }
         }
 
+        /// <summary>
+        /// 初始化加载所有筛选选项。
+        /// 包括：
+        /// 1. 日志类型 (LogType 表)。
+        /// 2. 动态扫描已有的业务分组 (DevicePointConfig 表中的 Category 字段)。
+        /// 3. 检查是否有模拟量点位以决定是否显示“模拟量数据”选项。
+        /// 4. 自动修补旧版日志数据库 Schema（后台任务）。
+        /// </summary>
         private void LoadCategories()
         {
             try
@@ -613,7 +790,19 @@ namespace DoorMonitorSystem.ViewModels
                     using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
                     db.Connect();
                     
-                    // 从点位配置表中获取所有已配置的分类
+                    // 1. 加载日志类型 (报警/状态/等)
+                    var logTypes = db.FindAll<LogTypeEntity>().OrderBy(x => x.SortOrder).ToList();
+                    var typeNames = new List<string> { "全部" };
+                    typeNames.AddRange(logTypes.Select(x => x.Name));
+                    
+                    LogLevelOptions = typeNames;
+                    OnPropertyChanged(nameof(LogLevelOptions));
+
+                    // 更新全局缓存，用于显示列表中的类型名称
+                    PointLogEntity.LogTypeMap.Clear();
+                    foreach(var lt in logTypes) PointLogEntity.LogTypeMap[lt.Id] = lt.Name;
+
+                    // 2. 加载业务分类
                     string sql = "SELECT DISTINCT Category FROM DevicePointConfig WHERE Category IS NOT NULL AND Category != ''";
                     var dt = db.ExecuteQuery(sql);
                     
@@ -623,8 +812,7 @@ namespace DoorMonitorSystem.ViewModels
                         if (!Categories.Contains(cat)) { Categories.Add(cat); }
                     }
 
-                    // 检查是否存在开启了记录功能的模拟量点位 (排除 bool/bit 类型，且 IsLogEnabled = 1)
-                    // 使用 LOWER() 确保大小写兼容
+                    // 3. 检查是否存在开启了记录功能的模拟量点位
                     var aDt = db.ExecuteQuery("SELECT COUNT(*) FROM DevicePointConfig WHERE LOWER(DataType) NOT LIKE '%bool%' AND LOWER(DataType) NOT LIKE '%bit%' AND IsLogEnabled = 1");
                     if (aDt.Rows.Count > 0)
                     {
@@ -640,7 +828,6 @@ namespace DoorMonitorSystem.ViewModels
                             using var ldb = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, logDb);
                             ldb.Connect();
                             
-                            // 补丁：同时检查 PointLogs 和 AnalogLogs 两类表
                             string[] prefixes = { "PointLogs", "AnalogLogs" };
                             foreach (var pfx in prefixes)
                             {
@@ -648,12 +835,8 @@ namespace DoorMonitorSystem.ViewModels
                                 foreach (System.Data.DataRow r in tables.Rows)
                                 {
                                     string tName = r[0].ToString();
-                                    
-                                    // Check & Add Category
                                     try { ldb.ExecuteNonQuery($"ALTER TABLE `{tName}` ADD COLUMN Category VARCHAR(50);"); } catch { }
-                                    // Check & Add UserName
                                     try { ldb.ExecuteNonQuery($"ALTER TABLE `{tName}` ADD COLUMN UserName VARCHAR(50);"); } catch { }
-                                    // Check & Add ValText
                                     try { ldb.ExecuteNonQuery($"ALTER TABLE `{tName}` ADD COLUMN ValText VARCHAR(50);"); } catch { }
                                 }
                             }

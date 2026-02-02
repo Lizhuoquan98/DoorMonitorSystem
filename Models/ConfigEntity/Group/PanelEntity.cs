@@ -11,13 +11,6 @@ namespace DoorMonitorSystem.Models.ConfigEntity.Group
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int Id { get; set; }
 
-        /// <summary>所属面板组ID</summary>
-        [Required]
-        public int PanelGroupId { get; set; }
-
-        /// <summary>面板类型ID (关联 PanelBitConfig)</summary>
-        public int PanelTypeId { get; set; }
-
         /// <summary>面板名称</summary>
         [Required, StringLength(100)]
         public string PanelName { get; set; } = "";
@@ -34,10 +27,22 @@ namespace DoorMonitorSystem.Models.ConfigEntity.Group
         /// <summary>排序序号</summary>
         public int SortOrder { get; set; }
 
-        /// <summary>起始字节偏移 (相对基址)</summary>
-        public int ByteStartAddr { get; set; }
+        /// <summary>面板类型 (关联 PanelType.KeyId)</summary>
+        [StringLength(50)]
+        public string PanelTypeKeyId { get; set; }
+
+        /// <summary>起始字节地址 (在组内)</summary>
+        public int ByteStartAddr { get; set; } // This property was "起始字节偏移 (相对基址)" in original, but the instruction's context implies it should be here.
 
         /// <summary>数据字节长度/宽度</summary>
         public int ByteLength { get; set; }
+
+        /// <summary>全局唯一标识 (GUID)</summary>
+        [StringLength(50)]
+        public string KeyId { get; set; }
+
+        /// <summary>关联父级面板组的KeyId</summary>
+        [StringLength(50)]
+        public string ParentKeyId { get; set; }
     }
 }

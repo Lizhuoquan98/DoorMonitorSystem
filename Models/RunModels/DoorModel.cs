@@ -15,6 +15,9 @@ namespace DoorMonitorSystem.Models.RunModels
         /// <summary>门ID（主键，用于UI路径定位）</summary>
         public int DoorId { get; set; }
 
+        /// <summary>全局唯一标识 (GUID)</summary>
+        public string KeyId { get; set; }
+
         /// <summary>所属门组ID（外键，通过ID关联门组）</summary>
         public int DoorGroupId { get; set; }
 
@@ -99,7 +102,12 @@ namespace DoorMonitorSystem.Models.RunModels
         /// <summary>
         /// 打开详情命令（直接绑定，避免 RelativeSource 查找开销）
         /// </summary>
-        public System.Windows.Input.ICommand? OpenDetailCommand { get; set; }
+        private System.Windows.Input.ICommand? _openDetailCommand;
+        public System.Windows.Input.ICommand? OpenDetailCommand 
+        { 
+            get => _openDetailCommand;
+            set { _openDetailCommand = value; OnPropertyChanged(); }
+        }
 
         #endregion
     }

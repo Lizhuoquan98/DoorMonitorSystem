@@ -28,6 +28,12 @@ namespace DoorMonitorSystem.Assets.Helper
                 EnsureColumnExists(db, "DoorBitConfig", "LogTypeId", "INT DEFAULT 1");
                 EnsureColumnExists(db, "PanelBitConfig", "LogTypeId", "INT DEFAULT 1");
 
+                // 确保缺失的 DataType 和 SortOrder 字段存在
+                EnsureColumnExists(db, "DoorBitConfig", "DataType", "VARCHAR(20) DEFAULT 'Bool'");
+                EnsureColumnExists(db, "DoorBitConfig", "SortOrder", "INT DEFAULT 0");
+                EnsureColumnExists(db, "PanelBitConfig", "DataType", "VARCHAR(20) DEFAULT 'Bool'");
+                EnsureColumnExists(db, "PanelBitConfig", "SortOrder", "INT DEFAULT 0");
+
                 // 修正遗留数据的 LogTypeId=0 问题 (默认为1)
                 db.ExecuteNonQuery("UPDATE DevicePointConfig SET LogTypeId = 1 WHERE LogTypeId = 0");
                 db.ExecuteNonQuery("UPDATE DoorBitConfig SET LogTypeId = 1 WHERE LogTypeId = 0");

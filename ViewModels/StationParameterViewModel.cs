@@ -105,11 +105,19 @@ namespace DoorMonitorSystem.ViewModels
             set { _targetDeviceId = value; OnPropertyChanged(); BindConfigToParameters(); } 
         }
 
-        /// <summary>站台关联的数据库ID (用于精准匹配 TargetType=3 & TargetObjId=StationId 的点位)</summary>
+        /// <summary>站台关联的数据库ID</summary>
         public int? StationId 
         { 
             get => _stationId; 
-            set { _stationId = value; OnPropertyChanged(); BindConfigToParameters(); } 
+            set { _stationId = value; OnPropertyChanged(); } 
+        }
+
+        private string _stationKeyId;
+        /// <summary>站台关联的唯一标识 (用于精准匹配 TargetKeyId 的点位)</summary>
+        public string StationKeyId
+        {
+            get => _stationKeyId;
+            set { _stationKeyId = value; OnPropertyChanged(); BindConfigToParameters(); }
         }
 
         #endregion
@@ -134,11 +142,12 @@ namespace DoorMonitorSystem.ViewModels
         /// <param name="models">全局预设的型号映射表 (此时已从数据库加载)</param>
         /// <param name="targetDeviceId">目标设备ID (可选，用于精确区分多站台)</param>
         /// <param name="stationId">站台数据库ID (可选，用于精确关联参数点位)</param>
-        public StationParameterViewModel(string stationName, ObservableCollection<AsdModelMapping> models, int? targetDeviceId = null, int? stationId = null)
+        public StationParameterViewModel(string stationName, ObservableCollection<AsdModelMapping> models, int? targetDeviceId = null, int? stationId = null, string stationKeyId = null)
         {
             StationName = stationName;
             TargetDeviceId = targetDeviceId;
             StationId = stationId;
+            StationKeyId = stationKeyId;
 
             AsdModels = models;
             _selectedAsdModel = AsdModels.FirstOrDefault();
@@ -204,17 +213,17 @@ namespace DoorMonitorSystem.ViewModels
                 // 核心逻辑：UI参数项与点位配置的“物理-逻辑”关联。
                 
                 DevicePointConfigEntity cfg = null;
-                if (StationId.HasValue)
+                if (!string.IsNullOrEmpty(StationKeyId))
                 {
                     // 1. 站台级精准寻址：查找明确绑定到此站台 (TargetType=Station) 的点位。
                     // 优先匹配 BindingRole 为 "Read" 的点位（最符合参数实时显示的语义）。
-                    cfg = DeviceCommunicationService.Instance?.GetPointConfigForStation(StationId.Value, item.BindingKey, "Read", TargetDeviceId);
+                    cfg = DeviceCommunicationService.Instance?.GetPointConfigForStation(StationKeyId, item.BindingKey, "Read", TargetDeviceId);
                     
                     // 2. 备选逻辑：如果没找到 Read 角色，尝试该站台下同键名但非 Write 角色的点位。
                     // 目的是兼容那些没设角色或者角色设为 Parameter 的点位，但严禁将“写入点位”当做“读取来源”。
                     if (cfg == null)
                     {
-                        var allConfigs = DeviceCommunicationService.Instance?.GetPointConfigsForStation(StationId.Value);
+                        var allConfigs = DeviceCommunicationService.Instance?.GetPointConfigsForStation(StationKeyId);
                         cfg = allConfigs?.FirstOrDefault(p => string.Equals(p.UiBinding, item.BindingKey, StringComparison.OrdinalIgnoreCase) 
                                                            && p.BindingRole != "Write"); 
                     }
@@ -237,7 +246,7 @@ namespace DoorMonitorSystem.ViewModels
 
                 if (cfg != null)
                 {
-                    item.DebugInfo = $"已绑定: Addr={cfg.Address}, Role={cfg.BindingRole}, ObjId={cfg.TargetObjId}";
+                    item.DebugInfo = $"已绑定: Addr={cfg.Address}, Role={cfg.BindingRole}";
                     foundCount++;
                     
                     if (cfg.LastValue != null)
@@ -253,7 +262,7 @@ namespace DoorMonitorSystem.ViewModels
                     // 只有在 ID 解析出来后才输出警告日志，避免启动瞬间产生的无效警告
                     if (TargetDeviceId.HasValue)
                     {
-                        LogHelper.Warn($"[ParamBind] {StationName} 匹配失败: Key='{item.BindingKey}'。请检查点表是否有 TargetType=3 & TargetObjId={StationId} & Role=Read 的配置。");
+                        LogHelper.Warn($"[ParamBind] {StationName} 匹配失败: Key='{item.BindingKey}'。请检查点表是否有 TargetType=3 & TargetKeyId={StationKeyId} & Role=Read 的配置。");
                     }
                 }
             }
@@ -377,12 +386,12 @@ namespace DoorMonitorSystem.ViewModels
                 DevicePointConfigEntity writeCfg = null;
 
                 // 1. 优先：站台级精准寻址
-                if (StationId.HasValue)
+                if (!string.IsNullOrEmpty(StationKeyId))
                 {
-                    writeCfg = DeviceCommunicationService.Instance?.GetPointConfigForStation(StationId.Value, item.BindingKey, "Write", TargetDeviceId);
+                    writeCfg = DeviceCommunicationService.Instance?.GetPointConfigForStation(StationKeyId, item.BindingKey, "Write", TargetDeviceId);
                     if (writeCfg == null)
                     {
-                        writeCfg = DeviceCommunicationService.Instance?.GetPointConfigForStation(StationId.Value, item.BindingKey, "Parameter", TargetDeviceId);
+                        writeCfg = DeviceCommunicationService.Instance?.GetPointConfigForStation(StationKeyId, item.BindingKey, "Parameter", TargetDeviceId);
                     }
                 }
 
@@ -436,10 +445,10 @@ namespace DoorMonitorSystem.ViewModels
             // --- 核心控制逻辑：下发门号 -> 延时 -> 触发写入指令 ---
             try 
             {
-                if (StationId.HasValue)
+                if (!string.IsNullOrEmpty(StationKeyId))
                 {
                     // 1. 下发门号 (Sys_DoorId)
-                    var doorIdPoint = DeviceCommunicationService.Instance?.GetPointConfigForStation(StationId.Value, "Sys_DoorId", "Write", TargetDeviceId);
+                    var doorIdPoint = DeviceCommunicationService.Instance?.GetPointConfigForStation(StationKeyId, "Sys_DoorId", "Write", TargetDeviceId);
                     if (doorIdPoint != null)
                     {
                         await DeviceCommunicationService.Instance.WritePointValueAsync(doorIdPoint, DoorId.ToString());
@@ -450,7 +459,7 @@ namespace DoorMonitorSystem.ViewModels
                     await Task.Delay(100);
 
                     // 3. 下发写入触发状态 (Sys_WriteTrigger)
-                    var writeTriggerPoint = DeviceCommunicationService.Instance?.GetPointConfigForStation(StationId.Value, "Sys_WriteTrigger", "Write", TargetDeviceId);
+                    var writeTriggerPoint = DeviceCommunicationService.Instance?.GetPointConfigForStation(StationKeyId, "Sys_WriteTrigger", "Write", TargetDeviceId);
                     if (writeTriggerPoint != null)
                     {
                         await DeviceCommunicationService.Instance.WritePointValueAsync(writeTriggerPoint, "1");
@@ -497,7 +506,7 @@ namespace DoorMonitorSystem.ViewModels
             try 
             {
                 // A. 下发目标门号 (Sys_DoorId)
-                var doorIdPoint = DeviceCommunicationService.Instance?.GetPointConfigForStation(StationId.Value, "Sys_DoorId", "Write", TargetDeviceId);
+                var doorIdPoint = DeviceCommunicationService.Instance?.GetPointConfigForStation(StationKeyId, "Sys_DoorId", "Write", TargetDeviceId);
                 if (doorIdPoint != null)
                 {
                     await DeviceCommunicationService.Instance.WritePointValueAsync(doorIdPoint, DoorId.ToString());
@@ -507,7 +516,7 @@ namespace DoorMonitorSystem.ViewModels
                 await Task.Delay(100);
 
                 // C. 下发读取触发指令 (Sys_ReadTrigger)
-                var readTriggerPoint = DeviceCommunicationService.Instance?.GetPointConfigForStation(StationId.Value, "Sys_ReadTrigger", "Write", TargetDeviceId);
+                var readTriggerPoint = DeviceCommunicationService.Instance?.GetPointConfigForStation(StationKeyId, "Sys_ReadTrigger", "Write", TargetDeviceId);
                 if (readTriggerPoint != null)
                 {
                     await DeviceCommunicationService.Instance.WritePointValueAsync(readTriggerPoint, "1");

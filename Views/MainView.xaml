@@ -25,7 +25,7 @@
                 BottomBackground="{Binding Visual.BottomBackground}"
                 BorderThickness="0"
                 IconItems="{Binding Visual.Icons}"
-                Command="{Binding OpenDetailCommand}"
+                Command="{Binding DataContext.OpenDoorDetailCommand, RelativeSource={RelativeSource AncestorType=local:MainView}}"
                 CommandParameter="{Binding}"
                 Width="50" Height="80"
                 Margin="1,0"
@@ -37,16 +37,18 @@
 
         <!-- 门组模板 -->
         <DataTemplate x:Key="DoorGroupTemplate" DataType="{x:Type models:DoorGroup}">
-            <ItemsControl ItemsSource="{Binding Doors}" Margin="0,2">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <StaticResource ResourceKey="DoorTemplate"/>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <Viewbox Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Center">
+                <ItemsControl ItemsSource="{Binding Doors}" Margin="0,2">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <StaticResource ResourceKey="DoorTemplate"/>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Viewbox>
         </DataTemplate>
 
         <!-- 面板点位模板 -->

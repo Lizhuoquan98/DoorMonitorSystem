@@ -93,7 +93,7 @@ namespace DoorMonitorSystem.ViewModels
                 if (existing == null)
                 {
                     System.Windows.Application.Current.Dispatcher.Invoke(() => {
-                        StationSettings.Add(new StationParameterViewModel(name, _asdModels, devId, stationId));
+                        StationSettings.Add(new StationParameterViewModel(name, _asdModels, devId, stationId, stVm.Station.KeyId));
                     });
                 }
                 else
@@ -101,6 +101,7 @@ namespace DoorMonitorSystem.ViewModels
                     // 同步 ID (解决异步加载或配置变更)
                     existing.TargetDeviceId = devId;
                     existing.StationId = stationId;
+                    existing.StationKeyId = stVm.Station.KeyId;
                 }
             }
 
@@ -156,8 +157,8 @@ namespace DoorMonitorSystem.ViewModels
 
                 // 策略 2：回退逻辑。如果该站台还没配门（例如仅作为参数集），
                 // 则尝试提取该站台 ID 下已配置的任意点位的 DeviceId。
-                var stationId = stVm.Station.StationId;
-                var stationPoints = DeviceCommunicationService.Instance?.GetPointConfigsForStation(stationId);
+                var stationKeyId = stVm.Station.KeyId;
+                var stationPoints = DeviceCommunicationService.Instance?.GetPointConfigsForStation(stationKeyId);
                 var firstPoint = stationPoints?.FirstOrDefault();
                 if (firstPoint != null) return firstPoint.SourceDeviceId;
             }

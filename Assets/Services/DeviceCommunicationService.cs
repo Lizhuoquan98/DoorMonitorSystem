@@ -14,7 +14,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Reflection;
 using System.Collections.Concurrent;
-using System.Collections.Concurrent;
 using Communicationlib; // 包含 ICommBase
 using DoorMonitorSystem; // 包含 GlobalData
 
@@ -50,8 +49,8 @@ namespace DoorMonitorSystem.Assets.Services
         private readonly Dictionary<int, IProtocolClient> _protocolClients = new();
         private readonly Dictionary<int, ICommBase> _slaves = new();
         private Dictionary<int, List<DevicePointConfigEntity>> _devicePointsCache = new();
-        private Dictionary<int, List<DevicePointConfigEntity>> _doorPointsIndex = new(); // Index by TargetObjId (Door)
-        private Dictionary<int, List<DevicePointConfigEntity>> _stationPointsIndex = new(); // Index by TargetObjId (Station)
+        private Dictionary<string, List<DevicePointConfigEntity>> _doorPointsIndex = new(); // Index by TargetKeyId (Door)
+        private Dictionary<string, List<DevicePointConfigEntity>> _stationPointsIndex = new(); // Index by TargetKeyId (Station)
         
         private DataProcessor? _dataProcessor;
 
@@ -78,9 +77,9 @@ namespace DoorMonitorSystem.Assets.Services
         /// <summary>
         /// (UI用) 根据门号查找点位配置
         /// </summary>
-        public DevicePointConfigEntity? GetPointConfigForDoor(int doorId, string uiBinding, string role = "Read", int? sourceDeviceId = null)
+        public DevicePointConfigEntity? GetPointConfigForDoor(string doorKeyId, string uiBinding, string role = "Read", int? sourceDeviceId = null)
         {
-            if (_doorPointsIndex.TryGetValue(doorId, out var list))
+            if (_doorPointsIndex.TryGetValue(doorKeyId, out var list))
             {
                 var query = list.Where(p => string.Equals(p.UiBinding, uiBinding, StringComparison.OrdinalIgnoreCase) 
                                          && string.Equals(p.BindingRole, role, StringComparison.OrdinalIgnoreCase));
@@ -95,11 +94,11 @@ namespace DoorMonitorSystem.Assets.Services
             return null;
         }
 
-        public DevicePointConfigEntity? GetPointConfigForDoorRelaxed(int doorId, string uiBinding, int? sourceDeviceId = null)
+        public DevicePointConfigEntity? GetPointConfigForDoorRelaxed(string doorKeyId, string uiBinding, int? sourceDeviceId = null)
         {
             if (string.IsNullOrWhiteSpace(uiBinding)) return null;
             
-            if (_doorPointsIndex.TryGetValue(doorId, out var list))
+            if (_doorPointsIndex.TryGetValue(doorKeyId, out var list))
             {
                 // 1. Try match (Case Insensitive)
                 var query = list.Where(p => string.Equals(p.UiBinding, uiBinding, StringComparison.OrdinalIgnoreCase));
@@ -117,13 +116,13 @@ namespace DoorMonitorSystem.Assets.Services
         /// <summary>
         /// (UI用) 根据站台号查找点位配置
         /// </summary>
-        public DevicePointConfigEntity? GetPointConfigForStation(int stationId, string uiBinding, string role = "Read", int? sourceDeviceId = null)
+        public DevicePointConfigEntity? GetPointConfigForStation(string stationKeyId, string uiBinding, string role = "Read", int? sourceDeviceId = null)
         {
             DevicePointConfigEntity? result = null;
 
             // 1. 优先查找当前站台特定的配置：
-            // 根据 stationId (TargetObjId) 在索引中定位该站台专属的点位列表
-            if (_stationPointsIndex.TryGetValue(stationId, out var list))
+            // 根据 stationKeyId 在索引中定位该站台专属的点位列表
+            if (_stationPointsIndex.TryGetValue(stationKeyId, out var list))
             {
                 var query = list.Where(p => string.Equals(p.UiBinding, uiBinding, StringComparison.OrdinalIgnoreCase) 
                                          && (role == null || string.Equals(p.BindingRole, role, StringComparison.OrdinalIgnoreCase)));
@@ -133,9 +132,9 @@ namespace DoorMonitorSystem.Assets.Services
                 result = query.FirstOrDefault();
             }
 
-            // 2. 备选查找站台通用配置 (TargetObjId = 0)：
+            // 2. 备选查找站台通用配置 (TargetKeyId = "0")：
             // 如果特定站台没配，则查找标记为“站台通用”的点位，实现多站台复用同一套配置
-            if (result == null && _stationPointsIndex.TryGetValue(0, out var commonList))
+            if (result == null && _stationPointsIndex.TryGetValue("0", out var commonList))
             {
                 var query = commonList.Where(p => string.Equals(p.UiBinding, uiBinding, StringComparison.OrdinalIgnoreCase) 
                                          && (role == null || string.Equals(p.BindingRole, role, StringComparison.OrdinalIgnoreCase)));
@@ -150,10 +149,11 @@ namespace DoorMonitorSystem.Assets.Services
         /// <summary>
         /// 获取站台下的所有点位配置
         /// </summary>
-        public List<DevicePointConfigEntity> GetPointConfigsForStation(int stationId)
+        public List<DevicePointConfigEntity> GetPointConfigsForStation(string stationKeyId)
         {
-            // 直接从站台索引中拉取该站台 ID 绑定的所有点位，用于批量解析或 ID 溯源
-            if (_stationPointsIndex.TryGetValue(stationId, out var list)) return list;
+            if (string.IsNullOrEmpty(stationKeyId)) return new List<DevicePointConfigEntity>();
+            // 直接从站台索引中拉取该站台 KeyId 绑定的所有点位，用于批量解析或 ID 溯源
+            if (_stationPointsIndex.TryGetValue(stationKeyId, out var list)) return list;
             return new List<DevicePointConfigEntity>();
         }
 
@@ -284,14 +284,16 @@ namespace DoorMonitorSystem.Assets.Services
                     // 1. 底层通讯索引 (Key = SourceDeviceId / PLC ID)
                     _devicePointsCache = points.GroupBy(p => p.SourceDeviceId).ToDictionary(g => g.Key, g => g.ToList());
                     
-                    // 2. UI 业务索引 (Key = TargetObjId / Door ID)
+                    // 2. UI 业务索引 (Key = TargetKeyId / Door KeyId)
                     _doorPointsIndex = points.Where(p => p.TargetType == TargetType.Door)
-                                             .GroupBy(p => p.TargetObjId)
+                                             .GroupBy(p => p.TargetKeyId)
+                                             .Where(g => !string.IsNullOrEmpty(g.Key))
                                              .ToDictionary(g => g.Key, g => g.ToList());
 
-                    // 3. UI 业务索引 (Key = TargetObjId / Station ID)
+                    // 3. UI 业务索引 (Key = TargetKeyId / Station KeyId)
                     _stationPointsIndex = points.Where(p => p.TargetType == TargetType.Station)
-                                             .GroupBy(p => p.TargetObjId)
+                                             .GroupBy(p => p.TargetKeyId)
+                                             .Where(g => !string.IsNullOrEmpty(g.Key))
                                              .ToDictionary(g => g.Key, g => g.ToList());
 
                     LogHelper.Info($"[CommService] 加载点位配置完成。点位总数: {points.Count}, 门组: {_doorPointsIndex.Count}, 站台组: {_stationPointsIndex.Count}");

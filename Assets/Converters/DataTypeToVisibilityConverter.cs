@@ -9,22 +9,35 @@ namespace DoorMonitorSystem.Assets.Converters
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is string dataType && parameter is string targetMode)
+            string targetMode = parameter as string;
+            
+            // 1. 特殊逻辑处理
+            if (targetMode == "HasValue")
+            {
+                bool hasValue = value != null && !string.IsNullOrEmpty(value.ToString());
+                return hasValue ? Visibility.Visible : Visibility.Collapsed;
+            }
+            if (targetMode == "InverseBool" && value is bool b)
+            {
+                return !b ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            // 2. 原有的数据类型判断逻辑
+            if (value is string dataType && !string.IsNullOrEmpty(targetMode))
             {
                 bool isBool = dataType.Equals("Bool", StringComparison.OrdinalIgnoreCase) || 
                               dataType.Equals("Bit", StringComparison.OrdinalIgnoreCase);
 
                 if (targetMode == "Bool")
                 {
-                    // If target mode is Bool, show only if IsBool is true
                     return isBool ? Visibility.Visible : Visibility.Collapsed;
                 }
                 else if (targetMode == "Analog")
                 {
-                    // If target mode is Analog, show only if IsBool is false
                     return !isBool ? Visibility.Visible : Visibility.Collapsed;
                 }
             }
+
             return Visibility.Collapsed;
         }
 
