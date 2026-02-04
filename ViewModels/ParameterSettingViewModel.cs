@@ -7,6 +7,8 @@ using Base;
 using DoorMonitorSystem.Base;
 using DoorMonitorSystem.Models.RunModels;
 using DoorMonitorSystem.Assets.Services;
+using System.Windows.Input;
+using DoorMonitorSystem.Models.ConfigEntity;
 
 namespace DoorMonitorSystem.ViewModels
 {
@@ -30,7 +32,123 @@ namespace DoorMonitorSystem.ViewModels
             set { _stationSettings = value; OnPropertyChanged(); }
         }
 
+        private bool _isManagementMode;
+        /// <summary>是否处于模板管理模式</summary>
+        public bool IsManagementMode
+        {
+            get => _isManagementMode;
+            set { _isManagementMode = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>管理用的参数定义集合</summary>
+        public ObservableCollection<ParameterDefineEntity> ManageParameterDefines { get; set; } = new ObservableCollection<ParameterDefineEntity>();
+        
+        /// <summary>管理用的 ASD 模型映射集合</summary>
+        public ObservableCollection<AsdModelMappingEntity> ManageAsdModels { get; set; } = new ObservableCollection<AsdModelMappingEntity>();
+
+        /// <summary>
+        /// 管理员可见性 (用于控制模板管理入口)
+        /// </summary>
+        public System.Windows.Visibility AdminVisibility => 
+            (GlobalData.CurrentUser?.Role?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true) 
+            ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+
+        /// <summary>
+        /// 刷新权限状态 (当用户切换时调用)
+        /// </summary>
+        public void UpdatePermissions()
+        {
+            OnPropertyChanged(nameof(AdminVisibility));
+            foreach (var st in StationSettings)
+            {
+                st.UpdatePermissions();
+            }
+        }
+
         #endregion
+
+        #region 命令 (Commands)
+
+        public ICommand ToggleManagementCommand => new RelayCommand(obj => {
+            IsManagementMode = !IsManagementMode;
+            if (IsManagementMode) LoadManagementData();
+        });
+
+        public ICommand AddDefCommand => new RelayCommand(obj => {
+            ManageParameterDefines.Add(new ParameterDefineEntity { Label = "新参数", DataType = "Int16", SortOrder = ManageParameterDefines.Count + 1 });
+        });
+
+        public ICommand DeleteDefCommand => new RelayCommand(obj => {
+            if (obj is ParameterDefineEntity entity) {
+                if (entity.Id > 0) DataManager.Instance.DeleteParameterDefine(entity);
+                ManageParameterDefines.Remove(entity);
+            }
+        });
+
+        public ICommand SaveDefsCommand => new RelayCommand(obj => {
+            foreach (var item in ManageParameterDefines) DataManager.Instance.SaveParameterDefine(item);
+            System.Windows.MessageBox.Show("参数项定义已保存到数据库。同步至实时界面中...", "操作成功");
+            ReloadRuntimeParameters();
+        });
+
+        public ICommand AddModelCommand => new RelayCommand(obj => {
+            ManageAsdModels.Add(new AsdModelMappingEntity { DisplayName = "NEW_MODEL", PlcId = 1 });
+        });
+
+        public ICommand DeleteModelCommand => new RelayCommand(obj => {
+            if (obj is AsdModelMappingEntity entity) {
+                if (entity.Id > 0) DataManager.Instance.DeleteAsdModel(entity);
+                ManageAsdModels.Remove(entity);
+            }
+        });
+
+        public ICommand SaveModelsCommand => new RelayCommand(obj => {
+            foreach (var item in ManageAsdModels) DataManager.Instance.SaveAsdModel(item);
+            System.Windows.MessageBox.Show("站台模型配置已保存。重新加载下拉框...", "操作成功");
+            ReloadRuntimeModels();
+        });
+
+        #endregion
+
+        private void LoadManagementData()
+        {
+            ManageParameterDefines.Clear();
+            var defs = DataManager.Instance.LoadParameterDefinesFromDb().OrderBy(p => p.SortOrder).ToList();
+            foreach (var item in defs) ManageParameterDefines.Add(item);
+
+            ManageAsdModels.Clear();
+            var models = DataManager.Instance.LoadAsdModelsFromDb().OrderBy(m => m.PlcId).ToList();
+            foreach (var item in models) ManageAsdModels.Add(item);
+        }
+
+        private void ReloadRuntimeParameters()
+        {
+            foreach (var st in StationSettings)
+            {
+                st.LoadParameterListFromDb(); // 重新从 DB 加载定义
+                st.BindConfigToParameters();  // 重新绑定点位
+            }
+        }
+
+        private void ReloadRuntimeModels()
+        {
+            var modelEntities = DataManager.Instance.LoadAsdModelsFromDb();
+            _asdModels.Clear();
+            foreach (var e in modelEntities)
+            {
+                _asdModels.Add(new AsdModelMapping { DisplayName = e.DisplayName, PlcId = e.PlcId });
+            }
+
+            foreach (var st in StationSettings)
+            {
+                // StationParameterViewModel 使用的是 _asdModels 引用，所以 Clear/Add 会自动同步
+                // 但为了保险，可以显式清理一下选中项如果它被删除了
+                if (st.SelectedAsdModel != null && !_asdModels.Contains(st.SelectedAsdModel))
+                {
+                    st.SelectedAsdModel = _asdModels.FirstOrDefault();
+                }
+            }
+        }
 
         /// <summary>
         /// 构造函数
@@ -42,7 +160,8 @@ namespace DoorMonitorSystem.ViewModels
             // 1. 从数据库读取 ASD 型号映射规则，实现动态扩展
             var modelEntities = DataManager.Instance.LoadAsdModelsFromDb();
             _asdModels = new ObservableCollection<AsdModelMapping>(
-                modelEntities.Select(e => new AsdModelMapping { DisplayName = e.DisplayName, PlcId = e.PlcId })
+                modelEntities.OrderBy(e => e.PlcId)
+                .Select(e => new AsdModelMapping { DisplayName = e.DisplayName, PlcId = e.PlcId })
             );
 
             // 如果数据库为空（理论上 DataManager 会初始化，但此处做防御），提供基础 fallback
@@ -168,5 +287,6 @@ namespace DoorMonitorSystem.ViewModels
             }
             return null;
         }
+        public List<string> PointDataTypes => Enum.GetNames(typeof(PointDataType)).ToList();
     }
 }

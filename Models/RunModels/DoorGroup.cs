@@ -18,7 +18,7 @@ namespace DoorMonitorSystem.Models.RunModels
         public int StationId { get; set; }
 
         /// <summary>门列表</summary>
-        public ObservableCollection<DoorModel> Doors { get; set; } = new();
+        public System.Collections.Generic.List<DoorModel> Doors { get; set; } = new();
 
         /// <summary>门组排序序号</summary>
         public int SortOrder { get; set; }

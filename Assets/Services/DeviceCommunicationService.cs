@@ -512,46 +512,60 @@ namespace DoorMonitorSystem.Assets.Services
             {
                 if (string.IsNullOrWhiteSpace(valueStr)) return false;
 
-                // 1. 数据类型解析与转换
-                string dType = p.DataType?.ToLower() ?? "word";
+                // 1. 数据类型解析与转换 (基于 DataTypeInfo)
+                string dType = p.DataType?.ToUpper() ?? "WORD";
                 ushort[]? registersToWrite = null;
                 bool isBitMode = false;
                 bool bitValue = false;
 
-                // 尝试解析数值
-                if (dType.Contains("bit") || dType.Contains("bool"))
+                // --- 统一写入解析逻辑 ---
+                if (dType == "BOOL" || dType == "BIT")
                 {
-                    // bool parsing: "1", "true", "on"
                     if (valueStr == "1" || valueStr.Equals("true", StringComparison.OrdinalIgnoreCase) || valueStr.Equals("on", StringComparison.OrdinalIgnoreCase)) bitValue = true;
                     else bitValue = false;
                     isBitMode = true;
                 }
-                else if (dType.Contains("dword") || dType.Contains("int32") || dType.Contains("uint32") || dType.Contains("integer"))
+                else if (dType == "BYTE")
                 {
-                    if (long.TryParse(valueStr, out long lVal))
+                    if (byte.TryParse(valueStr, out byte bVal)) registersToWrite = new ushort[] { bVal };
+                }
+                else if (dType == "SBYTE")
+                {
+                    if (sbyte.TryParse(valueStr, out sbyte sbVal)) registersToWrite = new ushort[] { (ushort)(byte)sbVal };
+                }
+                else if (dType == "INT16" || dType == "SHORT")
+                {
+                    if (short.TryParse(valueStr, out short sVal)) registersToWrite = new ushort[] { (ushort)sVal };
+                }
+                else if (dType == "UINT16" || dType == "WORD")
+                {
+                    if (ushort.TryParse(valueStr, out ushort u16Val)) registersToWrite = new ushort[] { u16Val };
+                }
+                else if (dType == "INT32" || dType == "DINT")
+                {
+                    if (int.TryParse(valueStr, out int i32Val))
                     {
-                        uint val = (uint)lVal;
-                        ushort high = (ushort)(val >> 16);
-                        ushort low = (ushort)(val & 0xFFFF);
-                        registersToWrite = new ushort[] { high, low }; // Big-Endian Word Order (CD AB)
+                        uint uVal = (uint)i32Val;
+                        registersToWrite = new ushort[] { (ushort)(uVal >> 16), (ushort)(uVal & 0xFFFF) };
                     }
                 }
-                else if (dType.Contains("float") || dType.Contains("real"))
+                else if (dType == "UINT32" || dType == "DWORD")
+                {
+                    if (uint.TryParse(valueStr, out uint u32Val))
+                    {
+                        registersToWrite = new ushort[] { (ushort)(u32Val >> 16), (ushort)(u32Val & 0xFFFF) };
+                    }
+                }
+                else if (dType == "FLOAT" || dType == "REAL")
                 {
                     if (float.TryParse(valueStr, out float fVal))
                     {
                         byte[] bytes = BitConverter.GetBytes(fVal);
-                        ushort low = BitConverter.ToUInt16(bytes, 0);
-                        ushort high = BitConverter.ToUInt16(bytes, 2);
-                        registersToWrite = new ushort[] { high, low }; // Big-Endian Word Order
-                    }
-                }
-                else // word, int16, short
-                {
-                    if (double.TryParse(valueStr, out double dVal))
-                    {
-                        ushort val = (ushort)(short)dVal;
-                        registersToWrite = new ushort[] { val };
+                        if (BitConverter.IsLittleEndian) Array.Reverse(bytes); // 转为 Big-Endian 字节序 ABCD
+                        registersToWrite = new ushort[] { 
+                            (ushort)((bytes[0] << 8) | bytes[1]), 
+                            (ushort)((bytes[2] << 8) | bytes[3]) 
+                        };
                     }
                 }
 

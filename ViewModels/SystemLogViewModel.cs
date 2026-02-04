@@ -282,7 +282,9 @@ namespace DoorMonitorSystem.ViewModels
             ResetCommand = new RelayCommand(OnReset);
             ExportCommand = new RelayCommand(OnExport);
 
-            // ExportCommand = new RelayCommand(OnExport); // Duplicate line removed
+            // 默认显示最近 1 小时的数据 (避免加载全天数据导致卡顿)
+            EndFullDateTime = DateTime.Now;
+            StartFullDateTime = DateTime.Now.AddHours(-1);
 
             // 加载分类
             LoadCategories();
@@ -491,10 +493,10 @@ namespace DoorMonitorSystem.ViewModels
         /// </summary>
         private void OnReset(object obj)
         {
-            StartDate = DateTime.Now;
-            EndDate = DateTime.Now;
-            SearchStartTime = "00:00:00";
-            SearchEndTime = DateTime.Now.ToString("HH:mm:ss");
+            // 重置为最近 1 小时 (减轻已包含大量数据的测试环境负载)
+            EndFullDateTime = DateTime.Now;
+            StartFullDateTime = DateTime.Now.AddHours(-1);
+
             Keyword = "";
             SelectedCategory = "全部";
             SelectedLogLevel = "全部";

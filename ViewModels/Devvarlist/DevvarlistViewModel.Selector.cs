@@ -85,7 +85,7 @@ namespace DoorMonitorSystem.ViewModels
                     NewPoint.Category = node.Category;
                     NewPoint.Description = $"{(string.IsNullOrEmpty(node.ParentName) ? "" : node.ParentName + "_")}{node.Name}";
                     break;
-
+                
                 case "PanelBit":
                     NewPoint.TargetType = TargetType.Panel;
                     NewPoint.TargetKeyId = node.KeyId;
@@ -95,7 +95,7 @@ namespace DoorMonitorSystem.ViewModels
                     NewPoint.Category = node.Category;
                     NewPoint.Description = $"{(string.IsNullOrEmpty(node.ParentName) ? "" : node.ParentName + "_")}{node.Name}";
                     break;
-
+             
                 case "ParamNode":
                 case "Param": // 兼容 XAML 中的 NodeType
                     NewPoint.TargetType = TargetType.Station;
@@ -210,10 +210,41 @@ namespace DoorMonitorSystem.ViewModels
                         stationRoot.Children.Add(groupNode);
                     }
 
-                    // 3. 系统参数
+                    // 3. 系统控制项 (如门号下发、读写触发)
+                    var controlGroup = new UiSelectorNode { Name = "系统控制", NodeType = "Group" };
+                    controlGroup.Children.Add(new UiSelectorNode { 
+                        Name = "目标门号下发 (Sys_DoorId)", 
+                        NodeType = "Param", 
+                        KeyId = station.KeyId, 
+                        BindingKey = "Sys_DoorId", 
+                        BindingRole = "Write", 
+                        Category = "系统控制",
+                        FullDescription = $"{station.StationName} > 系统控制 > 门号下发"
+                    });
+                    controlGroup.Children.Add(new UiSelectorNode { 
+                        Name = "参数读取触发 (Sys_ReadTrigger)", 
+                        NodeType = "Param", 
+                        KeyId = station.KeyId, 
+                        BindingKey = "Sys_ReadTrigger", 
+                        BindingRole = "Write", 
+                        Category = "系统控制",
+                        FullDescription = $"{station.StationName} > 系统控制 > 读取触发"
+                    });
+                    controlGroup.Children.Add(new UiSelectorNode { 
+                        Name = "参数写入触发 (Sys_WriteTrigger)", 
+                        NodeType = "Param", 
+                        KeyId = station.KeyId, 
+                        BindingKey = "Sys_WriteTrigger", 
+                        BindingRole = "Write", 
+                        Category = "系统控制",
+                        FullDescription = $"{station.StationName} > 系统控制 > 写入触发"
+                    });
+                    stationRoot.Children.Add(controlGroup);
+
+                    // 4. 系统参数
                     if (paramDefines.Count > 0)
                     {
-                        var paramGroup = new UiSelectorNode { Name = "系统参数", NodeType = "Group" };
+                        var paramGroup = new UiSelectorNode { Name = "站台参数模板", NodeType = "Group" };
                         foreach (var p in paramDefines.OrderBy(x => x.SortOrder))
                         {
                             var pNode = new UiSelectorNode 

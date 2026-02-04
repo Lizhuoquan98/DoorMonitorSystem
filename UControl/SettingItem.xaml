@@ -88,25 +88,25 @@
         </Grid.ColumnDefinitions>
 
         <!-- 参数名称 -->
-        <TextBlock Text="{Binding Label, RelativeSource={RelativeSource AncestorType={x:Type local:SettingItem}}}" 
+        <TextBlock Text="{Binding Label, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:SettingItem}}}" 
                    Style="{StaticResource BaseTextStyle}" 
                    HorizontalAlignment="Right" Margin="0,0,12,0"/>
 
         <!-- 设定值输入 -->
         <TextBox Grid.Column="1" 
-                 Text="{Binding Value, RelativeSource={RelativeSource AncestorType={x:Type local:SettingItem}}, UpdateSourceTrigger=LostFocus}"
+                 Text="{Binding Value, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:SettingItem}}, UpdateSourceTrigger=LostFocus}"
                  Style="{StaticResource SettingTextBoxStyle}"/>
 
         <!-- 实际值反馈 -->
         <TextBox Grid.Column="3" 
-                 Text="{Binding ReadbackValue, RelativeSource={RelativeSource AncestorType={x:Type local:SettingItem}}, Mode=OneWay}"
+                 Text="{Binding ReadbackValue, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:SettingItem}}, Mode=OneWay}"
                  Style="{StaticResource ReadbackTextBoxStyle}"/>
 
         <!-- 单位与量程 -->
         <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
-            <TextBlock Text="{Binding Unit, RelativeSource={RelativeSource AncestorType={x:Type local:SettingItem}}}" 
+            <TextBlock Text="{Binding Unit, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:SettingItem}}}" 
                        Style="{StaticResource BaseTextStyle}" Foreground="#A0B0C0" Margin="0,0,8,0"/>
-            <TextBlock Text="{Binding Hint, RelativeSource={RelativeSource AncestorType={x:Type local:SettingItem}}}" 
+            <TextBlock Text="{Binding Hint, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:SettingItem}}}" 
                        Style="{StaticResource BaseTextStyle}" Foreground="#666666" FontSize="12"/>
         </StackPanel>
     </Grid>

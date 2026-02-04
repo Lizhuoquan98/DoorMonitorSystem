@@ -140,7 +140,7 @@ namespace DoorMonitorSystem.Assets.Services
             {
                 // 增强默认消息内容：如果未配置模板，自动补齐分类前缀 [分类名] 描述
                 string logMsg = string.IsNullOrWhiteSpace(p.LogMessage) ? 
-                    (!string.IsNullOrEmpty(p.Category) ? $"[{p.Category}] {p.Description}" : p.Description) : 
+                    ( p.Description) : //!string.IsNullOrEmpty(p.Category) ? $"[{p.Category}] {p.Description}" :
                     p.LogMessage;
 
                 string valText = "";

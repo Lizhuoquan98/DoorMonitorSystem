@@ -181,6 +181,7 @@ namespace DoorMonitorSystem.ViewModels
             };
 
             Devices.Add(newDevice);
+            LogHelper.Info($"[设备配置] 用户新增了 PLC/控制器设备: {newDevice.Name} (ID: {newDevice.ID}, 协议: {newDevice.Protocol})");
             SelectedDeviceIndex = Devices.Count - 1;
             SelectedDevice = newDevice;
         });
@@ -204,7 +205,10 @@ namespace DoorMonitorSystem.ViewModels
 
             if (result == MessageBoxResult.Yes)
             {
+                var name = SelectedDevice?.Name;
+                var id = SelectedDevice?.ID;
                 Devices.RemoveAt(SelectedDeviceIndex);
+                LogHelper.Warn($"[设备配置] 用户删除了设备: {name} (ID: {id})");
                 SelectedDevice = Devices.FirstOrDefault();
                 SelectedDeviceIndex = Devices.Any() ? 0 : -1;
             }
@@ -425,17 +429,20 @@ namespace DoorMonitorSystem.ViewModels
                     
                     // 3. 更新全局缓存
                     GlobalData.ListDveices = Devices.ToList();
+                    LogHelper.Info($"[设备配置] 用户成功保存了设备列表（共 {Devices.Count} 个设备已同步至数据库）。");
 
                     MessageBox.Show("配置已成功保存到数据库！", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
-                catch
+                catch (Exception ex)
                 {
                     db.RollbackTransaction();
+                    LogHelper.Error($"[设备配置] 保存设备配置失败: {ex.Message}", ex);
                     throw;
                 }
             }
             catch (Exception ex)
             {
+                LogHelper.Error($"[设备配置] 保存严重错误: {ex.Message}", ex);
                 MessageBox.Show($"保存配置失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }

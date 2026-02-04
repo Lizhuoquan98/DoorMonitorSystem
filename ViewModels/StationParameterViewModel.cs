@@ -149,7 +149,17 @@ namespace DoorMonitorSystem.ViewModels
             StationId = stationId;
             StationKeyId = stationKeyId;
 
-            AsdModels = models;
+            // 修复排序问题：按物理ID (PlcId) 数字顺序排序，而非字符串字典序
+            if (models != null)
+            {
+                var sorted = models.OrderBy(m => m.PlcId).ToList();
+                AsdModels = new ObservableCollection<AsdModelMapping>(sorted);
+            }
+            else
+            {
+                AsdModels = new ObservableCollection<AsdModelMapping>();
+            }
+
             _selectedAsdModel = AsdModels.FirstOrDefault();
 
             // 订阅通信服务加载完成事件 (解决启动时数据库读取的时序问题)
@@ -297,7 +307,7 @@ namespace DoorMonitorSystem.ViewModels
         /// <summary>
         /// 从数据库加载参数定义模板
         /// </summary>
-        private void LoadParameterListFromDb()
+        public void LoadParameterListFromDb()
         {
             var defines = DataManager.Instance.LoadParameterDefinesFromDb();
             var items = defines.Select(d => new ParameterItem
@@ -319,12 +329,15 @@ namespace DoorMonitorSystem.ViewModels
         /// </summary>
         public void UpdatePermissions()
         {
-            // 获取当前登录用户的角色字符串，默认为 Operator
-            string userRole = GlobalData.CurrentUser?.Role ?? "Operator";
-            bool isOperator = userRole.Equals("Operator", StringComparison.OrdinalIgnoreCase);
-
-            // 如果是操作员，只读；非操作员，可写
-            bool canEdit = !isOperator;
+            // 获取当前登录用户的角色字符串，默认为 Observer (最低权限)
+            string userRole = GlobalData.CurrentUser?.Role ?? "Observer";
+            
+            // 四级权限逻辑：
+            // 1. Admin/Engineer/Operator: 可编辑参数
+            // 2. Observer: 只读
+            bool canEdit = userRole.Equals("Admin", StringComparison.OrdinalIgnoreCase) || 
+                           userRole.Equals("Engineer", StringComparison.OrdinalIgnoreCase) ||
+                           userRole.Equals("Operator", StringComparison.OrdinalIgnoreCase);
 
             foreach (var item in ParameterList)
             {
@@ -335,10 +348,14 @@ namespace DoorMonitorSystem.ViewModels
         /// <summary>
         /// 判断是否允许执行保存 (针对按钮的命令状态)
         /// </summary>
+        /// <summary>
+        /// 判断是否允许执行保存 (针对按钮的命令状态)
+        /// </summary>
         private bool CanExecuteSave(object obj)
         {
-             // 总是允许点击，为了在点击时弹出权限提示
-             return true;
+             // Observer (观察员) 也是只读模式，不允许保存
+             string userRole = GlobalData.CurrentUser?.Role ?? "Observer";
+             return !userRole.Equals("Observer", StringComparison.OrdinalIgnoreCase);
         }
 
         #region 核心业务逻辑实现
@@ -348,11 +365,10 @@ namespace DoorMonitorSystem.ViewModels
         /// </summary>
         private async void ExecuteSave(object obj)
         {
-             // 权限拦截：如果是 Operator，则提示禁止写入
-             string userRole = GlobalData.CurrentUser?.Role ?? "Operator";
-             if (userRole.Equals("Operator", StringComparison.OrdinalIgnoreCase))
+             string userRole = GlobalData.CurrentUser?.Role ?? "Observer";
+             if (userRole.Equals("Observer", StringComparison.OrdinalIgnoreCase))
              {
-                 MessageBox.Show("当前用户权限（Operator）仅允许读取，禁止写入参数！\n请联系管理员获取权限。", "权限不足", MessageBoxButton.OK, MessageBoxImage.Warning);
+                 System.Windows.MessageBox.Show("当前观察员权限仅允许查看参数，无权保存修改。", "权限不足", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
                  return;
              }
 

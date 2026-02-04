@@ -19,6 +19,10 @@ namespace DoorMonitorSystem.Models.ConfigEntity
 
         /// <summary>对应的 PLC 物理站号 (如 1, 24, 32)</summary>
         public int PlcId { get; set; }
+
+        /// <summary>全局唯一标识 (GUID)</summary>
+        [StringLength(50)]
+        public string KeyId { get; set; }
     }
 
 

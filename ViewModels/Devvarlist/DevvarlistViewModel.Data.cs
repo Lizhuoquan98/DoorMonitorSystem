@@ -83,6 +83,7 @@ namespace DoorMonitorSystem.ViewModels
                 var stationsByKey = db.FindAll<StationEntity>().Where(s => !string.IsNullOrEmpty(s.KeyId)).ToDictionary(s => s.KeyId);
                 var doorConfigsByKey = db.FindAll<DoorBitConfigEntity>().Where(c => !string.IsNullOrEmpty(c.KeyId)).ToDictionary(c => c.KeyId);
                 var panelConfigsByKey = db.FindAll<PanelBitConfigEntity>().Where(c => !string.IsNullOrEmpty(c.KeyId)).ToDictionary(c => c.KeyId);
+                var stationParamsByBindingKey = db.FindAll<ParameterDefineEntity>().Where(p => !string.IsNullOrEmpty(p.BindingKey)).ToDictionary(p => p.BindingKey);
 
                 int index = 1;
                 foreach (var entity in list)
@@ -135,6 +136,18 @@ namespace DoorMonitorSystem.ViewModels
                         if (!string.IsNullOrEmpty(entity.TargetKeyId) && stationsByKey.TryGetValue(entity.TargetKeyId, out var station))
                         {
                              fullPath = $"{station.StationName} > 站台参数";
+                             if (!string.IsNullOrEmpty(entity.UiBinding) && stationParamsByBindingKey.TryGetValue(entity.UiBinding, out var scfg))
+                             {
+                                 string roleName = entity.BindingRole switch {
+                                     "Read" => "读取",
+                                     "Write" => "写入",
+                                     "Auth" => "鉴权",
+                                     "AuthRow" => "行授权",
+                                     _ => entity.BindingRole
+                                 };
+                                 string roleSuffix = string.IsNullOrEmpty(roleName) ? "" : $" ({roleName})";
+                                 fullPath += $" > {scfg.Label}{roleSuffix}";
+                             }
                         }
                     }
                     
@@ -269,15 +282,27 @@ namespace DoorMonitorSystem.ViewModels
                     return; 
                 }
 
-                if (IsEditing) db.Update(NewPoint);
-                else db.Insert(NewPoint);
+                if (IsEditing)
+                {
+                    db.Update(NewPoint);
+                    LogHelper.Info($"[点表修改] 用户修改了设备 [{SelectedDevice.Name}] 下的点位: [ID: {NewPoint.Id}] {NewPoint.Description}, 地址: {NewPoint.Address}.{NewPoint.BitIndex}");
+                }
+                else
+                {
+                    db.Insert(NewPoint);
+                    LogHelper.Info($"[点表新增] 用户在设备 [{SelectedDevice.Name}] 下新增了点位: {NewPoint.Description}, 地址: {NewPoint.Address}.{NewPoint.BitIndex}");
+                }
 
                 IsEditorVisible = false;
                 LoadPoints();
                 ResetForm();
                 DeviceCommunicationService.Instance?.ReloadConfigs();
             }
-            catch (Exception ex) { MessageBox.Show($"保存失败: {ex.Message}"); }
+            catch (Exception ex) 
+            { 
+                LogHelper.Error($"[点表保存] 操作失败: {ex.Message}", ex);
+                MessageBox.Show($"保存失败: {ex.Message}"); 
+            }
         }
 
         /// <summary>
@@ -290,13 +315,19 @@ namespace DoorMonitorSystem.ViewModels
             {
                 try
                 {
+                    var entity = SelectedPoint.Entity;
                     using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
                     db.Connect();
-                    db.Delete(SelectedPoint.Entity); // 从展示层获取底层实体进行删除
+                    db.Delete(entity); // 从展示层获取底层实体进行删除
+                    LogHelper.Warn($"[点表删除] 用户删除了设备 [{SelectedDevice.Name}] 下的点位: [ID: {entity.Id}] {entity.Description}, 地址: {entity.Address}.{entity.BitIndex}");
                     LoadPoints();
                     DeviceCommunicationService.Instance?.ReloadConfigs();
                 }
-                catch (Exception ex) { MessageBox.Show($"删除失败: {ex.Message}"); }
+                catch (Exception ex) 
+                { 
+                    LogHelper.Error($"[点表删除] 删除失败: {ex.Message}", ex);
+                    MessageBox.Show($"删除失败: {ex.Message}"); 
+                }
             }
         }
         #endregion

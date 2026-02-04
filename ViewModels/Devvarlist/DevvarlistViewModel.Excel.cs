@@ -49,7 +49,8 @@ namespace DoorMonitorSystem.ViewModels
                     // 由于目前 Points 是 DevicePointRow 展示模型，需访问其内部的 Entity 实体。
                     var exportData = Points.Select(p => new
                     {
-                        序号 = p.RowIndex,
+                        序号 = p.Entity.Id, // 导出数据库实际 ID，便于反向导入更新
+                        序号显示 = p.RowIndex, // 仅供参考的行号
                         物理地址 = p.Entity.Address,
                         位索引 = p.Entity.BitIndex,
                         数据类型 = p.Entity.DataType,
@@ -59,6 +60,7 @@ namespace DoorMonitorSystem.ViewModels
                         目标类型 = (int)p.Entity.TargetType,
                         目标对象ID = p.Entity.TargetKeyId,
                         目标位配置ID = p.Entity.TargetBitConfigKeyId,
+                        功能码 = p.Entity.FunctionCode,
                         开启同步 = p.Entity.IsSyncEnabled ? 1 : 0,
                         同步目标设备ID = p.Entity.SyncTargetDeviceId,
                         同步写入地址 = p.Entity.SyncTargetAddress,
@@ -66,6 +68,8 @@ namespace DoorMonitorSystem.ViewModels
                         同步模式 = p.Entity.SyncMode,
                         开启日志 = p.Entity.IsLogEnabled ? 1 : 0,
                         日志类型ID = p.Entity.LogTypeId,
+                        日志触发策略 = p.Entity.LogTriggerState,
+                        日志死区 = p.Entity.LogDeadband,
                         日志内容模板 = p.Entity.LogMessage,
                         日志分类 = p.Entity.Category,
                         高限报警 = p.Entity.HighLimit,
@@ -76,10 +80,12 @@ namespace DoorMonitorSystem.ViewModels
                     });
 
                     MiniExcelLibs.MiniExcel.SaveAs(sfd.FileName, exportData);
+                    LogHelper.Info($"[Excel导出] 用户导出了设备 [{SelectedDevice.Name}] 的点位表，共 {Points.Count} 条记录。文件路径: {sfd.FileName}");
                     MessageBox.Show("导出成功！");
                 }
                 catch (Exception ex)
                 {
+                    LogHelper.Error($"[Excel导出] 导出失败: {ex.Message}", ex);
                     MessageBox.Show($"导出失败: {ex.Message}");
                 }
             }
@@ -106,27 +112,84 @@ namespace DoorMonitorSystem.ViewModels
             {
                 try
                 {
-                    var rows = MiniExcelLibs.MiniExcel.Query(ofd.FileName).ToList();
-                    if (rows.Count <= 1)
+                    // 1. 获取现有内存点位，构建 ID 查找表和地址匹配池 (应对重复地址点位)
+                    var dictById = new Dictionary<int, DevicePointConfigEntity>();
+                    // 使用 List 作为池，按顺序匹配并“消费”，解决 0.0 地址重复导致的冲突。
+                    var poolByAddr = new Dictionary<string, List<DevicePointConfigEntity>>(StringComparer.OrdinalIgnoreCase);
+                    
+                    foreach (var p in Points)
                     {
-                        MessageBox.Show("Excel 文件内容为空或格式不正确。");
+                        var entity = p.Entity;
+                        dictById[entity.Id] = entity;
+                        
+                        string addrKey = $"{entity.Address}_{entity.BitIndex}";
+                        if (!poolByAddr.ContainsKey(addrKey)) poolByAddr[addrKey] = new List<DevicePointConfigEntity>();
+                        poolByAddr[addrKey].Add(entity);
+                    }
+
+                    // 重新开启查询，启用 useHeaderRow 以通过列名精准读取，防止列偏移导致的数据缺失。
+                    IEnumerable<dynamic> rows;
+                    try
+                    {
+                        rows = MiniExcelLibs.MiniExcel.Query(ofd.FileName, useHeaderRow: true);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogHelper.Error($"[Excel导入] 无法读取文件: {ex.Message}");
+                        MessageBox.Show($"读取文件失败: {ex.Message}");
                         return;
                     }
 
-                    var dataRows = rows.Skip(1).Cast<IDictionary<string, object>>().ToList();
+                    var dataRows = rows.Cast<IDictionary<string, object>>().ToList();
+                    if (!dataRows.Any())
+                    {
+                        MessageBox.Show("未在 Excel 中发现有效数据行。");
+                        return;
+                    }
+
+                    // 用于高性能解析的辅助方法
+                    Func<IDictionary<string, object>, string, int, object> GetVal = (row, k, idx) => 
+                    {
+                        if (row.ContainsKey(k) && row[k] != null && !(row[k] is DBNull)) return row[k];
+                        // 备选方案：如果列名没对上，尝试按位置拿（但危险，仅作为最后保底）
+                        return row.Values.ElementAtOrDefault(idx);
+                    };
+                    
+                    Func<object, int, int?> ParseInt = (val, def) => 
+                    {
+                        if (val == null || val is DBNull || string.IsNullOrWhiteSpace(val.ToString())) return def;
+                        string s = val.ToString();
+                        if (double.TryParse(s, out double d)) return (int)Math.Round(d);
+                        return def;
+                    };
+
+                    Func<object, double?> ParseDouble = (val) => 
+                    {
+                        if (val == null || val is DBNull || string.IsNullOrWhiteSpace(val.ToString())) return null;
+                        if (double.TryParse(val.ToString(), out double d)) return d;
+                        return null;
+                    };
+
+                    Func<int?, int?, bool> IntEquals = (i1, i2) => (i1 ?? 0) == (i2 ?? 0);
+                    Func<double?, double?, bool> DoubleEquals = (d1, d2) => Math.Abs((d1 ?? 0) - (d2 ?? 0)) < 0.0001;
+
+                    Func<string, string, bool> StringEquals = (s1, s2) => 
+                    {
+                        return string.Equals(s1 ?? "", s2 ?? "", StringComparison.Ordinal);
+                    };
 
                     if (MessageBox.Show($"准备从 Excel 导入 {dataRows.Count} 个点位到设备 [{SelectedDevice.Name}]。\n\n是否继续？", "导入确认", MessageBoxButton.YesNo) != MessageBoxResult.Yes)
                         return;
 
-                    int successCount = 0;
+                    int addCount = 0;
+                    int updateCount = 0;
+                    int skipCount = 0;
                     int errorCount = 0;
 
                     using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
                     db.Connect();
 
-                    // 加载缓存以便判断是 Update 还是 Insert。
-                    var existingPoints = db.FindAll<DevicePointConfigEntity>("SourceDeviceId = @sid", new MySqlParameter("@sid", SelectedDevice.ID))
-                                           .ToDictionary(p => $"{p.Address}_{p.BitIndex}");
+                    List<string> errorDetails = new List<string>();
 
                     db.BeginTransaction();
                     try 
@@ -135,77 +198,160 @@ namespace DoorMonitorSystem.ViewModels
                         {
                             try
                             {
-                                // 安全获取整数的可空值转换函数。
-                                Func<string, int, int?> GetSafeInt = (k, idx) => 
+                                var addr = GetVal(row, "物理地址", 2)?.ToString();
+                                if (string.IsNullOrEmpty(addr)) continue;
+
+                                var bitIdx = ParseInt(GetVal(row, "位索引", 3), 0) ?? 0;
+                                int? excelId = ParseInt(GetVal(row, "序号", 0), -1);
+                                if (excelId == -1) excelId = null;
+
+                                // 查找现有记录
+                                DevicePointConfigEntity existing = null;
+                                
+                                // 策略 A：ID 优先匹配 (最准确)
+                                if (excelId.HasValue && dictById.TryGetValue(excelId.Value, out var pById)) 
                                 {
-                                    object val = row.ContainsKey(k) ? row[k] : row.Values.ElementAtOrDefault(idx);
-                                    if (val == null || val is DBNull || string.IsNullOrWhiteSpace(val.ToString())) return null;
-                                    try { return Convert.ToInt32(val); } catch { return null; } 
-                                };
+                                    existing = pById;
+                                    // 匹配后从地址池中同步移除，防止后续地址模糊匹配误中
+                                    string ak = $"{existing.Address}_{existing.BitIndex}";
+                                    if (poolByAddr.TryGetValue(ak, out var list)) list.Remove(existing);
+                                }
+                                // 策略 B：地址池顺序匹配 (解决重复地址点位 A, B, C 的 1:1 映射)
+                                else if (poolByAddr.TryGetValue($"{addr}_{bitIdx}", out var list) && list.Count > 0)
+                                {
+                                    existing = list[0];
+                                    list.RemoveAt(0); // “消费”掉这个点位，下一行 0.0 将匹配池中的下一个点位
+                                }
 
                                 var entity = new DevicePointConfigEntity
                                 {
                                     SourceDeviceId = SelectedDevice.ID,
-                                    Address = row.ContainsKey("物理地址") ? row["物理地址"]?.ToString() : row.Values.ElementAtOrDefault(1)?.ToString(),
-                                    BitIndex = Convert.ToInt32(row.ContainsKey("位索引") ? (row["位索引"] ?? 0) : (row.Values.ElementAtOrDefault(2) ?? 0)),
-                                    DataType = row.ContainsKey("数据类型") ? row["数据类型"]?.ToString() : row.Values.ElementAtOrDefault(3)?.ToString() ?? "Word",
-                                    Description = row.ContainsKey("备注说明") ? row["备注说明"]?.ToString() : row.Values.ElementAtOrDefault(4)?.ToString(),
-                                    UiBinding = row.ContainsKey("逻辑绑定键") ? row["逻辑绑定键"]?.ToString() : row.Values.ElementAtOrDefault(5)?.ToString(),
-                                    BindingRole = row.ContainsKey("绑定角色") ? row["绑定角色"]?.ToString() : row.Values.ElementAtOrDefault(6)?.ToString(),
-                                    TargetType = (TargetType)Convert.ToInt32(row.ContainsKey("目标类型") ? (row["目标类型"] ?? 0) : (row.Values.ElementAtOrDefault(7) ?? 0)),
-                                    TargetKeyId = row.ContainsKey("目标对象ID") ? row["目标对象ID"]?.ToString() : row.Values.ElementAtOrDefault(8)?.ToString(),
-                                    TargetBitConfigKeyId = row.ContainsKey("目标位配置ID") ? row["目标位配置ID"]?.ToString() : row.Values.ElementAtOrDefault(9)?.ToString(),
-                                    IsSyncEnabled = Convert.ToInt32(row.ContainsKey("开启同步") ? (row["开启同步"] ?? 0) : (row.Values.ElementAtOrDefault(10) ?? 0)) == 1,
-                                    SyncTargetDeviceId = GetSafeInt("同步目标设备ID", 11),
-                                    SyncTargetAddress = (ushort?)GetSafeInt("同步写入地址", 12),
-                                    SyncTargetBitIndex = GetSafeInt("同步目标位索引", 13),
-                                    SyncMode = Convert.ToInt32(row.ContainsKey("同步模式") ? (row["同步模式"] ?? 0) : (row.Values.ElementAtOrDefault(14) ?? 0)),
-                                    IsLogEnabled = Convert.ToInt32(row.ContainsKey("开启日志") ? (row["开启日志"] ?? 0) : (row.Values.ElementAtOrDefault(15) ?? 0)) == 1,
-                                    LogTypeId = Convert.ToInt32(row.ContainsKey("日志类型ID") ? (row["日志类型ID"] ?? 1) : (row.Values.ElementAtOrDefault(16) ?? 1)),
-                                    LogMessage = row.ContainsKey("日志内容模板") ? row["日志内容模板"]?.ToString() : row.Values.ElementAtOrDefault(17)?.ToString(),
-                                    Category = row.ContainsKey("日志分类") ? row["日志分类"]?.ToString() : row.Values.ElementAtOrDefault(18)?.ToString(),
-                                    HighLimit = row.ContainsKey("高限报警") && row["高限报警"] != null ? (double?)Convert.ToDouble(row["高限报警"]) : null,
-                                    LowLimit = row.ContainsKey("低限报警") && row["低限报警"] != null ? (double?)Convert.ToDouble(row["低限报警"]) : null,
-                                    State0Desc = row.ContainsKey("状态0描述") ? row["状态0描述"]?.ToString() : row.Values.ElementAtOrDefault(21)?.ToString(),
-                                    State1Desc = row.ContainsKey("状态1描述") ? row["状态1描述"]?.ToString() : row.Values.ElementAtOrDefault(22)?.ToString(),
-                                    AlarmTargetValue = row.ContainsKey("报警目标值") && row["报警目标值"] != null ? (int?)Convert.ToInt32(row["报警目标值"]) : null
+                                    Address = addr,
+                                    BitIndex = bitIdx,
+                                    DataType = GetVal(row, "数据类型", 4)?.ToString() ?? "Word",
+                                    Description = GetVal(row, "备注说明", 5)?.ToString(),
+                                    UiBinding = GetVal(row, "逻辑绑定键", 6)?.ToString(),
+                                    BindingRole = GetVal(row, "绑定角色", 7)?.ToString(),
+                                    TargetType = (TargetType)(ParseInt(GetVal(row, "目标类型", 8), 0) ?? 0),
+                                    TargetKeyId = GetVal(row, "目标对象ID", 9)?.ToString(),
+                                    TargetBitConfigKeyId = GetVal(row, "目标位配置ID", 10)?.ToString(),
+                                    FunctionCode = ParseInt(GetVal(row, "功能码", 11), 0) ?? 0,
+                                    IsSyncEnabled = ParseInt(GetVal(row, "开启同步", 12), 0) == 1,
+                                    SyncTargetDeviceId = ParseInt(GetVal(row, "同步目标设备ID", 13), -1) == -1 ? null : ParseInt(GetVal(row, "同步目标设备ID", 13), -1),
+                                    SyncTargetAddress = ParseInt(GetVal(row, "同步写入地址", 14), -1) == -1 ? null : (ushort?)ParseInt(GetVal(row, "同步写入地址", 14), -1),
+                                    SyncTargetBitIndex = ParseInt(GetVal(row, "同步目标位索引", 15), -1) == -1 ? null : ParseInt(GetVal(row, "同步目标位索引", 15), -1),
+                                    SyncMode = ParseInt(GetVal(row, "同步模式", 16), 0) ?? 0,
+                                    IsLogEnabled = ParseInt(GetVal(row, "开启日志", 17), 0) == 1,
+                                    LogTypeId = ParseInt(GetVal(row, "日志类型ID", 18), 1) ?? 1,
+                                    LogTriggerState = ParseInt(GetVal(row, "日志触发策略", 19), 2) ?? 2,
+                                    LogDeadband = ParseDouble(GetVal(row, "日志死区", 20)),
+                                    LogMessage = GetVal(row, "日志内容模板", 21)?.ToString(),
+                                    Category = GetVal(row, "日志分类", 22)?.ToString(),
+                                    HighLimit = ParseDouble(GetVal(row, "高限报警", 23)),
+                                    LowLimit = ParseDouble(GetVal(row, "低限报警", 24)),
+                                    State0Desc = GetVal(row, "状态0描述", 25)?.ToString(),
+                                    State1Desc = GetVal(row, "状态1描述", 26)?.ToString(),
+                                    AlarmTargetValue = ParseInt(GetVal(row, "报警目标值", 27), -1) == -1 ? null : ParseInt(GetVal(row, "报警目标值", 27), -1)
                                 };
 
-                                if (string.IsNullOrEmpty(entity.Address)) continue;
-
-                                string key = $"{entity.Address}_{entity.BitIndex}";
-                                if (existingPoints.TryGetValue(key, out var existing))
+                                if (existing != null)
                                 {
-                                    entity.Id = existing.Id;
-                                    db.Update(entity);
+                                    // 检查是否有实质性更改 (全字段严格比对)
+                                    bool isChanged = 
+                                        !StringEquals(entity.Address, existing.Address) ||
+                                        entity.BitIndex != existing.BitIndex ||
+                                        !StringEquals(entity.DataType, existing.DataType) ||
+                                        !StringEquals(entity.Description, existing.Description) ||
+                                        !StringEquals(entity.UiBinding, existing.UiBinding) ||
+                                        !StringEquals(entity.BindingRole, existing.BindingRole) ||
+                                        entity.TargetType != existing.TargetType ||
+                                        !StringEquals(entity.TargetKeyId, existing.TargetKeyId) ||
+                                        !StringEquals(entity.TargetBitConfigKeyId, existing.TargetBitConfigKeyId) ||
+                                        entity.IsSyncEnabled != existing.IsSyncEnabled ||
+                                        !IntEquals(entity.SyncTargetDeviceId, existing.SyncTargetDeviceId) ||
+                                        !IntEquals((int?)entity.SyncTargetAddress, (int?)existing.SyncTargetAddress) ||
+                                        !IntEquals(entity.SyncTargetBitIndex, existing.SyncTargetBitIndex) ||
+                                        entity.SyncMode != existing.SyncMode ||
+                                        entity.IsLogEnabled != existing.IsLogEnabled ||
+                                        entity.LogTypeId != existing.LogTypeId ||
+                                        !StringEquals(entity.LogMessage, existing.LogMessage) ||
+                                        !StringEquals(entity.Category, existing.Category) ||
+                                        !DoubleEquals(entity.HighLimit, existing.HighLimit) ||
+                                        !DoubleEquals(entity.LowLimit, existing.LowLimit) ||
+                                        !StringEquals(entity.State0Desc, existing.State0Desc) ||
+                                        !StringEquals(entity.State1Desc, existing.State1Desc) ||
+                                        !IntEquals(entity.AlarmTargetValue, existing.AlarmTargetValue) ||
+                                        entity.FunctionCode != existing.FunctionCode ||
+                                        entity.LogTriggerState != existing.LogTriggerState ||
+                                        !DoubleEquals(entity.LogDeadband, existing.LogDeadband);
+
+                                    if (isChanged)
+                                    {
+                                        if (updateCount < 5)
+                                        {
+                                            var sb = new System.Text.StringBuilder();
+                                            sb.Append($"[差异记录] 点位 {entity.Address} (ID: {existing.Id}): ");
+                                            if (!StringEquals(entity.DataType, existing.DataType)) sb.Append($"类型[{existing.DataType} -> {entity.DataType}] ");
+                                            if (!StringEquals(entity.Description, existing.Description)) sb.Append($"描述[{existing.Description} -> {entity.Description}] ");
+                                            if (entity.IsSyncEnabled != existing.IsSyncEnabled) sb.Append($"同步[{existing.IsSyncEnabled} -> {entity.IsSyncEnabled}] ");
+                                            if (!IntEquals(entity.SyncTargetDeviceId, existing.SyncTargetDeviceId)) sb.Append($"同步目标ID[{existing.SyncTargetDeviceId} -> {entity.SyncTargetDeviceId}] ");
+                                            if (!IntEquals(entity.AlarmTargetValue, existing.AlarmTargetValue)) sb.Append($"报警值[{existing.AlarmTargetValue} -> {entity.AlarmTargetValue}] ");
+                                            if (entity.FunctionCode != existing.FunctionCode) sb.Append($"功能码[{existing.FunctionCode} -> {entity.FunctionCode}] ");
+                                            if (entity.LogTriggerState != existing.LogTriggerState) sb.Append($"日志策略[{existing.LogTriggerState} -> {entity.LogTriggerState}] ");
+                                            if (!DoubleEquals(entity.LogDeadband, existing.LogDeadband)) sb.Append($"日志死区[{existing.LogDeadband} -> {entity.LogDeadband}] ");
+                                            LogHelper.Info(sb.ToString());
+                                        }
+
+                                        entity.Id = existing.Id;
+                                        db.Update(entity);
+                                        updateCount++;
+                                    }
+                                    else
+                                    {
+                                        skipCount++;
+                                    }
                                 }
                                 else
                                 {
                                     db.Insert(entity);
+                                    addCount++;
                                 }
-                                successCount++;
                             }
                             catch (Exception ex)
                             {
                                 errorCount++;
-                                LogHelper.Error($"导入行失败: {ex.Message}");
+                                if (errorCount <= 5) errorDetails.Add($"行数据解析失败: {ex.Message}");
                             }
                         }
                         db.CommitTransaction();
+
+                        if (errorDetails.Any())
+                        {
+                            LogHelper.Warn($"[Excel导入] 过程中发生了 {errorCount} 处解析问题，样本: {string.Join(" | ", errorDetails)}");
+                        }
+                        LogHelper.Info($"[Excel导入] 设备 [{SelectedDevice.Name}] 导入任务完成: 新增={addCount}, 更新={updateCount}, 未变跳过={skipCount}, 失败={errorCount}。");
                     }
                     catch (Exception ex)
                     {
                         db.RollbackTransaction();
+                        LogHelper.Error($"[Excel导入] 导入过程中止并回滚: {ex.Message}", ex);
                         throw new Exception($"导入过程发生异常，已回滚事务: {ex.Message}", ex);
                     }
 
-                    MessageBox.Show($"导入完成！\n成功: {successCount} 条\n异常: {errorCount} 条");
+                    // 显示详细的处理汇总
+                    MessageBox.Show($"点位导入任务已完成。\n\n" +
+                                    $"新增点位: {addCount} 条\n" +
+                                    $"更新点位: {updateCount} 条\n" +
+                                    $"跳过(无变化): {skipCount} 条\n" +
+                                    $"处理失败: {errorCount} 条\n\n" +
+                                    $"系统已根据导入的配置完成更新。", "操作成功", MessageBoxButton.OK, MessageBoxImage.Information);
                     LoadPoints(); 
                     DeviceCommunicationService.Instance?.ReloadConfigs();
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"导入失败: {ex.Message}");
+                    LogHelper.Error($"[Excel导入] 严重错误: {ex.Message}", ex);
+                    MessageBox.Show($"导入严重失败: {ex.Message}", "系统错误", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }

@@ -69,8 +69,8 @@
 
             <!-- Right: User & Exit -->
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                <!-- Refresh Button -->
-                <Button Command="{Binding RefreshUICommand}" Style="{StaticResource ActionButton}" Margin="0,0,10,0" Padding="10,5" Height="44" ToolTip="刷新数据">
+                <!-- Refresh Button (Admin Only) -->
+                <Button Command="{Binding RefreshUICommand}" Visibility="{Binding AdminVisibility}" Style="{StaticResource ActionButton}" Margin="0,0,10,0" Padding="10,5" Height="44" ToolTip="刷新数据">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="🔄" FontSize="18" VerticalAlignment="Center" Margin="0,0,5,0"/>
                         <TextBlock Text="刷新" FontSize="14" VerticalAlignment="Center"/>
@@ -110,16 +110,19 @@
                 <StackPanel Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <RadioButton Content="主界面" GroupName="NavGroup" IsChecked="True" Style="{StaticResource NavRadioButtonStyle}"
                                  Command="{Binding NavigationCommand}" CommandParameter="{x:Type dc:MainViewModel}" />
-                    <RadioButton Content="点表配置" GroupName="NavGroup" Style="{StaticResource NavRadioButtonStyle}"
+                    
+                    <!-- Admin Only Maps -->
+                    <RadioButton Content="点表配置" GroupName="NavGroup" Style="{StaticResource NavRadioButtonStyle}" Visibility="{Binding AdminVisibility}"
                                  Command="{Binding NavigationCommand}" CommandParameter="{x:Type dc:DevvarlistViewModel}" />
                     <RadioButton Content="参数设置" GroupName="NavGroup" Style="{StaticResource NavRadioButtonStyle}"
                                  Command="{Binding NavigationCommand}" CommandParameter="{x:Type dc:ParameterSettingViewModel}" />
-                    <RadioButton Content="图形编辑" GroupName="NavGroup" Style="{StaticResource NavRadioButtonStyle}"
+                    <RadioButton Content="图形编辑" GroupName="NavGroup" Style="{StaticResource NavRadioButtonStyle}" Visibility="{Binding AdminVisibility}"
                                  Command="{Binding NavigationCommand}" CommandParameter="{x:Type dc:GraphicEditingViewModel}" />
-                    <RadioButton Content="设备列表" GroupName="NavGroup" Style="{StaticResource NavRadioButtonStyle}" 
+                    <RadioButton Content="设备列表" GroupName="NavGroup" Style="{StaticResource NavRadioButtonStyle}" Visibility="{Binding AdminVisibility}"
                                  Command="{Binding NavigationCommand}" CommandParameter="{x:Type dc:DeployViewModel}" />
-                    <RadioButton Content="布局配置" GroupName="NavGroup" Style="{StaticResource NavRadioButtonStyle}" 
+                    <RadioButton Content="布局配置" GroupName="NavGroup" Style="{StaticResource NavRadioButtonStyle}" Visibility="{Binding AdminVisibility}"
                                  Command="{Binding NavigationCommand}" CommandParameter="{x:Type dc:LayoutConfigurationViewModel}" />
+                    
                     <RadioButton Content="系统日志" GroupName="NavGroup" Style="{StaticResource NavRadioButtonStyle}"
                                  Command="{Binding NavigationCommand}" CommandParameter="{x:Type dc:SystemLogViewModel}" />
                 </StackPanel>

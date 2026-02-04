@@ -35,11 +35,11 @@ namespace DoorMonitorSystem.Models.RunModels
         /// <summary>
         /// 门组列表（通过 DoorGroup.SortOrder 控制显示顺序）
         /// </summary>
-        public ObservableCollection<DoorGroup> DoorGroups { get; set; } = new();
+        public System.Collections.Generic.List<DoorGroup> DoorGroups { get; set; } = new();
 
         /// <summary>
         /// 面板组列表（通过 PanelGroup.SortOrder 控制显示顺序）
         /// </summary>
-        public ObservableCollection<PanelGroup> PanelGroups { get; set; } = new();
+        public System.Collections.Generic.List<PanelGroup> PanelGroups { get; set; } = new();
     }
 }

@@ -30,7 +30,24 @@ namespace DoorMonitorSystem.Assets.Helper
                 db.CreateTableFromModel<DoorBitConfigEntity>();
                 db.CreateTableFromModel<PanelBitConfigEntity>();
 
-                // 2. 补全 KeyId (GUID)
+                // 2. 确保站台参数相关表存在
+                db.CreateTableFromModel<AsdModelMappingEntity>();
+                db.CreateTableFromModel<ParameterDefineEntity>();
+
+                // 3. 补齐字段 (针对存量数据库)
+                EnsureColumnExists(db, "Station", "KeyId", "VARCHAR(50) DEFAULT NULL");
+                EnsureColumnExists(db, "DoorGroup", "KeyId", "VARCHAR(50) DEFAULT NULL");
+                EnsureColumnExists(db, "Door", "KeyId", "VARCHAR(50) DEFAULT NULL");
+                EnsureColumnExists(db, "PanelGroup", "KeyId", "VARCHAR(50) DEFAULT NULL");
+                EnsureColumnExists(db, "Panel", "KeyId", "VARCHAR(50) DEFAULT NULL");
+                EnsureColumnExists(db, "DoorBitConfig", "KeyId", "VARCHAR(50) DEFAULT NULL");
+                EnsureColumnExists(db, "PanelBitConfig", "KeyId", "VARCHAR(50) DEFAULT NULL");
+                EnsureColumnExists(db, "DoorType", "KeyId", "VARCHAR(50) DEFAULT NULL");
+                EnsureColumnExists(db, "PanelType", "KeyId", "VARCHAR(50) DEFAULT NULL");
+                EnsureColumnExists(db, "Sys_ParameterDefines", "KeyId", "VARCHAR(50) DEFAULT NULL");
+                EnsureColumnExists(db, "Sys_AsdModels", "KeyId", "VARCHAR(50) DEFAULT NULL");
+
+                // 4. 初始化 GUID 数据
                 db.ExecuteNonQuery("UPDATE Station SET KeyId = UUID() WHERE KeyId IS NULL OR KeyId = ''");
                 db.ExecuteNonQuery("UPDATE DoorGroup SET KeyId = UUID() WHERE KeyId IS NULL OR KeyId = ''");
                 db.ExecuteNonQuery("UPDATE Door SET KeyId = UUID() WHERE KeyId IS NULL OR KeyId = ''");
@@ -40,8 +57,19 @@ namespace DoorMonitorSystem.Assets.Helper
                 db.ExecuteNonQuery("UPDATE PanelBitConfig SET KeyId = UUID() WHERE KeyId IS NULL OR KeyId = ''");
                 db.ExecuteNonQuery("UPDATE DoorType SET KeyId = UUID() WHERE KeyId IS NULL OR KeyId = ''");
                 db.ExecuteNonQuery("UPDATE PanelType SET KeyId = UUID() WHERE KeyId IS NULL OR KeyId = ''");
+                db.ExecuteNonQuery("UPDATE Sys_ParameterDefines SET KeyId = UUID() WHERE KeyId IS NULL OR KeyId = ''");
+                db.ExecuteNonQuery("UPDATE Sys_AsdModels SET KeyId = UUID() WHERE KeyId IS NULL OR KeyId = ''");
 
-                // 3. 检查并添加缺失的 KeyId 关联列
+                // 5. 补齐业务字段
+                EnsureColumnExists(db, "Sys_ParameterDefines", "ByteOffset", "INT DEFAULT 0");
+                EnsureColumnExists(db, "Sys_ParameterDefines", "BitIndex", "INT DEFAULT 0");
+                EnsureColumnExists(db, "Sys_ParameterDefines", "BindingKey", "VARCHAR(50) DEFAULT NULL");
+                EnsureColumnExists(db, "Sys_ParameterDefines", "PlcPermissionValue", "INT DEFAULT 1");
+                EnsureColumnExists(db, "Sys_ParameterDefines", "SortOrder", "INT DEFAULT 0");
+                EnsureColumnExists(db, "Sys_ParameterDefines", "DataType", "VARCHAR(20) DEFAULT 'Int16'");
+                EnsureColumnExists(db, "Sys_AsdModels", "PlcId", "INT DEFAULT 0");
+
+                // 5. 检查并添加缺失的 KeyId 关联列
                 EnsureColumnExists(db, "DoorGroup", "StationKeyId", "VARCHAR(50) DEFAULT NULL");
                 EnsureColumnExists(db, "DoorGroup", "IsReverseOrder", "TINYINT(1) NOT NULL DEFAULT 0");
                 EnsureColumnExists(db, "PanelGroup", "StationKeyId", "VARCHAR(50) DEFAULT NULL");

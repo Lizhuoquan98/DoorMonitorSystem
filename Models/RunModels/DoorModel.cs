@@ -59,7 +59,7 @@ namespace DoorMonitorSystem.Models.RunModels
         /// 门的所有点位配置（根据门类型从模板复制）
         /// 点击门时，弹窗显示该集合中的所有点位详情
         /// </summary>
-        public ObservableCollection<DoorBitConfig> Bits { get; set; } = new();
+        public System.Collections.Generic.List<DoorBitConfig> Bits { get; set; } = new();
 
         #endregion
 
@@ -79,6 +79,11 @@ namespace DoorMonitorSystem.Models.RunModels
         /// 如果指纹未变，则无需重新克隆图形和触发 UI 刷新，极大降低 CPU 占用。
         /// </summary>
         public string LastVisualStateFingerprint { get; set; } = "";
+
+        /// <summary>
+        /// (性能优化) 暂存后台裁决结果，待同步到 UI 线程应用
+        /// </summary>
+        public object? PendingVisualStateResult { get; set; }
 
         #endregion
 

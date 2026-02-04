@@ -51,7 +51,7 @@ namespace DoorMonitorSystem.Models.RunModels
         #region 点位配置集合
 
         /// <summary>面板点位列表</summary>
-        public ObservableCollection<PanelBitConfig> BitList { get; set; } = new();
+        public System.Collections.Generic.List<PanelBitConfig> BitList { get; set; } = new();
 
         #endregion
     }

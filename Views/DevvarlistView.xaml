@@ -535,9 +535,8 @@
                                 <UniformGrid Columns="2" Margin="0,0,0,10">
                                     <StackPanel Margin="0,0,8,0">
                                         <TextBlock Text="数据类型" Style="{StaticResource LabelText}"/>
-                                        <ComboBox SelectedValue="{Binding NewPoint.DataType}" SelectedValuePath="Content" Height="40">
-                                            <ComboBoxItem Content="Bool"/><ComboBoxItem Content="Word"/><ComboBoxItem Content="DWord"/><ComboBoxItem Content="Float"/>
-                                        </ComboBox>
+                                        <!-- 使用统一的枚举数据源 -->
+                                        <ComboBox SelectedValue="{Binding NewPoint.DataType}" ItemsSource="{Binding PointDataTypes}" Height="40"/>
                                     </StackPanel>
                                     <StackPanel Margin="8,0,0,0">
                                         <TextBlock Text="功能码 (Area)" Style="{StaticResource LabelText}"/>

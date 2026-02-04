@@ -54,40 +54,44 @@ namespace DoorMonitorSystem.Assets.Services
                 ushort[]? registersToWrite = null;
                 bool isBitMode = false;
 
-                if (dType.Contains("dword") || dType.Contains("int32") || dType.Contains("uint32") || dType.Contains("integer"))
+                // --- 统一同步转发解析逻辑 ---
+                if (dType == "BOOL" || dType == "BIT")
                 {
-                     // Fix: Use Int64 first to safely handle negative Int32 values without overflow, then cast to UInt32
-                    long lVal = Convert.ToInt64(rawValue);
-                    uint val = (uint)lVal;
-                    
-                    ushort high = (ushort)(val >> 16);
-                    ushort low = (ushort)(val & 0xFFFF);
-                   
-                    registersToWrite = new ushort[] { high, low }; // ABCD Format (High Word First)
-                    if (trace) LogHelper.Debug($"    -> Convert Int32: [{high:X4}, {low:X4}]");
+                    isBitMode = true;
                 }
-                else if (dType.Contains("float") || dType.Contains("real"))
+                else if (dType == "BYTE")
+                {
+                    registersToWrite = new ushort[] { Convert.ToByte(rawValue) };
+                }
+                else if (dType == "SBYTE")
+                {
+                    registersToWrite = new ushort[] { (ushort)(byte)Convert.ToSByte(rawValue) };
+                }
+                else if (dType == "INT16" || dType == "SHORT")
+                {
+                    registersToWrite = new ushort[] { (ushort)Convert.ToInt16(rawValue) };
+                }
+                else if (dType == "UINT16" || dType == "WORD")
+                {
+                    registersToWrite = new ushort[] { Convert.ToUInt16(rawValue) };
+                }
+                else if (dType == "INT32" || dType == "DINT" || dType == "UINT32" || dType == "DWORD" || dType == "INTEGER")
+                {
+                    uint val = Convert.ToUInt32(rawValue);
+                    registersToWrite = new ushort[] { (ushort)(val >> 16), (ushort)(val & 0xFFFF) };
+                }
+                else if (dType == "FLOAT" || dType == "REAL")
                 {
                     float fVal = Convert.ToSingle(rawValue);
                     byte[] bytes = BitConverter.GetBytes(fVal);
-                    // BitConverter returns Little Endian on Windows (Low byte @ 0).
-                    ushort low = BitConverter.ToUInt16(bytes, 0);
-                    ushort high = BitConverter.ToUInt16(bytes, 2);
-                    
-                    // Fix: Align with Integer behavior -> Send High Word First (ABCD)
-                    // Previous: { low, high } (CDAB) -> Inconsistent
-                    registersToWrite = new ushort[] { high, low }; 
-                    if (trace) LogHelper.Debug($"    -> Convert Float: [{high:X4}, {low:X4}]");
-                }
-                else if (dType.Contains("word") || dType.Contains("int16") || dType.Contains("short"))
-                {
-                    ushort val = Convert.ToUInt16(rawValue);
-                    registersToWrite = new ushort[] { val };
-                    if (trace) LogHelper.Debug($"    -> Convert Word: [{val:X4}]");
+                    if (BitConverter.IsLittleEndian) Array.Reverse(bytes);
+                    registersToWrite = new ushort[] { 
+                        (ushort)((bytes[0] << 8) | bytes[1]), 
+                        (ushort)((bytes[2] << 8) | bytes[3]) 
+                    };
                 }
                 else
                 {
-                    // 默认为位操作模式
                     isBitMode = true;
                 }
 

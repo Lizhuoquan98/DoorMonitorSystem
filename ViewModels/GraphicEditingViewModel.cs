@@ -224,6 +224,7 @@ namespace DoorMonitorSystem.ViewModels
             );
 
             GlobalData.GraphicDictionary.Add(IconName, snapshot);
+            LogHelper.Info($"[图形编辑] 用户保存了新组件: {IconName} (包含 {snapshot.Count} 个路径元素)");
 
             GraphicGroups.Add(new GraphicGroup
             {
@@ -256,6 +257,7 @@ namespace DoorMonitorSystem.ViewModels
                 {
                     // 从全局字典中删除
                     GlobalData.GraphicDictionary.Remove(graphicName);
+                    LogHelper.Warn($"[图形编辑] 用户删删除了组件: {graphicName}");
 
                     // 从 UI 列表中删除
                     var groupToRemove = GraphicGroups.FirstOrDefault(g => g.Name == graphicName);
@@ -326,16 +328,19 @@ namespace DoorMonitorSystem.ViewModels
                     }
 
                     db.CommitTransaction();
+                    LogHelper.Info($"[图形编辑] 用户成功将组件库同步到数据库 (共 {GlobalData.GraphicDictionary.Count} 组组件)。");
                     MessageBox.Show("组件库已成功同步至数据库！", "同步成功", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
-                catch
+                catch (Exception ex)
                 {
                     db.RollbackTransaction();
+                    LogHelper.Error($"[图形编辑] 同步组件库方案到数据库失败: {ex.Message}", ex);
                     throw;
                 }
             }
             catch (Exception ex)
             {
+                LogHelper.Error($"[图形编辑] 同步严重错误: {ex.Message}", ex);
                 MessageBox.Show($"保存失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -390,11 +395,13 @@ namespace DoorMonitorSystem.ViewModels
                             importedCount++;
                         }
 
+                        LogHelper.Info($"[图形编辑] 用户从 JSON 文件导入了组件库，追加了 {importedCount} 组组件。");
                         MessageBox.Show($"组件库导入成功！已追加导入 {importedCount} 组组件。\n如有重名已自动重命名。", "导入完成", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                 }
                 catch (Exception ex)
                 {
+                    LogHelper.Error($"[图形编辑] 导入 JSON 失败: {ex.Message}", ex);
                     MessageBox.Show($"导入失败：{ex.Message}");
                 }
             }
@@ -507,6 +514,7 @@ namespace DoorMonitorSystem.ViewModels
                         }
                     }
 
+                    LogHelper.Info($"[图形编辑] 用户从 SVG 文件成功导入了 {successCount} 个路径元素 (文件: {Path.GetFileName(openDialog.FileName)})。");
                     MessageBox.Show(
                         $"SVG 加载成功！\n\n" +
                         $"文件: {Path.GetFileName(openDialog.FileName)}\n" +
@@ -519,6 +527,7 @@ namespace DoorMonitorSystem.ViewModels
                 }
                 catch (Exception ex)
                 {
+                    LogHelper.Error($"[图形编辑] SVG 导入失败: {ex.Message}", ex);
                     MessageBox.Show(
                         $"SVG 文件导入失败！\n\n错误信息:\n{ex.Message}",
                         "导入失败",

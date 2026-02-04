@@ -42,7 +42,7 @@ namespace DoorMonitorSystem.ViewModels
             {
                 _selectedUser = value;
                 OnPropertyChanged();
-                if (_selectedUser != null && !_isEditing)
+                if (_selectedUser != null)
                 {
                     LoadForm(_selectedUser);
                 }
@@ -56,7 +56,6 @@ namespace DoorMonitorSystem.ViewModels
             { 
                 _isEditing = value; 
                 OnPropertyChanged(); 
-                // Toggle ReadOnly state logic if needed
             }
         }
 
@@ -81,7 +80,12 @@ namespace DoorMonitorSystem.ViewModels
         public string FormRole
         {
             get => _formRole;
-            set { _formRole = value; OnPropertyChanged(); }
+            set 
+            { 
+                _formRole = value; 
+                OnPropertyChanged(); 
+                UpdatePermissions(_formRole);
+            }
         }
 
         public bool FormIsEnabled
@@ -96,8 +100,57 @@ namespace DoorMonitorSystem.ViewModels
             set { _formPassword = value; OnPropertyChanged(); }
         }
 
+        // Permission Display Properties
+        private bool _permSystemConfig;
+        public bool PermSystemConfig { get => _permSystemConfig; set { _permSystemConfig = value; OnPropertyChanged(); } }
+
+        private bool _permUserMgmt;
+        public bool PermUserMgmt { get => _permUserMgmt; set { _permUserMgmt = value; OnPropertyChanged(); } }
+
+        private bool _permDoorControl;
+        public bool PermDoorControl { get => _permDoorControl; set { _permDoorControl = value; OnPropertyChanged(); } }
+
+        private bool _permLogViewing;
+        public bool PermLogViewing { get => _permLogViewing; set { _permLogViewing = value; OnPropertyChanged(); } }
+
+        private void UpdatePermissions(string role)
+        {
+            // Default Reset
+            PermSystemConfig = false;
+            PermUserMgmt = false;
+            PermDoorControl = false;
+            PermLogViewing = false;
+
+            if (string.IsNullOrEmpty(role)) return;
+
+            if (role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                PermSystemConfig = true;
+                PermUserMgmt = true;
+                PermDoorControl = true;
+                PermLogViewing = true;
+            }
+            else if (role.Equals("Engineer", StringComparison.OrdinalIgnoreCase))
+            {
+                PermSystemConfig = false; // Engineer usually handles Parameters, not SysCfg
+                PermUserMgmt = true;      // We just enabled this
+                PermDoorControl = true;
+                PermLogViewing = true;
+            }
+            else if (role.Equals("Operator", StringComparison.OrdinalIgnoreCase))
+            {
+                PermDoorControl = true;
+                PermLogViewing = true;
+            }
+            else if (role.Equals("Observer", StringComparison.OrdinalIgnoreCase))
+            {
+                PermLogViewing = true;
+                // Observer is Read-Only
+            }
+        }
+
         // Roles Selection
-        public ObservableCollection<string> Roles { get; } = new ObservableCollection<string> { "Admin", "Operator", "Viewer" };
+        public ObservableCollection<string> Roles { get; } = new ObservableCollection<string> { "Admin", "Engineer", "Operator", "Observer" };
 
         #endregion
 
@@ -150,7 +203,7 @@ namespace DoorMonitorSystem.ViewModels
             FormRealName = user.RealName ?? "";
             FormRole = user.Role ?? "User";
             FormIsEnabled = user.IsEnabled;
-            FormPassword = user.Password; // Usually we don't load password back, but for simple editing we might show it or leave empty
+            FormPassword = ""; // 不回显密码，留空表示不修改
             IsEditing = true;
             EditTitle = $"编辑用户: {user.Username}";
         }
@@ -176,9 +229,10 @@ namespace DoorMonitorSystem.ViewModels
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(FormPassword))
+            // 新增用户时密码必填
+            if (_formId == 0 && string.IsNullOrWhiteSpace(FormPassword))
             {
-                MessageBox.Show("密码不能为空");
+                MessageBox.Show("新建用户必须设置初始密码");
                 return;
             }
 
@@ -197,7 +251,6 @@ namespace DoorMonitorSystem.ViewModels
                         Username = FormUsername,
                         RealName = FormRealName,
                         Role = FormRole,
-                        Password = FormPassword,
                         IsEnabled = FormIsEnabled,
                         LastLoginTime = DateTime.Now 
                     };
@@ -212,8 +265,10 @@ namespace DoorMonitorSystem.ViewModels
                             return;
                         }
                         
+                        user.Password = CryptoHelper.ComputeMD5(FormPassword); // 新用户加密密码
                         user.CreateTime = DateTime.Now;
                         db.Insert(user);
+                        LogHelper.Info($"[用户管理] 管理员新增了用户账号: {user.Username} (姓名: {user.RealName}, 角色: {user.Role})");
                     }
                     else
                     {
@@ -221,8 +276,21 @@ namespace DoorMonitorSystem.ViewModels
                         if(original != null)
                         {
                              user.CreateTime = original.CreateTime; // Keep original create time
+                             
+                             // 密码处理逻辑：如果表单密码为空，则保持原密码；否则更新为新加密密码
+                             if (string.IsNullOrWhiteSpace(FormPassword))
+                             {
+                                 user.Password = original.Password;
+                             }
+                             else
+                             {
+                                 user.Password = CryptoHelper.ComputeMD5(FormPassword);
+                             }
                         }
                         db.Update(user);
+                        
+                        string pwLog = string.IsNullOrWhiteSpace(FormPassword) ? "" : "(密码已修改)";
+                        LogHelper.Info($"[用户管理] 管理员更新了用户账号信息: {user.Username} {pwLog} (角色: {user.Role}, 状态: {(user.IsEnabled ? "启用" : "禁用")})");
                     }
 
                     LoadData();
@@ -251,8 +319,10 @@ namespace DoorMonitorSystem.ViewModels
                     using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
                     db.Connect();
                     
+                    var username = FormUsername;
                     var user = new UserEntity { Id = _formId };
                     db.Delete(user);
+                    LogHelper.Warn($"[用户管理] 管理员删除了用户账号: {username}");
                     
                     LoadData();
                     IsEditing = false; // Close form logic
@@ -260,7 +330,7 @@ namespace DoorMonitorSystem.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    LogHelper.Error("[UserVM] Delete Failed", ex);
+                    LogHelper.Error($"[用户管理] 删除用户失败: {ex.Message}", ex);
                     MessageBox.Show("删除失败");
                 }
             });

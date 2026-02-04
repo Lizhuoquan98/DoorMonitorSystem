@@ -443,12 +443,34 @@ namespace DoorMonitorSystem.ViewModels
                 else if (entity.TargetType == TargetType.Station)
                 {
                     var station = db.FindAll<StationEntity>("KeyId = @key", new MySql.Data.MySqlClient.MySqlParameter("@key", entity.TargetKeyId)).FirstOrDefault();
-                    if (station != null) return $"{station.StationName} > 站台参数";
+                    if (station != null)
+                    {
+                        string fullPath = $"{station.StationName} > 站台参数";
+                        if (!string.IsNullOrEmpty(entity.UiBinding))
+                        {
+                            var scfg = db.FindAll<ParameterDefineEntity>("BindingKey = @key", new MySql.Data.MySqlClient.MySqlParameter("@key", entity.UiBinding)).FirstOrDefault();
+                            if (scfg != null)
+                            {
+                                string roleName = entity.BindingRole switch
+                                {
+                                    "Read" => "读取",
+                                    "Write" => "写入",
+                                    "Auth" => "鉴权",
+                                    "AuthRow" => "行授权",
+                                    _ => entity.BindingRole
+                                };
+                                string roleSuffix = string.IsNullOrEmpty(roleName) ? "" : $" ({roleName})";
+                                fullPath += $" > {scfg.Label}{roleSuffix}";
+                            }
+                        }
+                        return fullPath;
+                    }
                 }
             }
             catch { }
 
             return entity.TargetType == TargetType.None ? "未关联业务对象" : "关联对象已失效或不存在";
         }
+        public List<string> PointDataTypes => Enum.GetNames(typeof(PointDataType)).ToList();
     }
 }

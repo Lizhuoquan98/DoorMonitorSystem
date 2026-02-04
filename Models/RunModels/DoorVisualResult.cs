@@ -15,56 +15,70 @@ namespace DoorMonitorSystem.Models.RunModels
     /// </summary>
     public class DoorVisualResult : NotifyPropertyChanged
     {
-        private ObservableCollection<IconItem> _icons = new();
-        /// <summary>
-        /// 中间图形集合。
-        /// 注意：UI 绑定此集合，应尽量避免直接重新赋值，而是使用 UpdateIcons 进行增量更新。
-        /// </summary>
-        public ObservableCollection<IconItem> Icons
+        // 顶部小图标槽位 (用于显示辅助状态)
+        private IconItem _iconTop;
+        public IconItem IconTop
         {
-            get => _icons;
-            set { _icons = value; OnPropertyChanged(); }
+            get => _iconTop;
+            set { if (_iconTop == value) return; _iconTop = value; OnPropertyChanged(); }
+        }
+
+        // 中间主图标槽位 (显示门体开关状态的核心矢量图)
+        private IconItem _iconMid;
+        public IconItem IconMid
+        {
+            get => _iconMid;
+            set { if (_iconMid == value) return; _iconMid = value; OnPropertyChanged(); }
+        }
+
+        // 底部小图标槽位 (用于显示安全回路等状态)
+        private IconItem _iconBot;
+        public IconItem IconBot
+        {
+            get => _iconBot;
+            set { if (_iconBot == value) return; _iconBot = value; OnPropertyChanged(); }
         }
 
         /// <summary>
-        /// 增量更新图标集合，避免 UI 全量重建
+        /// 视觉图标集合（用于绑定到 DoorControl）
         /// </summary>
-        public void UpdateIcons(List<IconItem> newItems)
-        {
-            if (newItems == null)
-            {
-                if (Icons.Count > 0) Icons.Clear();
-                return;
-            }
+        public ObservableCollection<IconItem> IconItems { get; set; } = new();
 
-            // 如果数量或内容不一致，清空并重新填充
-            // (也可以做更复杂的 Diff 算法，但 Clear+Add 对 1-3 个图标的小集合已经足够快且稳定)
-            Icons.Clear();
-            foreach (var item in newItems)
-            {
-                Icons.Add(item);
-            }
-        }
 
         private Brush _header = Brushes.LightGray;
         public Brush HeaderBackground
         {
             get => _header;
-            set { _header = value; OnPropertyChanged(); }
+            set 
+            { 
+                if (_header == value) return;
+                _header = value; 
+                OnPropertyChanged(); 
+            }
         }
 
         private string _headerText = "";
         public string HeaderText
         {
             get => _headerText;
-            set { _headerText = value; OnPropertyChanged(); }
+            set 
+            { 
+                if (_headerText == value) return;
+                _headerText = value; 
+                OnPropertyChanged(); 
+            }
         }
 
         private Brush _bottom = Brushes.LightGray;
         public Brush BottomBackground
         {
             get => _bottom;
-            set { _bottom = value; OnPropertyChanged(); }
+            set 
+            { 
+                if (_bottom == value) return;
+                _bottom = value; 
+                OnPropertyChanged(); 
+            }
         }
     }
 

@@ -564,19 +564,22 @@ namespace DoorMonitorSystem.ViewModels
                     }
 
                     db.CommitTransaction();
+                    LogHelper.Info("[布局配置] 用户成功保存了全局布局配置（站台、门组、门单元等结构已同步至数据库）。");
                     StatusMessage = "保存成功！";
                     MessageBox.Show("保存成功！", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
                     // 重新加载以确保所有状态同步
                     LoadData(null);
                 }
-                catch
+                catch (Exception ex)
                 {
                     db.RollbackTransaction();
+                    LogHelper.Error($"[布局配置] 保存布局过程中止并回滚: {ex.Message}", ex);
                     throw;
                 }
             }
             catch (Exception ex)
             {
+                LogHelper.Error($"[布局配置] 保存严重失败: {ex.Message}", ex);
                 MessageBox.Show($"保存失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -592,6 +595,7 @@ namespace DoorMonitorSystem.ViewModels
             };
             var item = new StationConfigItem(newStation);
             Stations.Add(item);
+            LogHelper.Info($"[布局配置] 用户新增了站台节点: {newStation.StationName}");
             item.IsSelected = true;
             SelectedItem = item;
         }
@@ -609,6 +613,7 @@ namespace DoorMonitorSystem.ViewModels
                 };
                 var item = new DoorGroupConfigItem(newGroup, stItem, DoorBitConfigsByTypeMap, this);
                 stItem.Children.Add(item);
+                LogHelper.Info($"[布局配置] 用户在站台 [{stItem.Name}] 下新增了门组: {newGroup.GroupName}");
                 stItem.IsExpanded = true;
                 item.IsSelected = true;
                 SelectedItem = item;
@@ -628,6 +633,7 @@ namespace DoorMonitorSystem.ViewModels
                 };
                 var item = new PanelGroupConfigItem(newGroup, stItem);
                 stItem.Children.Add(item);
+                LogHelper.Info($"[布局配置] 用户在站台 [{stItem.Name}] 下新增了面板组: {newGroup.GroupName}");
                 stItem.IsExpanded = true;
                 item.IsSelected = true;
                 SelectedItem = item;
@@ -701,21 +707,23 @@ namespace DoorMonitorSystem.ViewModels
                 if (SelectedItem is StationConfigItem stItem)
                 {
                     Stations.Remove(stItem);
+                    LogHelper.Warn($"[布局配置] 用户移除了站台节点: {stItem.Name}");
                     SelectedItem = null;
                 }
                 else if (SelectedItem is ConfigItemBase childItem)
                 {
                     ConfigItemBase parent = null;
-                    if (childItem is DoorGroupConfigItem dg) { parent = dg.Parent; dg.Parent.Children.Remove(dg); }
-                    else if (childItem is PanelGroupConfigItem pg) { parent = pg.Parent; pg.Parent.Children.Remove(pg); }
-                    else if (childItem is DoorConfigItem d) { parent = d.Parent; d.Parent.Children.Remove(d); }
-                    else if (childItem is PanelConfigItem p) { parent = p.Parent; p.Parent.Children.Remove(p); }
+                    if (childItem is DoorGroupConfigItem dg) { parent = dg.Parent; dg.Parent.Children.Remove(dg); LogHelper.Warn($"[布局配置] 用户移除了门组: {dg.Name}"); }
+                    else if (childItem is PanelGroupConfigItem pg) { parent = pg.Parent; pg.Parent.Children.Remove(pg); LogHelper.Warn($"[布局配置] 用户移除了面板组: {pg.Name}"); }
+                    else if (childItem is DoorConfigItem d) { parent = d.Parent; d.Parent.Children.Remove(d); LogHelper.Warn($"[布局配置] 用户移除了门单元: {d.Name}"); }
+                    else if (childItem is PanelConfigItem p) { parent = p.Parent; p.Parent.Children.Remove(p); LogHelper.Warn($"[布局配置] 用户移除了面板: {p.Name}"); }
                     
                     SelectedItem = parent;
                 }
             }
             catch (Exception ex)
             {
+                LogHelper.Error($"[布局配置] 移除项失败: {ex.Message}", ex);
                 MessageBox.Show($"移除失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }

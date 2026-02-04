@@ -1,5 +1,9 @@
-using DoorMonitorSystem.Base;
+using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
+using System.Collections.ObjectModel;
+using DoorMonitorSystem.Base;
+using ControlLibrary.Models;
 
 namespace DoorMonitorSystem.Models.RunModels
 {
@@ -17,6 +21,9 @@ namespace DoorMonitorSystem.Models.RunModels
 
         /// <summary>全局唯一标识 (GUID)</summary>
         public string KeyId { get; set; }
+
+        /// <summary>所属门的 KeyId (运行时性能优化用)</summary>
+        public string ParentDoorKeyId { get; set; } = "";
 
         /// <summary>点位描述，如：开门、关门、故障、锁闭等</summary>
         private string _description = "";

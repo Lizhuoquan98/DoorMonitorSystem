@@ -21,6 +21,6 @@ namespace DoorMonitorSystem.Models.RunModels
         public int SortOrder { get; set; }
 
         /// <summary>面板列表</summary>
-        public ObservableCollection<PanelModel> Panels { get; set; } = new();
+        public System.Collections.Generic.List<PanelModel> Panels { get; set; } = new();
     }
 }

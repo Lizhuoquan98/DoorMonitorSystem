@@ -15,7 +15,7 @@ namespace DoorMonitorSystem.Views
         {
             InitializeComponent();
             LoadUsers();
-            
+
             // Auto focus
             Loaded += (s, e) => ComboUser.Focus();
             KeyDown += LoginWindow_KeyDown;
@@ -26,18 +26,21 @@ namespace DoorMonitorSystem.Views
             try
             {
                 if (GlobalData.SysCfg == null) return;
-                
+
                 using var db = new Assets.Helper.SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
                 db.Connect();
                 if (db.IsConnected)
                 {
                     // Verify table exists first (if needed, but usually safe)
-                    var users = db.Query<UserEntity>("Sys_Users", ""); 
-                    if (users != null)
+                    // 安全策略：Admin 账号不显示在下拉列表中，防止被猜解
+                    var allUsers = db.Query<UserEntity>("Sys_Users", "");
+                    if (allUsers != null)
                     {
-                        ComboUser.ItemsSource = users;
-                        // Select Admin or first user by default if available
-                        if (users.Count > 0)
+                        var visibleUsers = allUsers.Where(u => !u.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase)).ToList();
+                        ComboUser.ItemsSource = visibleUsers;
+
+                        // Select first available user by default if available
+                        if (visibleUsers.Count > 0)
                             ComboUser.SelectedIndex = 0;
                     }
                 }
@@ -79,42 +82,59 @@ namespace DoorMonitorSystem.Views
                 {
                     // Simple query
                     // Security Note: Use parameterized query in production to prevent SQL injection
-                    string sql = $"Username='{username}' AND Password='{password}'"; 
-                    // Better:
-                    var users = db.Query<UserEntity>("Sys_Users", "Username=@u AND Password=@p", 
-                        new MySql.Data.MySqlClient.MySqlParameter("@u", username),
-                        new MySql.Data.MySqlClient.MySqlParameter("@p", password));
+                    // 1. Find user by username only
+                    var users = db.Query<UserEntity>("Sys_Users", "Username=@u",
+                        new MySql.Data.MySqlClient.MySqlParameter("@u", username));
 
                     if (users != null && users.Count > 0)
                     {
                         var user = users[0];
-                        if (!user.IsEnabled)
+                        bool isPasswordValid = false;
+
+                        // 验证逻辑：同时支持 MD5 和 明文 (平滑过渡)
+                        string inputMd5 = Assets.Helper.CryptoHelper.ComputeMD5(password);
+
+                        if (user.Password == inputMd5)
                         {
-                            LblError.Text = "该账户已被禁用";
-                            Assets.Services.DataManager.Instance.LogOperation("LoginFailed", $"账户被禁用: {username}", "Failed");
-                            return;
+                            isPasswordValid = true;
+                        }
+                        else if (user.Password == password)
+                        {
+                            // 兼容旧的明文密码，并在登录成功后自动升级为 MD5
+                            isPasswordValid = true;
+                            user.Password = inputMd5;
                         }
 
-                        // Success
-                        LoggedInUser = user;
-                        Assets.Services.DataManager.Instance.LogOperation("UserLogin", $"用户登录成功: {user.RealName} ({user.Role})");
-                        
-                        // Update last login
-                        user.LastLoginTime = DateTime.Now;
-                        db.Update(user); // Assuming Update works
+                        if (isPasswordValid)
+                        {
+                            if (!user.IsEnabled)
+                            {
+                                LblError.Text = "该账户已被禁用";
+                                Assets.Services.DataManager.Instance.LogOperation("LoginFailed", $"账户被禁用: {username}", "Failed");
+                                return;
+                            }
 
-                        DialogResult = true;
-                        Close();
+                            // Success
+                            LoggedInUser = user;
+                            Assets.Services.DataManager.Instance.LogOperation("UserLogin", $"用户登录成功: {user.RealName} ({user.Role})");
+
+                            // Update last login
+                            user.LastLoginTime = DateTime.Now;
+                            db.Update(user); // Assuming Update works
+
+                            DialogResult = true;
+                            Close();
+                        }
+                        else
+                        {
+                            LblError.Text = "用户名或密码错误";
+                            Assets.Services.DataManager.Instance.LogOperation("LoginFailed", $"密码错误或用户不存在/尝试用户: {username}", "Failed");
+                        }
                     }
                     else
                     {
-                        LblError.Text = "用户名或密码错误";
-                         Assets.Services.DataManager.Instance.LogOperation("LoginFailed", $"密码错误或用户不存在/尝试用户: {username}", "Failed");
+                        LblError.Text = "连接数据库失败";
                     }
-                }
-                else
-                {
-                    LblError.Text = "连接数据库失败";
                 }
             }
             catch (Exception ex)

@@ -16,32 +16,25 @@
 
 
     <UserControl.Resources>
-
-        <!-- 门控件模板（使用现有的 DoorControl） -->
+        <!-- 工业级门展示模板：恢复空间库 (ControlLibrary) 的 DoorControl 模型 -->
         <DataTemplate x:Key="DoorTemplate" DataType="{x:Type models:DoorModel}">
-            <usc:DoorControl
-                HeaderText="{Binding Visual.HeaderText}"
-                HeaderBackground="{Binding Visual.HeaderBackground}"
-                BottomBackground="{Binding Visual.BottomBackground}"
-                BorderThickness="0"
-                IconItems="{Binding Visual.Icons}"
-                Command="{Binding DataContext.OpenDoorDetailCommand, RelativeSource={RelativeSource AncestorType=local:MainView}}"
-                CommandParameter="{Binding}"
-                Width="50" Height="80"
-                Margin="1,0"
-                FontSize="14"
-                SnapsToDevicePixels="True"
-                UseLayoutRounding="True">
-            </usc:DoorControl>
+            <usc:DoorControl Width="54" Height="84" Margin="1,0" 
+                            ToolTip="{Binding DoorName}"
+                            HeaderText="{Binding DoorName}"
+                            HeaderBackground="{Binding Visual.HeaderBackground}"
+                            BottomBackground="{Binding Visual.BottomBackground}"
+                            IconItems="{Binding Visual.IconItems}"
+                            Command="{Binding DataContext.OpenDoorDetailCommand, RelativeSource={RelativeSource AncestorType=local:MainView}}"
+                            CommandParameter="{Binding}"/>
         </DataTemplate>
 
-        <!-- 门组模板 -->
+        <!-- 门组模板：恢复 Viewbox 适配模型，确保全屏幕适配 -->
         <DataTemplate x:Key="DoorGroupTemplate" DataType="{x:Type models:DoorGroup}">
-            <Viewbox Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Center">
-                <ItemsControl ItemsSource="{Binding Doors}" Margin="0,2">
+            <Viewbox Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Left">
+                <ItemsControl ItemsSource="{Binding Doors}" Margin="4,2">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left"/>
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
@@ -51,15 +44,18 @@
             </Viewbox>
         </DataTemplate>
 
-        <!-- 面板点位模板 -->
+        <!-- 面板点位模板 (恢复空间库 BitControl) -->
         <DataTemplate x:Key="PanelBitTemplate" DataType="{x:Type models:PanelBitConfig}">
-            <usc:BitControl Text="{Binding Description}"
-                           BITColor="{Binding ConfigColor}"
-                           Value="{Binding BitValue}"
-                           FontSize="15" Height="25"
-                           Margin="2,1"
-                           Foreground="White"
-                           HorizontalAlignment="Stretch"/>
+                <usc:BitControl Margin="0,0,10,0" 
+                                Value="{Binding BitValue}" 
+                                BITColor="{Binding ConfigColor}" 
+                                Text="{Binding Description}" 
+                                Foreground="White"
+                                Cursor="Hand">
+                    <usc:BitControl.InputBindings>
+                        <MouseBinding MouseAction="LeftClick" Command="{Binding DataContext.ShowDetailCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"/>
+                    </usc:BitControl.InputBindings>
+                </usc:BitControl>
         </DataTemplate>
 
         <!-- 优化后的面板模板（顶部标题） -->
@@ -228,16 +224,15 @@
                 </Style>
             </Grid.Style>
 
-            <!-- 主弹窗边框 (移除昂贵的阴影，改为加深边框以适配 Win7 老机器) -->
+            <!-- 主弹窗边框 -->
             <Border x:Name="PopupBorder" CornerRadius="12" MaxWidth="1200" MaxHeight="650"
                    Background="#1a1f2e" BorderBrush="#3a6f9f" BorderThickness="2">
                 <Border.RenderTransform>
                     <TranslateTransform x:Name="PopupTranslateTransform"/>
                 </Border.RenderTransform>
-                <Border.CacheMode>
-                    <BitmapCache RenderAtScale="1"/>
-                </Border.CacheMode>
-                <!-- 移除了 DropShadowEffect 以确保老设备流畅 -->
+                <!-- 注意：我们将 CacheMode 移动到不会频繁变化的组件上，或者完全移除它以换取拖动灵敏度 -->
+                <!-- 如果拖动发飘，请优先检查是否因为频繁更新导致 Cache 失效 -->
+
                 
                     <Grid>
                         <Grid.RowDefinitions>
@@ -266,21 +261,12 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
-                                <!-- 门视图 -->
-                                <Border Grid.Column="0"
-                                       Width="45" Height="65"
-                                       CornerRadius="5"
-                                       Background="#2a5a8f"
-                                       Margin="0,0,15,0"
-                                       Padding="2">
-                                    <usc:DoorControl
-                                        HeaderText="{Binding SelectedDoor.DoorName}"
-                                        HeaderBackground="{Binding SelectedDoor.Visual.HeaderBackground}"
-                                        BottomBackground="{Binding SelectedDoor.Visual.BottomBackground}"
-                                        IconItems="{Binding SelectedDoor.Visual.Icons}"
-                                        BorderThickness="0"
-                                        FontSize="11"/>
-                                </Border>
+                                <!-- 弹窗头部门预览 (恢复空间库 DoorControl) -->
+                                <usc:DoorControl Grid.Column="0" Width="40" Height="60" Margin="0,0,15,0"
+                                                HeaderText="{Binding SelectedDoor.DoorName}"
+                                                HeaderBackground="{Binding SelectedDoor.Visual.HeaderBackground}"
+                                                BottomBackground="{Binding SelectedDoor.Visual.BottomBackground}"
+                                                IconItems="{Binding SelectedDoor.Visual.IconItems}"/>
 
                                 <!-- 标题文字 -->
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
@@ -398,21 +384,13 @@
                                                     </ItemsControl.ItemsPanel>
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate>
-                                                            <Border CornerRadius="6"
-                                                                   Background="#1e2838"
-                                                                   BorderBrush="#3a4555"
-                                                                   BorderThickness="1"
-                                                                   Margin="3,2"
-                                                                   Padding="8,4"
-                                                                   SnapsToDevicePixels="True"
-                                                                   UseLayoutRounding="True">
-                                                                <usc:BitControl Text="{Binding Description}"
-                                                                              BITColor="{Binding ConfigColor}"
-                                                                              Value="{Binding BitValue}"
-                                                                              FontSize="15"
-                                                                              Height="28"
-                                                                              HorizontalAlignment="Stretch"
-                                                                              Foreground="White"/>
+                                                            <Border CornerRadius="4" Background="#FF1E2430" BorderBrush="#33FFFFFF" BorderThickness="1" Margin="3,2">
+                                                                <usc:BitControl Margin="8,4" Height="30"
+                                                                               Value="{Binding BitValue}"
+                                                                               BITColor="{Binding ConfigColor}"
+                                                                               Text="{Binding Description}"
+                                                                               FontSize="14"
+                                                                               Foreground="White"/>
                                                             </Border>
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>

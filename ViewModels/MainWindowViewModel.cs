@@ -24,6 +24,7 @@ namespace DoorMonitorSystem.ViewModels
         private string _stationName = "XX监测站";
         private string _currentUserName = "未登录"; // Default
         private string _loginButtonText = "登入";
+        private DispatcherTimer _autoLogoutTimer; // 自动登出计时器
 
         private object _currentViewModel;
         private UserControl _currentView;
@@ -96,6 +97,24 @@ namespace DoorMonitorSystem.ViewModels
             set { _loginButtonText = value; OnPropertyChanged(); }
         }
 
+        private bool _isAdmin;
+        /// <summary>
+        /// 是否为系统管理员权限 (Admin)
+        /// 用于控制界面上高级配置入口的显示/隐藏
+        /// </summary>
+        public bool IsAdmin
+        {
+            get => _isAdmin;
+            set 
+            { 
+                _isAdmin = value; 
+                OnPropertyChanged(); 
+                OnPropertyChanged(nameof(AdminVisibility)); // Notify derived property
+            }
+        }
+
+        public Visibility AdminVisibility => IsAdmin ? Visibility.Visible : Visibility.Collapsed;
+
         #endregion
 
         #region Commands (命令)
@@ -139,6 +158,7 @@ namespace DoorMonitorSystem.ViewModels
 
         /// <summary>
         /// 刷新配置信息 (站名/用户)
+        /// 并处理自动登出逻辑
         /// </summary>
         public void RefreshConfigInfo()
         {
@@ -147,16 +167,52 @@ namespace DoorMonitorSystem.ViewModels
                 StationName = GlobalData.SysCfg.StationName;
             }
 
+            // 初始化自动登出计时器
+            if (_autoLogoutTimer == null)
+            {
+                _autoLogoutTimer = new DispatcherTimer();
+                _autoLogoutTimer.Tick += (s, e) => 
+                {
+                    _autoLogoutTimer.Stop();
+                    // 触发降级逻辑
+                    Assets.Services.DataManager.Instance.LogOperation("SessionTimeout", "用户登录会话超时(2小时)，自动降级");
+                    TryAutoLogin(); // 重新执行自动登录(默认优先Observer)
+                    MessageBox.Show("登录会话已超时 (2小时)，系统自动降级为观察员模式。", "会话超时", MessageBoxButton.OK, MessageBoxImage.Information);
+                };
+            }
+            _autoLogoutTimer.Stop(); // 先停止，重新计时
+
             if (GlobalData.CurrentUser != null)
             {
                 // User requested to show Username instead of RealName
                 CurrentUserName = GlobalData.CurrentUser.Username; 
                 LoginButtonText = "切换账号";
+                
+                string role = GlobalData.CurrentUser.Role ?? "";
+                IsAdmin = role.Equals("Admin", StringComparison.OrdinalIgnoreCase);
+
+                // 如果非观察员模式，启动2小时倒计时
+                if (!role.Equals("Observer", StringComparison.OrdinalIgnoreCase))
+                {
+                    _autoLogoutTimer.Interval = TimeSpan.FromHours(2); // 2小时后自动降级
+                    _autoLogoutTimer.Start();
+                }
             }
             else
             {
                 CurrentUserName = "未登录";
                 LoginButtonText = "登入";
+                IsAdmin = false;
+            }
+
+            // 广播权限变更通知给所有已缓存的 ViewModel
+            foreach (var vm in ViewModels.Values)
+            {
+                if (vm is ParameterSettingViewModel pvm)
+                {
+                    pvm.UpdatePermissions();
+                }
+                // 如果其他 VM 也有 UpdatePermissions 方法，可以在此添加
             }
         }
 
@@ -194,7 +250,8 @@ namespace DoorMonitorSystem.ViewModels
         }
 
         /// <summary>
-        /// 自动尝试登录默认用户 (Operator/Guest)
+        /// 自动尝试登录默认用户 (Observer 观察员)
+        /// 若不存在则自动创建
         /// </summary>
         private void TryAutoLogin()
         {
@@ -204,55 +261,67 @@ namespace DoorMonitorSystem.ViewModels
                 db.Connect();
                 if (db.IsConnected)
                 {
-                    // Try to find a default low-level user, e.g., 'level 1' or Role 'Operator'
-                    // Strategy: Find any user that is NOT Admin, or specifically named 'Operator'
-                    // If none found, create a default 'Operator' user.
+                    // 1. 尝试查找 Observer 账号
+                    var observers = db.Query<Models.system.UserEntity>("Sys_Users", "Role='Observer' OR Username='Observer'");
 
-                    var operators = db.Query<Models.system.UserEntity>("Sys_Users", "Role='Operator' OR Role='Guest' OR Username='Operator'");
-
-                    if (operators != null && operators.Count > 0)
+                    if (observers != null && observers.Count > 0)
                     {
-                        // Auto login the first found operator
-                        GlobalData.CurrentUser = operators[0];
-                        Assets.Services.DataManager.Instance.LogOperation("AutoLogin", $"自动登录成功: {operators[0].Username}");
+                        // 找到观察员，自动登录
+                        GlobalData.CurrentUser = observers[0];
+                        Assets.Services.DataManager.Instance.LogOperation("AutoLogin", $"自动登录成功 (观察员): {observers[0].Username}");
                     }
                     else
                     {
-                        // If no operator exists, check if ANY user exists?
-                        // Or create a default 'Operator' user for convenience
+                        // 未找到观察员，检查是否是全新数据库
                         var anyUser = db.Query<Models.system.UserEntity>("Sys_Users", "");
+                        string hashedPassword = Assets.Helper.CryptoHelper.ComputeMD5("123");
+
                         if (anyUser == null || anyUser.Count == 0)
                         {
-                            // Create default Admin and Operator if empty
-                            var admin = new Models.system.UserEntity { Username = "Admin", Password = "123", RealName = "System Administrator", Role = "Admin", IsEnabled = true };
-                            var op = new Models.system.UserEntity { Username = "Operator", Password = "123", RealName = "Default Operator", Role = "Operator", IsEnabled = true };
+                            // 数据库为空，初始化 Admin 和 Observer
+                            // 创建默认 Admin (MD5 加密)
+                            var admin = new Models.system.UserEntity 
+                            { 
+                                Username = "Admin", 
+                                Password = hashedPassword, 
+                                RealName = "System Administrator", 
+                                Role = "Admin", 
+                                IsEnabled = true,
+                                CreateTime = DateTime.Now
+                            };
+                            
+                            // 创建默认 Observer (MD5 加密)
+                            var obs = new Models.system.UserEntity 
+                            { 
+                                Username = "Observer", 
+                                Password = hashedPassword, 
+                                RealName = "Default Observer", 
+                                Role = "Observer", 
+                                IsEnabled = true,
+                                CreateTime = DateTime.Now
+                            };
 
                             db.Insert(admin);
-                            db.Insert(op);
+                            db.Insert(obs);
 
-                            GlobalData.CurrentUser = op; // Logic as Operator
+                            GlobalData.CurrentUser = obs; // 默认登录为 Observer
+                            Assets.Services.DataManager.Instance.LogOperation("AutoInit", "系统初始化: 创建默认 Admin 和 Observer 账号");
                         }
                         else
                         {
-                            // Users exist but no explicit Operator found.
-                            // Login as the user with lowest ID that is not Admin? Or just stay logged out?
-                            // User asked for "lowest level default direct login".
-                            // Let's look for non-admin
-                            var nonAdmins = db.Query<Models.system.UserEntity>("Sys_Users", "Role<>'Admin'");
-                            if (nonAdmins != null && nonAdmins.Count > 0)
-                            {
-                                GlobalData.CurrentUser = nonAdmins[0];
-                            }
-                            else
-                            {
-                                // Only admins exist?
-                                // Stay logged out or login as Admin (unsafe)? 
-                                // Better stay logged out or ask user to create operator.
-                                // For now, let's create an Operator.
-                                var op = new Models.system.UserEntity { Username = "Operator", Password = "123", RealName = "Default Operator", Role = "Operator", IsEnabled = true };
-                                db.Insert(op);
-                                GlobalData.CurrentUser = op;
-                            }
+                            // 数据库不为空，但没有 Observer 账号 -> 自动创建一个
+                            var obs = new Models.system.UserEntity 
+                            { 
+                                Username = "Observer", 
+                                Password = hashedPassword, 
+                                RealName = "Default Observer", 
+                                Role = "Observer", 
+                                IsEnabled = true,
+                                CreateTime = DateTime.Now
+                            };
+                            db.Insert(obs);
+                            GlobalData.CurrentUser = obs;
+                            Assets.Services.DataManager.Instance.LogOperation("AutoCreate", "自动创建并登录 Observer 账号");
                         }
                     }
                 }
@@ -331,11 +400,22 @@ namespace DoorMonitorSystem.ViewModels
             // 假设必须登录才能退出 (或者没登录就直接退出)
             if (GlobalData.CurrentUser != null)
             {
+                 // 观察员禁止退出软件
+                 string role = GlobalData.CurrentUser.Role ?? "";
+                 if (role.Equals("Observer", StringComparison.OrdinalIgnoreCase))
+                 {
+                     MessageBox.Show("当前观察员模式禁止退出监控系统。", "禁止操作", MessageBoxButton.OK, MessageBoxImage.Warning);
+                     return;
+                 }
+
                  InputDialog dialog = new("身份验证", $"请输入用户[{GlobalData.CurrentUser.Username}]的密码以退出:", true);
                  if (dialog.ShowDialog() == true)
                  {
                      string input = dialog.InputText;
-                     if (input == GlobalData.CurrentUser.Password)
+                     string inputMd5 = Assets.Helper.CryptoHelper.ComputeMD5(input);
+                     
+                     // 验证逻辑：兼容明文和MD5
+                     if (input == GlobalData.CurrentUser.Password || inputMd5 == GlobalData.CurrentUser.Password)
                      {
                          // 密码正确
                          Assets.Services.DataManager.Instance.LogOperation("SystemExit", "用户验证密码后退出系统");

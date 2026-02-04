@@ -14,7 +14,12 @@ namespace DoorMonitorSystem.Views
             this.DataContext = user;
 
             // Simple role check for Management button visibility
-            if (user.Role != "Admin")
+            // Update: Allow Engineer to access User Management as per user request
+            string role = user.Role ?? "";
+            bool canManage = role.Equals("Admin", System.StringComparison.OrdinalIgnoreCase) || 
+                             role.Equals("Engineer", System.StringComparison.OrdinalIgnoreCase);
+
+            if (!canManage)
             {
                 BtnManage.Visibility = Visibility.Collapsed;
             }
