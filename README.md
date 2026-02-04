@@ -89,6 +89,9 @@ DoorMonitorSystem/
 │
 ├── Views/                          # 视图层 (XAML 界面)
 │   ├── MainWindow.xaml            # 主窗口
+│   ├── LoginWindow.xaml           # 登录窗口 ⭐
+│   ├── UserManagementWindow.xaml  # 用户管理窗口 ⭐
+│   ├── UserInfoWindow.xaml        # 用户信息弹窗
 │   ├── MainView.xaml              # 主视图
 │   ├── StationView.xaml           # 站点监控视图 ⭐
 │   ├── GraphicEditingView.xaml    # 图形编辑视图（站台门布局）
@@ -98,6 +101,7 @@ DoorMonitorSystem/
 │
 ├── ViewModels/                     # 视图模型层 (业务逻辑)
 │   ├── MainWindowViewModel.cs
+│   ├── UserManagementViewModel.cs # 用户管理逻辑 ⭐
 │   ├── StationViewModel.cs        # 站点监控业务逻辑 ⭐
 │   ├── GraphicEditingViewModel.cs # 图形编辑业务逻辑
 │   ├── DevvarlistViewModel.cs     # 设备变量管理
@@ -133,6 +137,7 @@ DoorMonitorSystem/
 │   │   └── BitDescriptionDict.cs  # 位描述字典（状态说明）
 │   │
 │   └── system/                    # 系统模型
+│       ├── UserEntity.cs          # 用户实体 ⭐
 │       └── SysCfg.cs              # 系统配置
 │
 ├── Assets/                         # 资源文件
@@ -149,6 +154,7 @@ DoorMonitorSystem/
 │   ├── Helper/                    # 帮助类
 │   │   ├── DatabaseHelper.cs      # 数据库帮助类
 │   │   ├── SQLHelper.cs           # SQL 帮助类
+│   │   ├── CryptoHelper.cs        # 加密帮助类 (MD5) ⭐
 │   │   └── UiPathHelper.cs        # UI 路径帮助类
 │   │
 │   ├── Navigation/                # 导航服务
