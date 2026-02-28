@@ -35,6 +35,7 @@ namespace DoorMonitorSystem.Models.system
         /// <summary>
         /// 对时配置 (JSON 序列化存储)
         /// </summary>
+        [StringLength(2000)]
         public string TimeSyncJson { get; set; } = "{}";
 
         /// <summary>

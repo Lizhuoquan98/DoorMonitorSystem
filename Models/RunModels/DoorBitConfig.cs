@@ -14,6 +14,11 @@ namespace DoorMonitorSystem.Models.RunModels
     /// </summary>
     public partial class DoorBitConfig : NotifyPropertyChanged
     {
+        /// <summary>
+        /// 主界面主要依赖 DoorVisualResult 聚合结果。
+        /// 关闭详情弹窗时，抑制单点位通知可降低高频刷新开销。
+        /// </summary>
+        public static bool SuppressBitValueNotifications { get; set; } = true;
         #region 基础属性
 
         /// <summary>点位ID（主键，点位模板的唯一标识）</summary>
@@ -46,8 +51,10 @@ namespace DoorMonitorSystem.Models.RunModels
             {
                 if (_bitValue == value) return;
                 _bitValue = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(IndicatorBrush));
+                if (!SuppressBitValueNotifications)
+                {
+                    OnPropertyChanged();
+                }
             }
         }
 

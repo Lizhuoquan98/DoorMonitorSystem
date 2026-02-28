@@ -5,6 +5,7 @@ using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using DoorMonitorSystem.Assets.Helper;
 
 namespace DoorMonitorSystem
 {
@@ -23,6 +24,8 @@ namespace DoorMonitorSystem
             System.Diagnostics.Trace.Listeners.Add(new DoorMonitorSystem.Assets.Helper.LogTraceListener());
             
             DoorMonitorSystem.Assets.Helper.LogHelper.Info("=== Application Started ===");
+
+            PerformanceHelper.Initialize();
 
             // 3. 全局异常捕获
             this.DispatcherUnhandledException += App_DispatcherUnhandledException;

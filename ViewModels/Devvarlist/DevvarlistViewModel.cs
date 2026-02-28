@@ -1,4 +1,4 @@
-﻿using DoorMonitorSystem;
+﻿﻿﻿﻿using DoorMonitorSystem;
 using DoorMonitorSystem.Base;
 using DoorMonitorSystem.Models.ConfigEntity;
 using DoorMonitorSystem.Assets.Helper;
@@ -18,6 +18,7 @@ using DoorMonitorSystem.Models.Ui;
 using DoorMonitorSystem.Models.ConfigEntity.Door;
 using DoorMonitorSystem.Models.ConfigEntity.Group;
 using DoorMonitorSystem.Models;
+using System.Threading.Tasks;
 
 namespace DoorMonitorSystem.ViewModels
 {
@@ -32,6 +33,17 @@ namespace DoorMonitorSystem.ViewModels
     /// </summary>
     public partial class DevvarlistViewModel : NotifyPropertyChanged
     {
+        // --- 缓存优化：一次性加载，避免重复查询数据库 ---
+        private Dictionary<string, StationEntity> _stationCache = new();
+        private Dictionary<string, DoorGroupEntity> _doorGroupCache = new();
+        private Dictionary<string, DoorEntity> _doorCache = new();
+        private Dictionary<string, PanelGroupEntity> _panelGroupCache = new();
+        private Dictionary<string, PanelEntity> _panelCache = new();
+        private Dictionary<string, DoorBitConfigEntity> _doorBitConfigCache = new();
+        private Dictionary<string, PanelBitConfigEntity> _panelBitConfigCache = new();
+        private Dictionary<string, ParameterDefineEntity> _paramDefineCache = new();
+        // -----------------------------------------
+
         #region 属性定义 (Properties)
 
         /// <summary>
@@ -50,11 +62,11 @@ namespace DoorMonitorSystem.ViewModels
         /// </summary>
         public ObservableCollection<LogTypeEntity> LogTypes { get; set; } = new ObservableCollection<LogTypeEntity>();
 
-        private DevicePointRow _selectedPoint;
+        private DevicePointRow? _selectedPoint;
         /// <summary>
         /// 当前在 DataGrid 中用户选中的点位配置。
         /// </summary>
-        public DevicePointRow SelectedPoint
+        public DevicePointRow? SelectedPoint
         {
             get => _selectedPoint;
             set { _selectedPoint = value; OnPropertyChanged(); }
@@ -72,8 +84,9 @@ namespace DoorMonitorSystem.ViewModels
                 if (_newPoint != null) _newPoint.PropertyChanged -= NewPoint_PropertyChanged;
                 _newPoint = value; 
                 if (_newPoint != null) _newPoint.PropertyChanged += NewPoint_PropertyChanged;
-                OnPropertyChanged(); 
-                UpdateNewPointPath(); 
+                OnPropertyChanged();
+                // 异步更新路径，避免阻塞 UI
+                _ = UpdateNewPointPathAsync(); 
             }
         }
 
@@ -81,56 +94,64 @@ namespace DoorMonitorSystem.ViewModels
         {
             if (e.PropertyName == nameof(DevicePointConfigEntity.UiBinding))
             {
-                TryResolveBinding(NewPoint.UiBinding);
-                UpdateNewPointPath();
+                // 异步解析绑定并更新路径
+                _ = ResolveBindingAndPathAsync(NewPoint.UiBinding);
             }
         }
 
-        private void TryResolveBinding(string uid)
+        private async Task ResolveBindingAndPathAsync(string uid)
+        {
+            await TryResolveBindingAsync(uid);
+            await UpdateNewPointPathAsync();
+        }
+
+        private async Task TryResolveBindingAsync(string uid)
         {
             if (string.IsNullOrEmpty(uid) || !uid.Contains("_")) return;
+            LogHelper.Info($"[DevvarlistViewModel] 开始解析绑定 UID: {uid}");
 
-            try
+            await Task.Run(() =>
             {
-                var parts = uid.Split('_');
-                if (parts.Length != 2) return;
-
-                string objectKey = parts[0];
-                string bitKey = parts[1];
-
-                using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
-                if (!db.DatabaseExists()) return;
-                db.Connect();
-
-                // 尝试匹配门
-                var door = db.FindAll<DoorEntity>("KeyId = @key", new MySql.Data.MySqlClient.MySqlParameter("@key", objectKey)).FirstOrDefault();
-                if (door != null)
+                // 优化：不再连接数据库，直接从内存缓存中查找，极大提升响应速度。
+                try 
                 {
-                    NewPoint.TargetType = TargetType.Door;
-                    NewPoint.TargetKeyId = objectKey;
-                    NewPoint.TargetBitConfigKeyId = bitKey;
-                    if (string.IsNullOrEmpty(NewPoint.Category) || NewPoint.Category == "Uncategorized")
-                        NewPoint.Category = door.DoorName;
-                    
-                    UpdateNewPointPath(); // 解析成功后刷新路径展示
-                    return;
-                }
+                    var parts = uid.Split('_');
+                    if (parts.Length != 2) return;
 
-                // 尝试匹配面板
-                var panel = db.FindAll<PanelEntity>("KeyId = @key", new MySql.Data.MySqlClient.MySqlParameter("@key", objectKey)).FirstOrDefault();
-                if (panel != null)
-                {
-                    NewPoint.TargetType = TargetType.Panel;
-                    NewPoint.TargetKeyId = objectKey;
-                    NewPoint.TargetBitConfigKeyId = bitKey;
-                    if (string.IsNullOrEmpty(NewPoint.Category) || NewPoint.Category == "Uncategorized")
-                        NewPoint.Category = panel.PanelName;
+                    string objectKey = parts[0];
+                    string bitKey = parts[1];
                     
-                    UpdateNewPointPath(); // 解析成功后刷新路径展示
-                    return;
+                    if (_doorCache.TryGetValue(objectKey, out var door))
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            NewPoint.TargetType = TargetType.Door;
+                            NewPoint.TargetKeyId = objectKey;
+                            NewPoint.TargetBitConfigKeyId = bitKey;
+                            if (string.IsNullOrEmpty(NewPoint.Category) || NewPoint.Category == "Uncategorized")
+                                NewPoint.Category = door?.DoorName;
+                        });
+                        return;
+                    }
+
+                    if (_panelCache.TryGetValue(objectKey, out var panel))
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            NewPoint.TargetType = TargetType.Panel;
+                            NewPoint.TargetKeyId = objectKey;
+                            NewPoint.TargetBitConfigKeyId = bitKey;
+                            if (string.IsNullOrEmpty(NewPoint.Category) || NewPoint.Category == "Uncategorized")
+                                NewPoint.Category = panel?.PanelName;
+                        });
+                        return;
+                    }
                 }
-            }
-            catch { }
+                catch (Exception ex)
+                {
+                    LogHelper.Error($"[DevvarlistViewModel] 异步解析绑定UID '{uid}' 失败", ex);
+                }
+            });
         }
 
         private string _newPointBindingPath = "未绑定";
@@ -144,11 +165,11 @@ namespace DoorMonitorSystem.ViewModels
             set { _newPointBindingPath = value; OnPropertyChanged(); }
         }
 
-        private ConfigEntity _selectedDevice;
+        private ConfigEntity? _selectedDevice;
         /// <summary>
         /// 当前正在编辑其点表的目标设备。切换此设备会触发对应点表的重载。
         /// </summary>
-        public ConfigEntity SelectedDevice
+        public ConfigEntity? SelectedDevice
         {
             get => _selectedDevice;
             set 
@@ -339,8 +360,10 @@ namespace DoorMonitorSystem.ViewModels
         /// </summary>
         public DevvarlistViewModel()
         {
+            LogHelper.Info("[DevvarlistViewModel] 构造函数开始执行");
             if (_newPoint != null) _newPoint.PropertyChanged += NewPoint_PropertyChanged;
             LoadLogTypes();
+            LoadCaches(); // 关键优化：加载所有缓存
             LoadDevices();
             LoadPoints(); 
         }
@@ -387,12 +410,47 @@ namespace DoorMonitorSystem.ViewModels
             }
             catch (Exception ex) { LogHelper.Error("加载日志分类失败", ex); }
         }
+
+        /// <summary>
+        /// 将所有用于路径解析的实体一次性加载到内存缓存中，极大提升性能。
+        /// </summary>
+        private void LoadCaches()
+        {
+            try
+            {
+                using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
+                if (!db.DatabaseExists()) return;
+                db.Connect();
+
+                _stationCache = db.FindAll<StationEntity>().ToDictionary(e => e.KeyId, e => e);
+                _doorGroupCache = db.FindAll<DoorGroupEntity>().ToDictionary(e => e.KeyId, e => e);
+                _doorCache = db.FindAll<DoorEntity>().ToDictionary(e => e.KeyId, e => e);
+                _panelGroupCache = db.FindAll<PanelGroupEntity>().ToDictionary(e => e.KeyId, e => e);
+                _panelCache = db.FindAll<PanelEntity>().ToDictionary(e => e.KeyId, e => e);
+                _doorBitConfigCache = db.FindAll<DoorBitConfigEntity>().ToDictionary(e => e.KeyId, e => e);
+                _panelBitConfigCache = db.FindAll<PanelBitConfigEntity>().ToDictionary(e => e.KeyId, e => e);
+                _paramDefineCache = db.FindAll<ParameterDefineEntity>().ToDictionary(e => e.BindingKey, e => e);
+                LogHelper.Info("[DevvarlistViewModel] 缓存加载完成");
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error("加载实体缓存失败，路径解析功能可能受影响。", ex);
+            }
+        }
+
         /// <summary>
         /// 刷新当前 NewPoint 的路径预览。
         /// </summary>
         public void UpdateNewPointPath()
         {
-            NewPointBindingPath = GetFullPathForEntity(NewPoint);
+            _ = UpdateNewPointPathAsync();
+        }
+
+        public async Task UpdateNewPointPathAsync()
+        {
+            NewPointBindingPath = "查询中...";
+            string path = await Task.Run(() => GetFullPathForEntity(NewPoint));
+            NewPointBindingPath = path;
         }
 
         /// <summary>
@@ -406,68 +464,53 @@ namespace DoorMonitorSystem.ViewModels
             
             try 
             {
-                using var db = new SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
-                if (!db.DatabaseExists()) return "数据未就绪";
-                db.Connect();
-
-                // 快速加载缓存 (由于此方法被频繁调用，建议在 VM 初始化时加载一次，此处为了逻辑清晰先直接查)
-                // 后续优化：将字典存为 VM 字段。
+                // 优化：直接从内存缓存中查找，替代频繁的数据库查询
                 if (entity.TargetType == TargetType.Door)
                 {
-                    var door = db.FindAll<DoorEntity>("KeyId = @key", new MySql.Data.MySqlClient.MySqlParameter("@key", entity.TargetKeyId)).FirstOrDefault();
-                    if (door != null)
+                    if (_doorCache.TryGetValue(entity.TargetKeyId ?? "", out var door) &&
+                        _doorGroupCache.TryGetValue(door.ParentKeyId ?? "", out var group) &&
+                        _stationCache.TryGetValue(group.StationKeyId ?? "", out var station) &&
+                        _doorBitConfigCache.TryGetValue(entity.TargetBitConfigKeyId ?? "", out var cfg))
                     {
-                        var group = db.FindAll<DoorGroupEntity>("KeyId = @key", new MySql.Data.MySqlClient.MySqlParameter("@key", door.ParentKeyId)).FirstOrDefault();
-                        var station = group != null ? db.FindAll<StationEntity>("KeyId = @key", new MySql.Data.MySqlClient.MySqlParameter("@key", group.StationKeyId)).FirstOrDefault() : null;
-                        var cfg = db.FindAll<DoorBitConfigEntity>("KeyId = @key", new MySql.Data.MySqlClient.MySqlParameter("@key", entity.TargetBitConfigKeyId)).FirstOrDefault();
-                        
-                        string sName = station?.StationName ?? "未知站台";
-                        string gName = group?.GroupName ?? "未知分组";
-                        return $"{sName} > {gName} > {door.DoorName} > {cfg?.Description ?? "未知点位"}";
+                        return $"{station.StationName} > {group.GroupName} > {door.DoorName} > {cfg.Description}";
                     }
                 }
                 else if (entity.TargetType == TargetType.Panel)
                 {
-                    var panel = db.FindAll<PanelEntity>("KeyId = @key", new MySql.Data.MySqlClient.MySqlParameter("@key", entity.TargetKeyId)).FirstOrDefault();
-                    if (panel != null)
+                    if (_panelCache.TryGetValue(entity.TargetKeyId ?? "", out var panel) &&
+                        _panelGroupCache.TryGetValue(panel.ParentKeyId ?? "", out var group) &&
+                        _stationCache.TryGetValue(group.StationKeyId ?? "", out var station) &&
+                        _panelBitConfigCache.TryGetValue(entity.TargetBitConfigKeyId ?? "", out var cfg))
                     {
-                        var group = db.FindAll<PanelGroupEntity>("KeyId = @key", new MySql.Data.MySqlClient.MySqlParameter("@key", panel.ParentKeyId)).FirstOrDefault();
-                        var station = group != null ? db.FindAll<StationEntity>("KeyId = @key", new MySql.Data.MySqlClient.MySqlParameter("@key", group.StationKeyId)).FirstOrDefault() : null;
-                        var cfg = db.FindAll<PanelBitConfigEntity>("KeyId = @key", new MySql.Data.MySqlClient.MySqlParameter("@key", entity.TargetBitConfigKeyId)).FirstOrDefault();
-
-                        string sName = station?.StationName ?? "未知站台";
-                        string gName = group?.GroupName ?? "未知分组";
-                        return $"{sName} > {gName} > {panel.PanelName} > {cfg?.Description ?? "未知点位"}";
+                        return $"{station.StationName} > {group.GroupName} > {panel.PanelName} > {cfg.Description}";
                     }
                 }
                 else if (entity.TargetType == TargetType.Station)
                 {
-                    var station = db.FindAll<StationEntity>("KeyId = @key", new MySql.Data.MySqlClient.MySqlParameter("@key", entity.TargetKeyId)).FirstOrDefault();
-                    if (station != null)
+                    if (_stationCache.TryGetValue(entity.TargetKeyId ?? "", out var station))
                     {
                         string fullPath = $"{station.StationName} > 站台参数";
-                        if (!string.IsNullOrEmpty(entity.UiBinding))
+                        if (!string.IsNullOrEmpty(entity.UiBinding) && _paramDefineCache.TryGetValue(entity.UiBinding, out var scfg))
                         {
-                            var scfg = db.FindAll<ParameterDefineEntity>("BindingKey = @key", new MySql.Data.MySqlClient.MySqlParameter("@key", entity.UiBinding)).FirstOrDefault();
-                            if (scfg != null)
+                            string roleName = entity.BindingRole switch
                             {
-                                string roleName = entity.BindingRole switch
-                                {
-                                    "Read" => "读取",
-                                    "Write" => "写入",
-                                    "Auth" => "鉴权",
-                                    "AuthRow" => "行授权",
-                                    _ => entity.BindingRole
-                                };
-                                string roleSuffix = string.IsNullOrEmpty(roleName) ? "" : $" ({roleName})";
-                                fullPath += $" > {scfg.Label}{roleSuffix}";
-                            }
+                                "Read" => "读取",
+                                "Write" => "写入",
+                                "Auth" => "鉴权",
+                                "AuthRow" => "行授权",
+                                _ => entity.BindingRole
+                            };
+                            string roleSuffix = string.IsNullOrEmpty(roleName) ? "" : $" ({roleName})";
+                            fullPath += $" > {scfg.Label}{roleSuffix}";
                         }
                         return fullPath;
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                LogHelper.Error($"路径解析失败 (实体ID: {entity.Id})", ex);
+            }
 
             return entity.TargetType == TargetType.None ? "未关联业务对象" : "关联对象已失效或不存在";
         }

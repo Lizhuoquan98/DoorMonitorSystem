@@ -77,7 +77,7 @@ namespace DoorMonitorSystem.Models.Ui
             }
         }
 
-        private string _syncTargetDeviceName;
+        private string _syncTargetDeviceName = "";
         /// <summary>
         /// 同步目标设备的名称。
         /// 由外部加载时匹配 DeviceID 后填入。

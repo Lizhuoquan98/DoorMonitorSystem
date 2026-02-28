@@ -44,13 +44,38 @@
         </Border>
 
         <!-- [1] 站台实时显示区 -->
-        <ItemsControl Grid.Row="1" ItemsSource="{Binding StationSettings}">
-            <ItemsControl.ItemsPanel>
+        <ListBox Grid.Row="1"
+                 ItemsSource="{Binding StationSettings}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                 ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                 ScrollViewer.CanContentScroll="True"
+                 VirtualizingPanel.IsVirtualizing="True"
+                 VirtualizingPanel.VirtualizationMode="Recycling">
+            <ListBox.ItemsPanel>
                 <ItemsPanelTemplate>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
+                    <VirtualizingStackPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
                 </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="Margin" Value="0"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="BorderThickness" Value="0"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                    <Setter Property="IsTabStop" Value="False"/>
+                    <Style.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Background" Value="Transparent"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
                 <DataTemplate DataType="{x:Type vm:StationParameterViewModel}">
                     <!-- 缩小 Margin 和 Padding 提升密度 -->
                     <Border Background="#1a1f2e" CornerRadius="12" Margin="5" Padding="15" Width="550">
@@ -113,31 +138,55 @@
                             </Border>
 
                             <!-- [3] 详细参数编辑：垂直回正布局 -->
-                            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Height="auto">
-                                <ItemsControl ItemsSource="{Binding ParameterList}" HorizontalAlignment="Stretch">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <StackPanel Orientation="Vertical"  />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <uc:SettingItem Label="{Binding Label, StringFormat='{}{0} :'}" 
-                                                            Value="{Binding Value, Mode=TwoWay}"
-                                                            ReadbackValue="{Binding ReadbackValue}" 
-                                                            Unit="{Binding Unit}" 
-                                                            Hint="{Binding Hint}" 
-                                                            ToolTip="{Binding DebugInfo}"
-                                                            Margin="0,0,0,6"/>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
+                            <ListBox Grid.Row="2"
+                                     ItemsSource="{Binding ParameterList}"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     ScrollViewer.CanContentScroll="True"
+                                     VirtualizingPanel.IsVirtualizing="True"
+                                     VirtualizingPanel.VirtualizationMode="Recycling"
+                                     HorizontalContentAlignment="Stretch">
+                                <ListBox.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <VirtualizingStackPanel Orientation="Vertical"/>
+                                    </ItemsPanelTemplate>
+                                </ListBox.ItemsPanel>
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="Padding" Value="0"/>
+                                        <Setter Property="Margin" Value="0"/>
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                        <Setter Property="VerticalContentAlignment" Value="Top"/>
+                                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                        <Setter Property="IsTabStop" Value="False"/>
+                                        <Style.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter Property="Background" Value="Transparent"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <uc:SettingItem Label="{Binding Label, StringFormat='{}{0} :'}" 
+                                                        Value="{Binding Value, Mode=TwoWay}"
+                                                        ReadbackValue="{Binding ReadbackValue}" 
+                                                        Unit="{Binding Unit}" 
+                                                        Hint="{Binding Hint}" 
+                                                        ToolTip="{Binding DebugInfo}"
+                                                        Margin="0,0,0,6"/>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
                         </Grid>
                     </Border>
                 </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
+            </ListBox.ItemTemplate>
+        </ListBox>
 
  
         <!-- [2] 模板管理浮层 (配置模式) -->

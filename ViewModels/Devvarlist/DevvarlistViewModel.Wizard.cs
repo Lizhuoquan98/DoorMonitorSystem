@@ -224,7 +224,7 @@ namespace DoorMonitorSystem.ViewModels
                     catch (Exception ex) 
                     { 
                         db.RollbackTransaction(); 
-                        throw ex; 
+                        throw;
                     }
                 }
             }

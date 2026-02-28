@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -145,11 +146,12 @@ namespace DoorMonitorSystem.ViewModels
         {
             TimeUpdateMethod();
 
-            // Try Auto Login on Startup
-            TryAutoLogin();
             CommandInit();
             // 默认显示主界面
             NavigateToViewModel(typeof(MainViewModel));
+
+            // 异步执行自动登录，不阻塞 UI 线程（避免 DB 连接超时导致窗口卡死）
+            _ = TryAutoLoginAsync();
         }
 
         #endregion
@@ -176,7 +178,7 @@ namespace DoorMonitorSystem.ViewModels
                     _autoLogoutTimer.Stop();
                     // 触发降级逻辑
                     Assets.Services.DataManager.Instance.LogOperation("SessionTimeout", "用户登录会话超时(2小时)，自动降级");
-                    TryAutoLogin(); // 重新执行自动登录(默认优先Observer)
+                    _ = TryAutoLoginAsync(); // 重新执行自动登录(默认优先Observer)
                     MessageBox.Show("登录会话已超时 (2小时)，系统自动降级为观察员模式。", "会话超时", MessageBoxButton.OK, MessageBoxImage.Information);
                 };
             }
@@ -223,7 +225,7 @@ namespace DoorMonitorSystem.ViewModels
         {
             var timer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromSeconds(0.5F)
+                Interval = TimeSpan.FromSeconds(1.0)
             };
             timer.Tick += (sender, e) =>
             {
@@ -250,87 +252,62 @@ namespace DoorMonitorSystem.ViewModels
         }
 
         /// <summary>
-        /// 自动尝试登录默认用户 (Observer 观察员)
-        /// 若不存在则自动创建
+        /// 异步尝试登录默认用户 (Observer 观察员)
+        /// 运行在后台线程，不阻塞 UI 主线程
         /// </summary>
-        private void TryAutoLogin()
+        private async Task TryAutoLoginAsync()
         {
             try
             {
-                using var db = new Assets.Helper.SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
-                db.Connect();
-                if (db.IsConnected)
+                if (GlobalData.SysCfg == null) return;
+
+                // 异步在后台运行 DB 查询，避免阻塞 UI
+                var (currentUser, logMsg) = await Task.Run(() =>
                 {
+                    using var db = new Assets.Helper.SQLHelper(GlobalData.SysCfg.ServerAddress, GlobalData.SysCfg.UserName, GlobalData.SysCfg.UserPassword, GlobalData.SysCfg.DatabaseName);
+                    db.Connect();
+                    if (!db.IsConnected) return (null, ("", ""));
+
                     // 1. 尝试查找 Observer 账号
                     var observers = db.Query<Models.system.UserEntity>("Sys_Users", "Role='Observer' OR Username='Observer'");
 
                     if (observers != null && observers.Count > 0)
                     {
-                        // 找到观察员，自动登录
-                        GlobalData.CurrentUser = observers[0];
-                        Assets.Services.DataManager.Instance.LogOperation("AutoLogin", $"自动登录成功 (观察员): {observers[0].Username}");
+                        return (observers[0], ("AutoLogin", $"自动登录成功 (观察员): {observers[0].Username}"));
+                    }
+
+                    string hashedPassword = Assets.Helper.CryptoHelper.ComputeMD5("123");
+                    var anyUser = db.Query<Models.system.UserEntity>("Sys_Users", "");
+
+                    if (anyUser == null || anyUser.Count == 0)
+                    {
+                        // 初始化默认账号
+                        var admin = new Models.system.UserEntity { Username = "Admin", Password = hashedPassword, RealName = "System Administrator", Role = "Admin", IsEnabled = true, CreateTime = DateTime.Now };
+                        var obs = new Models.system.UserEntity { Username = "Observer", Password = hashedPassword, RealName = "Default Observer", Role = "Observer", IsEnabled = true, CreateTime = DateTime.Now };
+                        db.Insert(admin);
+                        db.Insert(obs);
+                        return (obs, ("AutoInit", "系统初始化: 创建默认 Admin 和 Observer 账号"));
                     }
                     else
                     {
-                        // 未找到观察员，检查是否是全新数据库
-                        var anyUser = db.Query<Models.system.UserEntity>("Sys_Users", "");
-                        string hashedPassword = Assets.Helper.CryptoHelper.ComputeMD5("123");
-
-                        if (anyUser == null || anyUser.Count == 0)
-                        {
-                            // 数据库为空，初始化 Admin 和 Observer
-                            // 创建默认 Admin (MD5 加密)
-                            var admin = new Models.system.UserEntity 
-                            { 
-                                Username = "Admin", 
-                                Password = hashedPassword, 
-                                RealName = "System Administrator", 
-                                Role = "Admin", 
-                                IsEnabled = true,
-                                CreateTime = DateTime.Now
-                            };
-                            
-                            // 创建默认 Observer (MD5 加密)
-                            var obs = new Models.system.UserEntity 
-                            { 
-                                Username = "Observer", 
-                                Password = hashedPassword, 
-                                RealName = "Default Observer", 
-                                Role = "Observer", 
-                                IsEnabled = true,
-                                CreateTime = DateTime.Now
-                            };
-
-                            db.Insert(admin);
-                            db.Insert(obs);
-
-                            GlobalData.CurrentUser = obs; // 默认登录为 Observer
-                            Assets.Services.DataManager.Instance.LogOperation("AutoInit", "系统初始化: 创建默认 Admin 和 Observer 账号");
-                        }
-                        else
-                        {
-                            // 数据库不为空，但没有 Observer 账号 -> 自动创建一个
-                            var obs = new Models.system.UserEntity 
-                            { 
-                                Username = "Observer", 
-                                Password = hashedPassword, 
-                                RealName = "Default Observer", 
-                                Role = "Observer", 
-                                IsEnabled = true,
-                                CreateTime = DateTime.Now
-                            };
-                            db.Insert(obs);
-                            GlobalData.CurrentUser = obs;
-                            Assets.Services.DataManager.Instance.LogOperation("AutoCreate", "自动创建并登录 Observer 账号");
-                        }
+                        var obs = new Models.system.UserEntity { Username = "Observer", Password = hashedPassword, RealName = "Default Observer", Role = "Observer", IsEnabled = true, CreateTime = DateTime.Now };
+                        db.Insert(obs);
+                        return (obs, ("AutoCreate", "自动创建并登录 Observer 账号"));
                     }
-                }
+                });
 
+                // 切回 UI 线程设置结果
+                if (currentUser != null)
+                {
+                    GlobalData.CurrentUser = currentUser;
+                    if (!string.IsNullOrEmpty(logMsg.Item1))
+                        Assets.Services.DataManager.Instance.LogOperation(logMsg.Item1, logMsg.Item2);
+                }
                 RefreshConfigInfo();
             }
             catch (Exception ex)
             {
-                // Auto login failed (maybe DB not ready), ignore
+                // Auto login failed (maybe DB not ready), ignore and show as guest
                 System.Diagnostics.Debug.WriteLine("Auto login failed: " + ex.Message);
             }
         }
@@ -456,7 +433,7 @@ namespace DoorMonitorSystem.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"创建ViewModel失败: {ex.Message}");
+                    MessageBox.Show($"创建 ViewModel 失败: {ex.Message}");
                     return;
                 }
             }
@@ -483,7 +460,7 @@ namespace DoorMonitorSystem.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"创建View失败: {ex.Message}");
+                    MessageBox.Show($"创建 View 失败: {ex.Message}");
                     return;
                 }
             }

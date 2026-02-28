@@ -75,10 +75,10 @@ namespace DoorMonitorSystem.Models.RunModels
         public DoorVisualResult Visual { get; set; } = new();
 
         /// <summary>
-        /// 视觉状态指纹：用于记录上一次裁决结果的关键特征汇聚（HeaderID + ImageID + BottomID）
-        /// 如果指纹未变，则无需重新克隆图形和触发 UI 刷新，极大降低 CPU 占用。
+        /// (性能优化：高性能指纹) 使用 Tuple 避免字符串开销。
+        /// 顺序：HeaderId, ImageId, BottomId, HeaderBrushHash, BottomBrushHash
         /// </summary>
-        public string LastVisualStateFingerprint { get; set; } = "";
+        public (int, int, int, int, int) LastVisualFingerprint { get; set; }
 
         /// <summary>
         /// (性能优化) 暂存后台裁决结果，待同步到 UI 线程应用

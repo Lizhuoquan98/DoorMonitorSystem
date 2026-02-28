@@ -42,7 +42,6 @@ namespace DoorMonitorSystem.Models.RunModels
                 {
                     _bitValue = value;
                     OnPropertyChanged();
-                    OnPropertyChanged(nameof(DisplayBrush));
                 }
             }
         }
@@ -59,11 +58,25 @@ namespace DoorMonitorSystem.Models.RunModels
         /// <summary>点位排序序号</summary>
         public int SortOrder { get; set; }
 
-        /// <summary>BitControl 专用的颜色配置对象</summary>
-        public ControlLibrary.Models.BitColor ConfigColor => new ControlLibrary.Models.BitColor 
-        { 
-            High = HighBrush, 
-            Low = LowBrush 
-        };
+        /// <summary>BitControl 专用的颜色配置对象 (缓存以提升性能)</summary>
+        private ControlLibrary.Models.BitColor _configColor;
+        public ControlLibrary.Models.BitColor ConfigColor
+        {
+            get
+            {
+                if (_configColor == null)
+                {
+                    _configColor = new ControlLibrary.Models.BitColor 
+                    { 
+                        High = HighBrush, 
+                        Low = LowBrush 
+                    };
+                    // 冻结内部画笔提升渲染性能
+                    if (_configColor.High?.CanFreeze == true && !_configColor.High.IsFrozen) _configColor.High.Freeze();
+                    if (_configColor.Low?.CanFreeze == true && !_configColor.Low.IsFrozen) _configColor.Low.Freeze();
+                }
+                return _configColor;
+            }
+        }
     }
 }

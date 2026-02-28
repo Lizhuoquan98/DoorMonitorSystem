@@ -2,7 +2,6 @@
 using DoorMonitorSystem.Base;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -42,7 +41,12 @@ namespace DoorMonitorSystem.Models.RunModels
         /// <summary>
         /// 视觉图标集合（用于绑定到 DoorControl）
         /// </summary>
-        public ObservableCollection<IconItem> IconItems { get; set; } = new();
+        private IEnumerable<IconItem> _iconItems = Array.Empty<IconItem>();
+        public IEnumerable<IconItem> IconItems 
+        { 
+            get => _iconItems; 
+            set { if (_iconItems == value) return; _iconItems = value; OnPropertyChanged(); } 
+        }
 
 
         private Brush _header = Brushes.LightGray;

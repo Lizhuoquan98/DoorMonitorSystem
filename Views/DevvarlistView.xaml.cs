@@ -1,4 +1,4 @@
-﻿using DoorMonitorSystem.Assets.Helper;
+﻿﻿using DoorMonitorSystem.Assets.Helper;
 using DoorMonitorSystem.ViewModels;
 using System;
 using System.Collections.Generic;
@@ -30,7 +30,7 @@ namespace DoorMonitorSystem.Views
 
         private bool _isDragging = false;
         private Point _startPoint;
-        private TranslateTransform _transform;
+        private TranslateTransform? _transform;
 
         private void ConfigWindow_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {

@@ -37,6 +37,7 @@ namespace DoorMonitorSystem.Assets.Services
         }
 
         private ConcurrentBag<DevicePointConfigEntity> _pointConfigs = new();
+        public IEnumerable<DevicePointConfigEntity> PointConfigs => _pointConfigs;
         private bool _isRunning = false;
 
         /// <summary>配置是否已从数据库完全加载到内存字典</summary>

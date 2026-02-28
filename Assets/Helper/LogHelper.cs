@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Text;
 using System.Threading;
+using System.Collections.Concurrent;
 using System.Threading.Tasks;
 
 namespace DoorMonitorSystem.Assets.Helper
@@ -24,10 +25,28 @@ namespace DoorMonitorSystem.Assets.Helper
         private static string _lastFileMonth = "";
         private static long _currentFileSize = 0;
 
+        // 异步日志队列：消费者线程负责真正写入文件，彻底隔离 IO 对通讯性能的影响
+        private static readonly BlockingCollection<(string msg, string level, DateTime time)> _logQueue = new(10000);
+        
         static LogHelper()
         {
             // 初始化定时器，用于在日志停止刷新一段时间后自动写入汇总
             _flushTimer = new Timer(OnFlushTimer, null, Timeout.Infinite, Timeout.Infinite);
+
+            // 启动独立高优先级消费线程
+            _ = Task.Factory.StartNew(() => ProcessLogQueue(), TaskCreationOptions.LongRunning);
+        }
+
+        private static void ProcessLogQueue()
+        {
+            foreach (var item in _logQueue.GetConsumingEnumerable())
+            {
+                try
+                {
+                    WriteToFile(item.msg, item.level, item.time);
+                }
+                catch { }
+            }
         }
 
         private static void OnFlushTimer(object? state)
@@ -39,34 +58,12 @@ namespace DoorMonitorSystem.Assets.Helper
         }
 
         /// <summary>
-        /// 写入日志（带防抖去重）
+        /// 写入日志（完全异步，零阻塞）
         /// </summary>
         public static void WriteLog(string message, string level = "INFO")
         {
-            try
-            {
-                lock (_lock)
-                {
-                    // 如果是新消息，先结算上一条的重复记录
-                    FlushRepeatedLog();
-
-                    // 记录新消息
-                    _lastMessage = message;
-                    _lastLevel = level;
-                    _repeatCount = 1;
-                    _firstOccurTime = DateTime.Now;
-                    _lastOccurTime = DateTime.Now;
-                    
-                    WriteToFile(message, level, DateTime.Now);
-                    
-                    // 同样启动定时器，防止只有一条消息时无法结算
-                    _flushTimer.Change(5000, Timeout.Infinite);
-                }
-            }
-            catch
-            {
-                // Ignore
-            }
+            // 仅仅是压入队列，耗时极其微小
+            _logQueue.TryAdd((message, level, DateTime.Now));
         }
 
         private static void FlushRepeatedLog()

@@ -21,13 +21,13 @@ namespace DoorMonitorSystem.Models.ConfigEntity
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int Id { get => _id; set { _id = value; OnPropertyChanged(); } }
 
-        private string _category;
+        private string? _category;
         /// <summary>
         /// 点位所属的大分类。
         /// 用于在配置界面进行批量过滤显示，或者作为日志导出的分类标识（如：1号屏蔽门）。
         /// </summary>
         [StringLength(50)]
-        public string Category { get => _category; set { _category = value; OnPropertyChanged(); } }
+        public string? Category { get => _category; set { _category = value; OnPropertyChanged(); } }
 
         #region 数据源配置 (采集来源)
 
@@ -47,21 +47,21 @@ namespace DoorMonitorSystem.Models.ConfigEntity
         [Required, StringLength(50)]
         public string Address { get => _address; set { _address = value; OnPropertyChanged(); } }
 
-        private string _uiBinding;
+        private string? _uiBinding;
         /// <summary>
         /// 前端 UI 绑定键名。
         /// 全局唯一的 Key，前端图形界面根据此 Key 订阅实时变化的数据。
         /// </summary>
         [StringLength(50)]
-        public string UiBinding { get => _uiBinding; set { _uiBinding = value; OnPropertyChanged(); } }
+        public string? UiBinding { get => _uiBinding; set { _uiBinding = value; OnPropertyChanged(); } }
 
-        private string _bindingRole;
+        private string? _bindingRole;
         /// <summary>
         /// 数据绑定角色。
         /// 标识该点位是“只读”数据还是“可下发”指令。常用取值：Read, Write, AuthRow（行授权开关）。
         /// </summary>
         [StringLength(20)]
-        public string BindingRole { get => _bindingRole; set { _bindingRole = value; OnPropertyChanged(); } }
+        public string? BindingRole { get => _bindingRole; set { _bindingRole = value; OnPropertyChanged(); } }
 
         private string _dataType = "Word";
         /// <summary>
@@ -98,21 +98,21 @@ namespace DoorMonitorSystem.Models.ConfigEntity
         /// </summary>
         public TargetType TargetType { get => _targetType; set { _targetType = value; OnPropertyChanged(); } }
 
-        private string _targetKeyId;
+        private string? _targetKeyId;
         /// <summary>
         /// 目标业务对象的实例全局 ID (GUID)。
         /// 关联到具体哪一扇门或哪块面板。
         /// </summary>
         [StringLength(50)]
-        public string TargetKeyId { get => _targetKeyId; set { _targetKeyId = value; OnPropertyChanged(); } }
+        public string? TargetKeyId { get => _targetKeyId; set { _targetKeyId = value; OnPropertyChanged(); } }
 
-        private string _targetBitConfigKeyId;
+        private string? _targetBitConfigKeyId;
         /// <summary>
         /// 业务功能的定义配置 ID。
         /// 例如指明该点位对应的是这扇门的“锁紧状态”还是“行程终点信号”。
         /// </summary>
         [StringLength(50)]
-        public string TargetBitConfigKeyId { get => _targetBitConfigKeyId; set { _targetBitConfigKeyId = value; OnPropertyChanged(); } }
+        public string? TargetBitConfigKeyId { get => _targetBitConfigKeyId; set { _targetBitConfigKeyId = value; OnPropertyChanged(); } }
 
         #endregion
 
@@ -174,13 +174,13 @@ namespace DoorMonitorSystem.Models.ConfigEntity
         /// </summary>
         public int LogTriggerState { get => _logTriggerState; set { _logTriggerState = value; OnPropertyChanged(); } }
 
-        private string _logMessage;
+        private string? _logMessage;
         /// <summary>
         /// 自定义日志文本模板。
         /// 支持通过占位符替换点位描述和值，用于导出生成更具可读性的中文日志。
         /// </summary>
         [StringLength(200)]
-        public string LogMessage { get => _logMessage; set { _logMessage = value; OnPropertyChanged(); } }
+        public string? LogMessage { get => _logMessage; set { _logMessage = value; OnPropertyChanged(); } }
         
         private double? _logDeadband;
         /// <summary>
@@ -205,19 +205,19 @@ namespace DoorMonitorSystem.Models.ConfigEntity
         /// </summary>
         public double? LowLimit { get => _lowLimit; set { _lowLimit = value; OnPropertyChanged(); } }
 
-        private string _state0Desc;
+        private string? _state0Desc;
         /// <summary>
         /// 开关量值为 0 时的文本描述（如：“解锁”、“关闭”、“正常”）。
         /// </summary>
         [StringLength(50)]
-        public string State0Desc { get => _state0Desc; set { _state0Desc = value; OnPropertyChanged(); } }
+        public string? State0Desc { get => _state0Desc; set { _state0Desc = value; OnPropertyChanged(); } }
 
-        private string _state1Desc;
+        private string? _state1Desc;
         /// <summary>
         /// 开关量值为 1 时的文本描述（如：“锁定”、“打开”、“故障”）。
         /// </summary>
         [StringLength(50)]
-        public string State1Desc { get => _state1Desc; set { _state1Desc = value; OnPropertyChanged(); } }
+        public string? State1Desc { get => _state1Desc; set { _state1Desc = value; OnPropertyChanged(); } }
 
         private int? _alarmTargetValue;
         /// <summary>
@@ -228,21 +228,28 @@ namespace DoorMonitorSystem.Models.ConfigEntity
 
         #endregion
 
-        private string _description;
+        private string? _description;
         /// <summary>
         /// 点位的注释或详细说明。
         /// 一般填写该物理信号的实际物理含义。
         /// </summary>
         [StringLength(200)]
-        public string Description { get => _description; set { _description = value; OnPropertyChanged(); } }
+        public string? Description { get => _description; set { _description = value; OnPropertyChanged(); } }
 
-        private object _lastValue;
+        private object? _lastValue;
         /// <summary>
         /// 运行时最后一个采集值缓存 (NotMapped)。
         /// 仅用于通讯引擎判断数据变化和界面实时展示，不存入数据库。
         /// </summary>
         [NotMapped]
-        public object LastValue { get => _lastValue; set { _lastValue = value; OnPropertyChanged(); } }
+        public object? LastValue { get => _lastValue; set { _lastValue = value; OnPropertyChanged(); } }
+
+        /// <summary>
+        /// (性能优化) 运行时绑定的目标业务对象引用 (NotMapped)。
+        /// 可直接引用已映射的 DoorBitConfig 或 PanelBitConfig，消除字典查找开销。
+        /// </summary>
+        [NotMapped]
+        public object? CachedTargetObject { get; set; }
     }
 
     public enum TargetType

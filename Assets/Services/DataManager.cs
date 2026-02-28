@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
@@ -28,10 +29,14 @@ namespace DoorMonitorSystem.Assets.Services
     /// 3. 执行业务逻辑裁决 (Visual Adjudication)
     /// 4. 驱动 UI 与通讯层的业务同步
     /// </summary>
-    public class DataManager
+    public class DataManager : IDisposable
     {
         private static readonly Lazy<DataManager> _instance = new(() => new DataManager());
         public static DataManager Instance => _instance.Value;
+
+        // 后台任务统一取消令牌（批量更新循环 + 日志清理调度器）
+        private readonly CancellationTokenSource _backgroundCts = new CancellationTokenSource();
+        private bool _disposed = false;
 
         // 高性能索引：[设备ID] -> [归一化地址] -> [该地址下的点位列表]
         private Dictionary<int, Dictionary<int, List<DevicePointConfigEntity>>> _addressIndex = new();
@@ -281,6 +286,7 @@ namespace DoorMonitorSystem.Assets.Services
 
         private void StartLogCleanupScheduler()
         {
+            var token = _backgroundCts.Token;
             Task.Run(async () =>
             {
                 // 1. 启动时立即尝试执行一次 (确保即便夜间没开机，开机也会清)
@@ -288,11 +294,11 @@ namespace DoorMonitorSystem.Assets.Services
 
                 string lastRunDate = DateTime.Now.ToString("yyyy-MM-dd");
 
-                while (true)
+                while (!token.IsCancellationRequested)
                 {
                     try
                     {
-                        await Task.Delay(TimeSpan.FromMinutes(1)); // 每分钟检测一次
+                        await Task.Delay(TimeSpan.FromMinutes(1), token); // 每分钟检测一次
 
                         string configTime = GlobalData.DebugConfig?.LogCleanupTime ?? "01:00:00";
                         if (TimeSpan.TryParse(configTime, out TimeSpan targetTime))
@@ -306,12 +312,16 @@ namespace DoorMonitorSystem.Assets.Services
                             }
                         }
                     }
+                    catch (OperationCanceledException)
+                    {
+                        break; // 正常退出
+                    }
                     catch (Exception ex)
                     {
                         LogHelper.Error("[DataManager] 定时清理任务调度异常", ex);
                     }
                 }
-            });
+            }, token);
         }
 
         private void EnsureLogDatabaseExists()
@@ -362,13 +372,13 @@ namespace DoorMonitorSystem.Assets.Services
                     var defaultUser = new UserEntity
                     {
                         Username = "admin",
-                        Password = "admin", // 明文仅演示，实际应哈希
+                        Password = CryptoHelper.ComputeMD5("123"), // MD5 哈希，默认密码 123
                         RealName = "System Administrator",
                         Role = "Admin",
                         IsEnabled = true
                     };
                     dbMain.Insert(defaultUser);
-                    LogHelper.Info("[DataManager] 已创建默认管理员账号: admin/admin");
+                    LogHelper.Info("[DataManager] 已创建默认管理员账号 (密码已 MD5 哈希)");
                 }
             }
             catch (Exception ex)
@@ -1058,10 +1068,11 @@ namespace DoorMonitorSystem.Assets.Services
                         foreach (var door in dirtyDoors)
                         {
                             var res = CalculateDoorVisualState(door);
-                            string fingerprint = $"{res.HeaderId}_{res.ImageId}_{res.BottomId}";
-                            if (door.LastVisualStateFingerprint != fingerprint)
+                            // 使用 DoorModel 中实际存在的 LastVisualFingerprint (Tuple)
+                            var newFingerprint = (res.HeaderId, res.ImageId, res.BottomId, 0, 0);
+                            if (door.LastVisualFingerprint != newFingerprint)
                             {
-                                door.LastVisualStateFingerprint = fingerprint;
+                                door.LastVisualFingerprint = newFingerprint;
                                 finalUpdates.Add((door, res));
                             }
                         }
@@ -1273,15 +1284,8 @@ namespace DoorMonitorSystem.Assets.Services
 
             // 核心修复：更新 IconItems 集合。
             // 对应空间库 DoorControl 的 Row 1 (中间区域) 绑定。
-            // 只放入 IconsMiddle 图层，解决多个槽位重叠导致的“错位/混乱”问题。
-            door.Visual.IconItems.Clear();
-            if (res.IconsMiddle != null)
-            {
-                foreach (var icon in res.IconsMiddle)
-                {
-                    door.Visual.IconItems.Add(icon);
-                }
-            }
+            // 只放入 IconsMiddle 图层，解决多个槽位重叠导致的"错位/混乱"问题。
+            door.Visual.IconItems = res.IconsMiddle ?? System.Linq.Enumerable.Empty<ControlLibrary.Models.IconItem>();
 
             door.Visual.HeaderText = door.DoorName; // 保持文字更新
         }
@@ -1336,6 +1340,22 @@ namespace DoorMonitorSystem.Assets.Services
                     LogHelper.Error("[LogOperation] Failed to write to DB", ex);
                 }
             });
+        }
+
+        #endregion
+
+        #region IDisposable
+
+        /// <summary>
+        /// 释放后台任务资源（取消 CancellationToken）
+        /// 应在 MainWindow.Closed 事件中调用
+        /// </summary>
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _backgroundCts.Cancel();
+            _backgroundCts.Dispose();
         }
 
         #endregion

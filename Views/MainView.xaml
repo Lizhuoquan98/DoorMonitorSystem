@@ -11,15 +11,16 @@
     xmlns:conv="clr-namespace:DoorMonitorSystem.Assets.Converter"
     mc:Ignorable="d"
     Tag="主界面"
-    UseLayoutRounding="True">
+    UseLayoutRounding="True"
+    TextOptions.TextFormattingMode="Display"
+    TextOptions.TextRenderingMode="ClearType">
 
 
 
     <UserControl.Resources>
         <!-- 工业级门展示模板：恢复空间库 (ControlLibrary) 的 DoorControl 模型 -->
         <DataTemplate x:Key="DoorTemplate" DataType="{x:Type models:DoorModel}">
-            <usc:DoorControl Width="54" Height="84" Margin="1,0" 
-                            ToolTip="{Binding DoorName}"
+            <usc:DoorControl Width="54" Height="84" Margin="1,0"
                             HeaderText="{Binding DoorName}"
                             HeaderBackground="{Binding Visual.HeaderBackground}"
                             BottomBackground="{Binding Visual.BottomBackground}"
@@ -30,30 +31,28 @@
 
         <!-- 门组模板：恢复 Viewbox 适配模型，确保全屏幕适配 -->
         <DataTemplate x:Key="DoorGroupTemplate" DataType="{x:Type models:DoorGroup}">
-            <Viewbox Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Left">
-                <ItemsControl ItemsSource="{Binding Doors}" Margin="4,2">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <StaticResource ResourceKey="DoorTemplate"/>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </Viewbox>
+            <ItemsControl ItemsSource="{Binding Doors}" Margin="4,2">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <StaticResource ResourceKey="DoorTemplate"/>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
         </DataTemplate>
 
         <!-- 面板点位模板 (恢复空间库 BitControl) -->
         <DataTemplate x:Key="PanelBitTemplate" DataType="{x:Type models:PanelBitConfig}">
-                <usc:BitControl Margin="0,0,10,0" 
+                <usc:BitControl Margin="2,1" 
                                 Value="{Binding BitValue}" 
                                 BITColor="{Binding ConfigColor}" 
                                 Text="{Binding Description}" 
                                 Foreground="White"
                                 Cursor="Hand">
                     <usc:BitControl.InputBindings>
-                        <MouseBinding MouseAction="LeftClick" Command="{Binding DataContext.ShowDetailCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"/>
+                        <MouseBinding MouseAction="LeftClick" Command="{Binding DataContext.OpenDoorDetailCommand, RelativeSource={RelativeSource AncestorType={x:Type local:MainView}}}" CommandParameter="{Binding}"/>
                     </usc:BitControl.InputBindings>
                 </usc:BitControl>
         </DataTemplate>
@@ -80,6 +79,7 @@
                     <!-- 点位内容 -->
                     <ItemsControl Grid.Row="1" ItemsSource="{Binding BitList}"
                                  ItemTemplate="{StaticResource PanelBitTemplate}"
+                                 VerticalAlignment="Top"
                                  Padding="8">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
@@ -102,9 +102,10 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <!-- 点位内容 -->
+                    <!-- 点位内容 (添加 VerticalAlignment="Top" 防止稀疏分布) -->
                     <ItemsControl Grid.Row="0" ItemsSource="{Binding BitList}"
                                  ItemTemplate="{StaticResource PanelBitTemplate}"
+                                 VerticalAlignment="Top"
                                  Padding="8">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
@@ -168,17 +169,26 @@
 
     <Grid>
         <!-- 主内容区 - 站台列表（全屏显示） -->
-        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="5,1"
-                     Background="Transparent">
-            <ItemsControl ItemsSource="{Binding Stations}"
-                          VirtualizingPanel.IsVirtualizing="True"
-                          VirtualizingPanel.VirtualizationMode="Recycling"
-                          ScrollViewer.CanContentScroll="True">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <VirtualizingStackPanel Orientation="Vertical"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
+        <!-- 优化：修复虚拟化逻辑。将 ScrollViewer 移入 ItemsControl 内部，确保 VirtualizingStackPanel 生效 -->
+        <ItemsControl ItemsSource="{Binding Stations}"
+                      VirtualizingPanel.IsVirtualizing="True"
+                      VirtualizingPanel.VirtualizationMode="Recycling"
+                      VirtualizingPanel.CacheLengthUnit="Item"
+                      VirtualizingPanel.CacheLength="2,2"
+                      ScrollViewer.CanContentScroll="True"
+                      ScrollViewer.VerticalScrollBarVisibility="Auto">
+            <ItemsControl.Template>
+                <ControlTemplate TargetType="ItemsControl">
+                    <ScrollViewer Focusable="False" Padding="{TemplateBinding Padding}">
+                        <ItemsPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                    </ScrollViewer>
+                </ControlTemplate>
+            </ItemsControl.Template>
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <VirtualizingStackPanel Orientation="Vertical"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
 
                 <!-- 单个站台模板（极简容器版） -->
                 <ItemsControl.ItemTemplate>
@@ -196,25 +206,19 @@
                                     </ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
                             </ItemsControl>
-                            
-                            <!-- 移除了会导致模糊的位图缓存 -->
                         </Border>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+        </ItemsControl>
 
         <!-- 门详情弹窗（优化版：Grid Overlay 替代 Popup） -->
-        <!-- 使用 Grid 覆盖层替代 Popup，配合 RenderTransform 实现 GPU 加速拖动 -->
-        <!-- 启用位图缓存 (BitmapCache) 以确保拖动时整个容器被视为一张纹理，消除重绘开销 -->
-        
-        <!-- 门详情弹窗（回退方案：静态居中显示，暂不支持拖动） -->
+        <!-- 优化：全屏遮罩背景，提升视觉焦点；点击背景可关闭弹窗 -->
         <Grid x:Name="OverlayContainer"
               Panel.ZIndex="1000"
-              HorizontalAlignment="Center"
-              VerticalAlignment="Center">
+              MouseLeftButtonDown="OverlayBackground_MouseLeftButtonDown">
             <Grid.Style>
                 <Style TargetType="Grid">
+                    <Setter Property="Background" Value="#99000000"/> <!-- 半透明暗化背景 -->
                     <Setter Property="Visibility" Value="Collapsed"/>
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding IsPopupOpen}" Value="True">
@@ -224,14 +228,26 @@
                 </Style>
             </Grid.Style>
 
+            <!-- 拖动快照层（仅拖动时可见） -->
+            <Image x:Name="PopupDragSnapshot"
+                   Panel.ZIndex="1001"
+                   Visibility="Collapsed"
+                   IsHitTestVisible="False"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Stretch="Fill"/>
+
             <!-- 主弹窗边框 -->
             <Border x:Name="PopupBorder" CornerRadius="12" MaxWidth="1200" MaxHeight="650"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
                    Background="#1a1f2e" BorderBrush="#3a6f9f" BorderThickness="2">
                 <Border.RenderTransform>
                     <TranslateTransform x:Name="PopupTranslateTransform"/>
                 </Border.RenderTransform>
-                <!-- 注意：我们将 CacheMode 移动到不会频繁变化的组件上，或者完全移除它以换取拖动灵敏度 -->
-                <!-- 如果拖动发飘，请优先检查是否因为频繁更新导致 Cache 失效 -->
+                <!-- 优化：添加阴影效果，增强层级感 -->
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="30" ShadowDepth="0" Opacity="0.7" Color="Black"/>
+                </Border.Effect>
 
                 
                     <Grid>
@@ -242,11 +258,12 @@
                         </Grid.RowDefinitions>
 
                         <!-- 标题栏（可拖动区域） -->
-                        <Border Grid.Row="0" CornerRadius="15,15,0,0"
-                                Padding="20,15"
+                        <Border Grid.Row="0" CornerRadius="15,15,0,0" 
                                 MouseLeftButtonDown="Header_MouseLeftButtonDown"
+                                MouseMove="Header_MouseMove"
                                 MouseLeftButtonUp="Header_MouseLeftButtonUp"
-                                MouseMove="Header_MouseMove">
+                                Cursor="SizeAll"
+                                Padding="20,15">
                             <Border.Background>
                                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
                                     <GradientStop Color="#1e3a5f" Offset="0"/>
@@ -375,6 +392,7 @@
 
                                                 <!-- 点位列表 -->
                                                 <ItemsControl ItemsSource="{Binding Bits}"
+                                                              VerticalAlignment="Top"
                                                               Padding="10">
                                                     <ItemsControl.ItemsPanel>
                                                         <ItemsPanelTemplate>
@@ -384,14 +402,15 @@
                                                     </ItemsControl.ItemsPanel>
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate>
-                                                            <Border CornerRadius="4" Background="#FF1E2430" BorderBrush="#33FFFFFF" BorderThickness="1" Margin="3,2">
-                                                                <usc:BitControl Margin="8,4" Height="30"
-                                                                               Value="{Binding BitValue}"
-                                                                               BITColor="{Binding ConfigColor}"
-                                                                               Text="{Binding Description}"
-                                                                               FontSize="14"
-                                                                               Foreground="White"/>
-                                                            </Border>
+                                                            <usc:BitControl Margin="1,2" Padding="4,2" MinHeight="26"
+                                                                           Background="#FF1E2430" 
+                                                                           BorderBrush="#33FFFFFF" 
+                                                                           BorderThickness="1"
+                                                                           Value="{Binding BitValue}"
+                                                                           BITColor="{Binding ConfigColor}"
+                                                                           Text="{Binding Description}"
+                                                                           FontSize="14"
+                                                                           Foreground="White"/>
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>
                                                 </ItemsControl>

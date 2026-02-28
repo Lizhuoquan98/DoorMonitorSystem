@@ -1,21 +1,16 @@
 ﻿using Base;
 using ControlLibrary.Models;
 using DoorMonitorSystem.Base;
-using Google.Protobuf.Compiler;
 using Microsoft.Win32;
-using MySqlX.XDevAPI;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
-using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Media3D;
 using DoorMonitorSystem.Assets.Helper;
 using DoorMonitorSystem.Models.system;
 

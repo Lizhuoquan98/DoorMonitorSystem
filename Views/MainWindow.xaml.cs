@@ -1,6 +1,8 @@
 ﻿using DoorMonitorSystem.Assets.Services;
 using System;
 using System.Windows;
+using DoorMonitorSystem.Assets.Helper;
+using System.Windows.Threading;
 
 namespace DoorMonitorSystem.Views
 {
@@ -66,19 +68,27 @@ namespace DoorMonitorSystem.Views
                 Console.WriteLine($"Error settings window location: {ex.Message}");
             }
 
+            if (PerformanceHelper.IsLowGraphicsMode)
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    PerformanceHelper.ApplyLowGraphicsMode(this);
+                }), DispatcherPriority.Background);
+            }
+
             _ = _commService.StartAsync();
         }
 
         /// <summary>
         /// 窗口关闭时触发
-        /// 释放通讯服务资源
+        /// 释放通讯服务资源和后台任务
         /// </summary>
         private void MainWindow_Closed(object? sender, EventArgs e)
         {
             _commService?.Dispose();
+            // 取消 DataManager 中的后台批量更新循环和日志清理调度器
+            DataManager.Instance.Dispose();
         }
+
     }
 }
-
-
-

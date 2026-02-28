@@ -187,8 +187,8 @@ namespace DoorMonitorSystem.ViewModels
             });
 
             // 4. 启动自动刷新定时器 (提升至 200ms 一次，确保 1Hz 变化的源数据不跳帧)
-            _refreshTimer = new System.Windows.Threading.DispatcherTimer();
-            _refreshTimer.Interval = TimeSpan.FromMilliseconds(200);
+            _refreshTimer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Background);
+            _refreshTimer.Interval = TimeSpan.FromMilliseconds(500);
             _refreshTimer.Tick += (s, e) => RefreshRealtimeData();
             _refreshTimer.Start();
 

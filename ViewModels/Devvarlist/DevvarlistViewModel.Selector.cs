@@ -30,11 +30,11 @@ namespace DoorMonitorSystem.ViewModels
         /// </summary>
         public ObservableCollection<UiSelectorNode> SelectorTree { get; set; } = new ObservableCollection<UiSelectorNode>();
 
-        private UiSelectorNode _selectedTreeNode;
+        private UiSelectorNode? _selectedTreeNode;
         /// <summary>
         /// 用户在树形结构中当前选中的节点。
         /// </summary>
-        public UiSelectorNode SelectedTreeNode
+        public UiSelectorNode? SelectedTreeNode
         {
             get => _selectedTreeNode;
             set { _selectedTreeNode = value; OnPropertyChanged(); }

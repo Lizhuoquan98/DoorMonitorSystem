@@ -22,7 +22,7 @@
     <PackageReference Include="Dapper" Version="2.1.66" />
     <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.135" />
     <PackageReference Include="MiniExcel" Version="1.42.0" />
-    <PackageReference Include="MySql.Data" Version="9.3.0" />
+    <PackageReference Include="MySql.Data" Version="8.0.33" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Sharp7" Version="1.1.84" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="7.0.0" />
@@ -55,3 +55,4 @@
   </ItemGroup>
 
 </Project>
+

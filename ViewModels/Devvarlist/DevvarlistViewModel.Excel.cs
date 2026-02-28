@@ -95,7 +95,7 @@ namespace DoorMonitorSystem.ViewModels
         /// 从 Excel 文件批量导入点位配置到当前设备。
         /// 包含事务处理以确保数据完整性，并支持根据地址自动判断新增或更新。
         /// </summary>
-        private async void ImportPoints()
+        private void ImportPoints()
         {
             if (SelectedDevice == null)
             {
@@ -148,14 +148,14 @@ namespace DoorMonitorSystem.ViewModels
                     }
 
                     // 用于高性能解析的辅助方法
-                    Func<IDictionary<string, object>, string, int, object> GetVal = (row, k, idx) => 
+                    Func<IDictionary<string, object>, string, int, object?> GetVal = (row, k, idx) => 
                     {
                         if (row.ContainsKey(k) && row[k] != null && !(row[k] is DBNull)) return row[k];
                         // 备选方案：如果列名没对上，尝试按位置拿（但危险，仅作为最后保底）
                         return row.Values.ElementAtOrDefault(idx);
                     };
                     
-                    Func<object, int, int?> ParseInt = (val, def) => 
+                    Func<object?, int, int?> ParseInt = (val, def) => 
                     {
                         if (val == null || val is DBNull || string.IsNullOrWhiteSpace(val.ToString())) return def;
                         string s = val.ToString();
@@ -163,7 +163,7 @@ namespace DoorMonitorSystem.ViewModels
                         return def;
                     };
 
-                    Func<object, double?> ParseDouble = (val) => 
+                    Func<object?, double?> ParseDouble = (val) => 
                     {
                         if (val == null || val is DBNull || string.IsNullOrWhiteSpace(val.ToString())) return null;
                         if (double.TryParse(val.ToString(), out double d)) return d;
@@ -173,7 +173,7 @@ namespace DoorMonitorSystem.ViewModels
                     Func<int?, int?, bool> IntEquals = (i1, i2) => (i1 ?? 0) == (i2 ?? 0);
                     Func<double?, double?, bool> DoubleEquals = (d1, d2) => Math.Abs((d1 ?? 0) - (d2 ?? 0)) < 0.0001;
 
-                    Func<string, string, bool> StringEquals = (s1, s2) => 
+                    Func<string?, string?, bool> StringEquals = (s1, s2) => 
                     {
                         return string.Equals(s1 ?? "", s2 ?? "", StringComparison.Ordinal);
                     };
@@ -206,7 +206,7 @@ namespace DoorMonitorSystem.ViewModels
                                 if (excelId == -1) excelId = null;
 
                                 // 查找现有记录
-                                DevicePointConfigEntity existing = null;
+                                DevicePointConfigEntity? existing = null;
                                 
                                 // 策略 A：ID 优先匹配 (最准确)
                                 if (excelId.HasValue && dictById.TryGetValue(excelId.Value, out var pById)) 

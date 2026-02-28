@@ -9,7 +9,7 @@ namespace DoorMonitorSystem.Views
 {
     public partial class LoginWindow : Window
     {
-        public UserEntity LoggedInUser { get; private set; }
+        public UserEntity? LoggedInUser { get; private set; }
 
         public LoginWindow()
         {

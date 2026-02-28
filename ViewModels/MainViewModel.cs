@@ -14,6 +14,7 @@ using System.Windows.Input;
 using System.Collections.Generic;
 using System.Windows.Media;
 using System.ComponentModel;
+using System.Windows.Threading;
 using ControlLibrary.Models;
 
 namespace DoorMonitorSystem.ViewModels
@@ -23,7 +24,7 @@ namespace DoorMonitorSystem.ViewModels
     /// 管理所有站台 (Stations)、门详情 (SelectedDoor) 以及弹窗逻辑。
     /// 这里的业务逻辑尽量下沉到 DataManager，保持 VM 轻量化。
     /// </summary>
-    public class MainViewModel : NotifyPropertyChanged
+    public class MainViewModel : NotifyPropertyChanged, IDisposable
     {
         #region Fields (字段)
 
@@ -32,6 +33,13 @@ namespace DoorMonitorSystem.ViewModels
         private string _popupTitle = "";
         private DoorModel? _selectedDoor;
         private ObservableCollection<CategoryGroup> _categoryGroups = new();
+        private readonly DispatcherTimer _aggregateUpdateTimer;
+        private int _aggregateUpdatePending = 0;
+        private bool _disposed = false;
+
+        // 缓存字段：避免每次 UI 绑定读取时重建集合（防止频繁 GC 压力）
+        private ObservableCollection<DoorBitConfig> _alarmBitsCache = new();
+        private ObservableCollection<DoorBitConfig> _statusBitsCache = new();
 
         #endregion
 
@@ -49,7 +57,16 @@ namespace DoorMonitorSystem.ViewModels
         public bool IsPopupOpen
         {
             get => _isPopupOpen;
-            set { _isPopupOpen = value; OnPropertyChanged(); }
+            set
+            {
+                if (_isPopupOpen == value) return;
+                _isPopupOpen = value;
+
+                // 弹窗关闭时，主界面仅需要门聚合视觉，禁用门点位逐条通知以降低 CPU。
+                DoorBitConfig.SuppressBitValueNotifications = !value;
+
+                OnPropertyChanged();
+            }
         }
 
         /// <summary>
@@ -104,38 +121,14 @@ namespace DoorMonitorSystem.ViewModels
         }
 
         /// <summary>
-        /// 报警类别的点位集合 (兼容旧UI绑定)
+        /// 报警类别的点位集合 (兼容旧UI绑定) — 缓存版，仅在门切换时刷新
         /// </summary>
-        public ObservableCollection<DoorBitConfig> AlarmBits
-        {
-            get
-            {
-                if (SelectedDoor == null) return new();
-
-                return new ObservableCollection<DoorBitConfig>(
-                    SelectedDoor.Bits
-                        .Where(b => b.Category != null && b.Category.Code == "Alarm")
-                        .OrderBy(b => b.SortOrder)
-                );
-            }
-        }
+        public ObservableCollection<DoorBitConfig> AlarmBits => _alarmBitsCache;
 
         /// <summary>
-        /// 状态类别的点位集合 (兼容旧UI绑定)
+        /// 状态类别的点位集合 (兼容旧UI绑定) — 缓存版，仅在门切换时刷新
         /// </summary>
-        public ObservableCollection<DoorBitConfig> StatusBits
-        {
-            get
-            {
-                if (SelectedDoor == null) return new();
-
-                return new ObservableCollection<DoorBitConfig>(
-                    SelectedDoor.Bits
-                        .Where(b => b.Category != null && b.Category.Code == "Status")
-                        .OrderBy(b => b.SortOrder)
-                );
-            }
-        }
+        public ObservableCollection<DoorBitConfig> StatusBits => _statusBitsCache;
 
         /// <summary>
         /// 当前激活的报警数量 (红色徽标计数)
@@ -192,6 +185,17 @@ namespace DoorMonitorSystem.ViewModels
 
         public MainViewModel()
         {
+            _aggregateUpdateTimer = new DispatcherTimer(DispatcherPriority.Background)
+            {
+                Interval = TimeSpan.FromMilliseconds(200)
+            };
+            _aggregateUpdateTimer.Tick += (_, __) =>
+            {
+                _aggregateUpdateTimer.Stop();
+                System.Threading.Interlocked.Exchange(ref _aggregateUpdatePending, 0);
+                RaiseAggregateProperties();
+            };
+
             // 将当前实例注册到全局，以便通讯服务更新 UI
             GlobalData.MainVm = this;
 
@@ -228,16 +232,29 @@ namespace DoorMonitorSystem.ViewModels
         /// </summary>
         private void NotifyAggregateProperties()
         {
-            // 使用 SafeInvoke 确保 UI 线程安全 (虽然 NotifyPropertyChanged 通常会自动 marshal，但聚合计算最好明确)
-            SafeInvoke(() => 
+            if (System.Threading.Interlocked.Exchange(ref _aggregateUpdatePending, 1) == 1)
             {
-                OnPropertyChanged(nameof(ActiveAlarmCount));
-                OnPropertyChanged(nameof(ActiveStatusCount));
-                OnPropertyChanged(nameof(AlarmBits));
-                OnPropertyChanged(nameof(StatusBits));
-                // CategoryGroups 内部集合元素变化不需要通知 CategoryGroups 本身，但如果在这里重新分组则需要
-                // 目前是只更新数字，CategoryGroups 结构不变
+                return; // 已有待处理更新，避免高频刷 UI
+            }
+
+            // 使用 SafeInvoke 确保 UI 线程安全 (虽然 NotifyPropertyChanged 通常会自动 marshal，但聚合计算最好明确)
+            SafeInvoke(() =>
+            {
+                if (!_aggregateUpdateTimer.IsEnabled)
+                {
+                    _aggregateUpdateTimer.Start();
+                }
             });
+        }
+
+        private void RaiseAggregateProperties()
+        {
+            OnPropertyChanged(nameof(ActiveAlarmCount));
+            OnPropertyChanged(nameof(ActiveStatusCount));
+            OnPropertyChanged(nameof(AlarmBits)); // Notify that the content of the cached collection might have changed
+            OnPropertyChanged(nameof(StatusBits)); // Notify that the content of the cached collection might have changed
+            // CategoryGroups 内部集合元素变化不需要通知 CategoryGroups 本身，但如果在这里重新分组则需要
+            // 目前是只更新数字，CategoryGroups 结构不变
         }
 
         /// <summary>
@@ -249,6 +266,8 @@ namespace DoorMonitorSystem.ViewModels
             if (SelectedDoor == null)
             {
                 CategoryGroups = new();
+                _alarmBitsCache.Clear();
+                _statusBitsCache.Clear();
                 return;
             }
 
@@ -289,6 +308,19 @@ namespace DoorMonitorSystem.ViewModels
             }
 
             CategoryGroups = new ObservableCollection<CategoryGroup>(list);
+
+            // 更新缓存的 AlarmBits 和 StatusBits
+            _alarmBitsCache.Clear();
+            foreach (var bit in SelectedDoor.Bits.Where(b => b.Category != null && b.Category.Code == "Alarm").OrderBy(b => b.SortOrder))
+            {
+                _alarmBitsCache.Add(bit);
+            }
+
+            _statusBitsCache.Clear();
+            foreach (var bit in SelectedDoor.Bits.Where(b => b.Category != null && b.Category.Code == "Status").OrderBy(b => b.SortOrder))
+            {
+                _statusBitsCache.Add(bit);
+            }
         }
 
         /// <summary>
@@ -380,10 +412,22 @@ namespace DoorMonitorSystem.ViewModels
         }
 
         /// <summary>
-        /// 释放资源
+        /// 释放资源（IDisposable 实现）
         /// </summary>
         public void Dispose()
         {
+            if (_disposed) return;
+            _disposed = true;
+
+            // 清理当前门的事件订阅，防止悬挂引用
+            if (_selectedDoor != null)
+            {
+                foreach (var b in _selectedDoor.Bits)
+                    b.PropertyChanged -= Bit_PropertyChanged;
+                _selectedDoor = null;
+            }
+
+            _aggregateUpdateTimer?.Stop();
             _updateLoopTokenSource?.Cancel();
             _updateLoopTokenSource?.Dispose();
         }

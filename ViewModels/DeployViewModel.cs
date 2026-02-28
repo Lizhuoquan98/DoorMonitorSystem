@@ -340,17 +340,32 @@ namespace DoorMonitorSystem.ViewModels
                 {
                     // Deep Clone to avoid modifying global state directly until Save
                     // 简单的序列化克隆，防止直接引用修改
-                    var json = JsonSerializer.Serialize(GlobalData.ListDveices);
-                    var list = JsonSerializer.Deserialize<List<ConfigEntity>>(json);
-                    
-                    if (list != null)
+                    try
                     {
+                        var json = JsonSerializer.Serialize(GlobalData.ListDveices);
+                        var list = JsonSerializer.Deserialize<List<ConfigEntity>>(json);
+                        
+                        if (list != null)
+                        {
+                            Devices = new ObservableCollection<ConfigEntity>(list);
+                            SelectedDevice = Devices.FirstOrDefault();
+                            if (Devices.Any())
+                            {
+                                SelectedDeviceIndex = 0;
+                            }
+                        }
+                    }
+                    catch (System.Text.Json.JsonException jsonEx)
+                    {
+                        LogHelper.Error($"[DeployViewModel] 深拷贝序列化失败，退回浅拷贝策略: {jsonEx.Message}");
+                        var list = new List<ConfigEntity>();
+                        foreach (var item in GlobalData.ListDveices)
+                        {
+                             // 此时使用我们此前可能自定义实现的深/浅克隆(如果你有实现 ConfigEntity.Clone 方法可用)
+                             list.Add(item.Clone()); 
+                        }
                         Devices = new ObservableCollection<ConfigEntity>(list);
                         SelectedDevice = Devices.FirstOrDefault();
-                        if (Devices.Any())
-                        {
-                            SelectedDeviceIndex = 0;
-                        }
                     }
                 }
             }
@@ -394,6 +409,9 @@ namespace DoorMonitorSystem.ViewModels
                     // 1. 清空旧数据 (先删子表 Param，再删主表 Device)
                     db.ExecuteNonQuery("DELETE FROM SysDeviceParamEntity");
                     db.ExecuteNonQuery("DELETE FROM SysDeviceEntity");
+
+                    // Ensure the table schema allows the long JSON
+                    try { db.ExecuteNonQuery("ALTER TABLE `SysDeviceEntity` MODIFY COLUMN `TimeSyncJson` VARCHAR(2000);"); } catch { }
 
                     // 2. 插入新数据
                     foreach (var dev in Devices)
